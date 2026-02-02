@@ -4,16 +4,16 @@
     android:height="80dp"
     android:viewportWidth="80"
     android:viewportHeight="80">
-  <!-- Círculo exterior (verde) -->
+  <!-- Círculo exterior (verde brillante) -->
   <path
-      android:fillColor="#FF4CAF50"
+      android:fillColor="#FF69F0AE"
       android:pathData="M40,40m-36,0a36,36 0,1 1,72 0a36,36 0,1 1,-72 0"/>
-  <!-- Círculo interior (blanco) -->
+  <!-- Círculo interior (oscuro) -->
   <path
-      android:fillColor="#FFFFFFFF"
+      android:fillColor="#FF1A1A1A"
       android:pathData="M40,40m-26,0a26,26 0,1 1,52 0a26,26 0,1 1,-52 0"/>
-  <!-- Auto simplificado grande (verde) -->
+  <!-- Auto simplificado grande (verde brillante) -->
   <path
-      android:fillColor="#FF4CAF50"
+      android:fillColor="#FF69F0AE"
       android:pathData="M54.84,32.02C54.64,31.42 54.08,31 53.42,31h-26.84c-0.66,0 -1.21,0.42 -1.42,1.01L23,40v14c0,0.55 0.45,1 1,1h3c0.55,0 1,-0.45 1,-1v-1h16v1c0,0.55 0.45,1 1,1h3c0.55,0 1,-0.45 1,-1v-14l-2.16,-7.98zM28.42,47c-1.1,0 -2,-0.9 -2,-2s0.9,-2 2,-2 2,0.9 2,2 -0.9,2 -2,2zM47.42,47c-1.1,0 -2,-0.9 -2,-2s0.9,-2 2,-2 2,0.9 2,2 -0.9,2 -2,2zM26,40l2,-6h20l2,6H26z"/>
 </vector>

@@ -11,7 +11,6 @@ import kotlinx.coroutines.launch
 
 class AutosAplicacion : Application() {
 
-    // Un CoroutineScope para toda la aplicación
     private val applicationScope = CoroutineScope(Dispatchers.IO)
 
     private val database by lazy { AppDatabase.getDatabase(this) }
@@ -26,7 +25,6 @@ class AutosAplicacion : Application() {
     override fun onCreate() {
         super.onCreate()
         instance = this
-        // Lanzamos la inicialización en un hilo secundario
         applicationScope.launch {
             repository
         }

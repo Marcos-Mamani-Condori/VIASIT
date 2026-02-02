@@ -28,7 +28,7 @@ object RetrofitClient {
             val url = if (isEmulator) {
                 "http://10.0.2.2:8090/"
             } else {
-                "http://192.168.1.14:8090/"
+                "http://192.168.1.17:8090/"
             }
             return url
         }
