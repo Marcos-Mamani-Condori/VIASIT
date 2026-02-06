@@ -2,29 +2,45 @@ package com.oficial.viasit.model
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
-import com.google.gson.annotations.SerializedName
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
+@Serializable
 @Entity(tableName = "autos")
 data class Auto(
     @PrimaryKey
-    @SerializedName("id")
+    @SerialName("id")
     val id: String = "",
 
-    @SerializedName("placa")
+    @SerialName("placa")
     val placa: String = "",
 
-    @SerializedName("linea")
+    @SerialName("linea")
     val linea: String = "",
 
-    @SerializedName("lat")
+    @SerialName("lat")
     val lat: Double = 0.0,
 
-    @SerializedName("lng")
+    @SerialName("lng")
     val lng: Double = 0.0,
 
-    @SerializedName("angulo")
-    val angulo: Float = 0f,
+    @SerialName("angulo")
+    val angulo: Double = 0.0,
 
-    @SerializedName("updated")
-    val updated: String = ""
+    @SerialName("colectivoid")
+    val colectivoid: String = "",
+
+    @SerialName("created")
+    val created: String = "",
+
+    @SerialName("updated")
+    val updated: String = "",
+
+    @SerialName("collectionId")
+    val collectionId: String = "",
+
+    @SerialName("collectionName")
+    val collectionName: String = "autos"
 )
+
+

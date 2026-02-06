@@ -8,32 +8,48 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.oficial.viasit.AutosAplicacion
 import com.oficial.viasit.data.AutoRepository
 import com.oficial.viasit.model.Auto
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+/**
+ * ViewModel con soporte Realtime de PocketBase
+ * Los datos se actualizan automáticamente cuando hay cambios en el servidor
+ */
 class AutosViewModel(private val repository: AutoRepository) : ViewModel() {
 
+    // Flow de autos desde PocketBase Realtime
     val autosUiState: StateFlow<List<Auto>> = repository.autos
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
 
+    // Inicializar suscripción realtime
     init {
-        iniciarActualizacionAutomatica()
+        viewModelScope.launch {
+            repository.startRealtimeSubscription()
+        }
     }
 
-    private fun iniciarActualizacionAutomatica() {
+    /**
+     * Forzar refresh manual de datos
+     */
+    fun refresh() {
         viewModelScope.launch {
-            while (true) {
-                repository.refreshAutos()
-                delay(10000)
-            }
+            repository.refreshAutos()
         }
+    }
+
+    /**
+     * Sincronizar con caché local (para uso offline)
+     */
+    fun syncWithCache() {
+        viewModelScope.launch {
+            repository.syncWithLocalCache()
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        // Detener polling al destruir ViewModel
+        repository.stopRealtimeSubscription()
     }
 
     companion object {

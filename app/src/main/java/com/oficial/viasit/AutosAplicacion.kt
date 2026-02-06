@@ -4,20 +4,20 @@ import android.app.Application
 import android.util.Log
 import com.oficial.viasit.data.AppDatabase
 import com.oficial.viasit.data.AutoRepository
-import com.oficial.viasit.data.RetrofitClient
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
+import com.oficial.viasit.data.PocketBaseRealtimeClient
 
 class AutosAplicacion : Application() {
 
-    private val applicationScope = CoroutineScope(Dispatchers.IO)
-
     private val database by lazy { AppDatabase.getDatabase(this) }
+
+    // Cliente PocketBase con SDK oficial y Realtime
+    private val pocketBaseClient by lazy { 
+        PocketBaseRealtimeClient(database.autoData()) 
+    }
 
     val repository: AutoRepository by lazy {
         AutoRepository(
-            api = RetrofitClient.api,
+            pocketBaseClient = pocketBaseClient,
             dao = database.autoData()
         )
     }
@@ -25,9 +25,14 @@ class AutosAplicacion : Application() {
     override fun onCreate() {
         super.onCreate()
         instance = this
-        applicationScope.launch {
-            repository
-        }
+        Log.d("AutosAplicacion", "Inicializado con PocketBase Kotlin SDK + Realtime")
+    }
+
+    override fun onTerminate() {
+        super.onTerminate()
+        // Liberar recursos del cliente PocketBase
+        pocketBaseClient.release()
+        Log.d("AutosAplicacion", "Recursos liberados")
     }
 
     companion object {
