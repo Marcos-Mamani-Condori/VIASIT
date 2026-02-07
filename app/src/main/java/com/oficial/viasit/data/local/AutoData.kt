@@ -1,9 +1,9 @@
-package com.oficial.viasit.data
+package com.oficial.viasit.data.local
 
 import androidx.room.Dao
 import androidx.room.Query
 import androidx.room.Upsert
-import com.oficial.viasit.model.Auto
+import com.oficial.viasit.domain.model.Auto
 import kotlinx.coroutines.flow.Flow
 
 @Dao

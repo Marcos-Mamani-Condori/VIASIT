@@ -1,7 +1,9 @@
-package com.oficial.viasit.data
+package com.oficial.viasit.data.repository
 
 import android.util.Log
-import com.oficial.viasit.model.Auto
+import com.oficial.viasit.domain.model.Auto
+import com.oficial.viasit.data.local.AutoData
+import com.oficial.viasit.data.remote.PocketBaseRealtimeClient
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 

@@ -1,13 +1,11 @@
+@file:OptIn(ExperimentalMaterial3Api::class)
+
 package com.oficial.viasit
 
 import android.Manifest
-import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.PointF
 import android.os.Bundle
-import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -20,9 +18,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.LocationOn
-
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -38,11 +34,12 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.google.android.gms.location.LocationServices
-import com.google.android.gms.location.Priority
-import com.oficial.viasit.model.Auto
-import com.oficial.viasit.viewmodels.AutosViewModel
+import com.oficial.viasit.domain.model.*
+import com.oficial.viasit.service.LocationTrackingService
+import com.oficial.viasit.ui.auth.AuthScreen
+import com.oficial.viasit.ui.map.AutosViewModel
 import com.oficial.viasit.ui.theme.VIASITTheme
+import com.oficial.viasit.viewmodels.AuthViewModel
 import org.maplibre.android.MapLibre
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
@@ -54,23 +51,22 @@ import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.layers.PropertyFactory
 import org.maplibre.android.style.layers.SymbolLayer
-import org.maplibre.android.style.layers.PropertyValue
-import org.maplibre.android.style.expressions.Expression
-import org.maplibre.android.style.expressions.Expression.*
 import org.maplibre.android.style.sources.GeoJsonSource
 import org.maplibre.geojson.Feature
 import org.maplibre.geojson.FeatureCollection
+import org.maplibre.geojson.GeoJson
 import org.maplibre.geojson.Point
+import org.maplibre.geojson.gson.GeometryGeoJson
+import com.google.gson.JsonObject
 
 class MainActivity : ComponentActivity() {
 
     private val requestPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted: Boolean ->
-        if (isGranted) {
-            recreate()
-        } else {
-            Toast.makeText(this, "La app necesita ubicación para funcionar correctamente", Toast.LENGTH_LONG).show()
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val allGranted = permissions.all { it.value }
+        if (!allGranted) {
+            Toast.makeText(this, "La app necesita ubicación para funcionar", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -78,27 +74,100 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         MapLibre.getInstance(this)
 
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+        if (!hasLocationPermission()) {
+            requestLocationPermission()
         }
 
         setContent {
             VIASITTheme {
-                MapScreen()
+                VIASITApp()
             }
         }
     }
+
+    private fun hasLocationPermission(): Boolean {
+        return ContextCompat.checkSelfPermission(
+            this, Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun requestLocationPermission() {
+        val permissions = mutableListOf(Manifest.permission.ACCESS_FINE_LOCATION)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            permissions.add(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        requestPermissionLauncher.launch(permissions.toTypedArray())
+    }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MapScreen() {
+fun VIASITApp() {
+    val authViewModel: AuthViewModel = viewModel(factory = AuthViewModel.Factory)
+    val authState by authViewModel.authState.collectAsState()
+    val context = LocalContext.current
+    
+    var showAuthScreen by remember { mutableStateOf(!authViewModel.isLoggedIn()) }
+    
+    LaunchedEffect(authState) {
+        showAuthScreen = authState is AuthState.Unauthenticated
+    }
+    
+    LaunchedEffect(authState) {
+        when (val state = authState) {
+            is AuthState.Authenticated -> {
+                // Servicio de ubicación deshabilitado por ahora
+                // val intent = Intent(context, LocationTrackingService::class.java).apply {
+                //     action = LocationTrackingService.ACTION_START
+                //     putExtra("userId", user.id)
+                //     putExtra("userName", user.name)
+                //     putExtra("userRole", user.role)
+                //     putExtra("isInService", user.isInService)
+                // }
+                // context.startForegroundService(intent)
+            }
+            is AuthState.Unauthenticated -> {
+                // Servicio de ubicación deshabilitado
+                // val intent = Intent(context, LocationTrackingService::class.java).apply {
+                //     action = LocationTrackingService.ACTION_STOP
+                // }
+                // context.startService(intent)
+            }
+            else -> {}
+        }
+    }
+    
+    if (showAuthScreen) {
+        AuthScreen(
+            onAuthSuccess = {
+                showAuthScreen = false
+            }
+        )
+    } else {
+        MainMapScreen(
+            authViewModel = authViewModel,
+            onLogout = {
+                authViewModel.logout()
+                showAuthScreen = true
+            }
+        )
+    }
+}
+@Composable
+fun MainMapScreen(
+    authViewModel: AuthViewModel,
+    onLogout: () -> Unit
+) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val viewModel: AutosViewModel = viewModel(factory = AutosViewModel.Factory)
-    val autos by viewModel.autosUiState.collectAsState()
-
+    val autosViewModel: AutosViewModel = viewModel(factory = AutosViewModel.Factory)
+    val autos by autosViewModel.autosUiState.collectAsState()
+    val authState by authViewModel.authState.collectAsState()
+    
     var mapInstance by remember { mutableStateOf<MapLibreMap?>(null) }
     var selectedCar by remember { mutableStateOf<Auto?>(null) }
+    
+    val currentUser = (authState as? AuthState.Authenticated)?.user
 
     val mapView = remember {
         MapView(context).apply {
@@ -149,41 +218,213 @@ fun MapScreen() {
     Box(modifier = Modifier.fillMaxSize()) {
         AndroidView({ mapView }, modifier = Modifier.fillMaxSize())
 
-        MapOverlayUI(
-            autos = autos,
-            selectedCar = selectedCar,
-            onFindClick = { mapInstance?.let { centerOnUser(it, context) } },
-            onCarSelected = { car ->
-                selectedCar = car
-                mapInstance?.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(car.lat, car.lng), 17.0), 1000)
+        TopAppBar(
+            title = {
+                Column {
+                    Text(
+                        "VIASIT",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Black,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    currentUser?.let { user ->
+                        Text(
+                            text = user.name,
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                        )
+                    }
+                }
             },
-            onCloseCarInfo = { selectedCar = null }
+            actions = {
+                // Controles de conductor deshabilitados
+                // if (currentUser?.userRole == UserRole.CONDUCTOR) {
+                //     IconButton(onClick = { showDriverControls = !showDriverControls }) {
+                //         Icon(
+                //             Icons.Default.DirectionsCar,
+                //             contentDescription = "Controles conductor",
+                //             tint = if (isInService) Color.Green else MaterialTheme.colorScheme.onSurface
+                //         )
+                //     }
+                // }
+                IconButton(onClick = onLogout) {
+                    Icon(Icons.Default.Logout, contentDescription = "Cerrar sesión")
+                }
+            },
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
+            ),
+            modifier = Modifier.align(Alignment.TopCenter)
         )
+
+        LargeFloatingActionButton(
+            onClick = { mapInstance?.let { centerOnUser(it, context) } },
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = 150.dp, end = 20.dp),
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = Color.White,
+            shape = CircleShape
+        ) {
+            Icon(Icons.Default.LocationOn, contentDescription = "Mi posición")
+        }
+
+        Box(modifier = Modifier.align(Alignment.BottomStart).padding(16.dp).fillMaxWidth(0.8f)) {
+            if (selectedCar != null) {
+                CarInfoCard(car = selectedCar!!, onClose = { selectedCar = null })
+            } else if (autos.isNotEmpty()) {
+                CarListSimple(autos = autos, onCarClick = { car ->
+                    selectedCar = car
+                    mapInstance?.animateCamera(
+                        CameraUpdateFactory.newLatLngZoom(LatLng(car.lat, car.lng), 17.0), 
+                        1000
+                    )
+                })
+            }
+        }
     }
 }
 
-private fun vectorToBitmap(context: Context, drawableId: Int): Bitmap? {
-    val drawable = ContextCompat.getDrawable(context, drawableId) ?: return null
-    
-    val bitmap = Bitmap.createBitmap(drawable.intrinsicWidth, drawable.intrinsicHeight, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
-    drawable.setBounds(0, 0, canvas.width, canvas.height)
-    drawable.draw(canvas)
-    return bitmap
+@Composable
+private fun DriverControlsCard(
+    isInService: Boolean,
+    onToggleService: (Boolean) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier.padding(horizontal = 16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer
+        ),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column {
+                Text(
+                    text = "Modo Conductor",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp
+                )
+                Text(
+                    text = if (isInService) "En servicio - Enviando ubicación" else "Fuera de servicio",
+                    fontSize = 12.sp,
+                    color = if (isInService) Color.Green else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                )
+            }
+            
+            Switch(
+                checked = isInService,
+                onCheckedChange = onToggleService,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = Color.Green,
+                    checkedTrackColor = Color.Green.copy(alpha = 0.5f)
+                )
+            )
+        }
+    }
 }
 
-private fun addCarIconToStyle(style: Style, context: Context) {
-    try {
-        val carIcon = vectorToBitmap(context, R.drawable.ic_car_icon)
-        if (carIcon != null) style.addImage("car-icon", carIcon)
-    } catch (e: Exception) { Log.e("MapSetup", "Error icono: ${e.message}") }
+@Composable
+fun CarListSimple(autos: List<Auto>, onCarClick: (Auto) -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
+        ),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(
+                text = "${autos.size} vehículos activos",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            LazyColumn(
+                modifier = Modifier.heightIn(max = 150.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                items(autos.take(5)) { auto ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onCarClick(auto) }
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.DirectionsCar,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = auto.placa,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
 
-private fun updateCarIcon(style: Style, context: Context) {
-    try {
-        val carIcon = vectorToBitmap(context, R.drawable.ic_car_icon)
-        if (carIcon != null) style.addImage("car-icon", carIcon, true)
-    } catch (e: Exception) { Log.e("MapSetup", "Error actualizar icono: ${e.message}") }
+@Composable
+fun CarInfoCard(car: Auto, onClose: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
+        ),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = car.placa,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                IconButton(onClick = onClose) {
+                    Icon(Icons.Default.Close, contentDescription = "Cerrar")
+                }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Línea: ${car.linea}",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Text(
+                text = "ID: ${car.id}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+            )
+        }
+    }
+}
+
+private fun addCarIconToStyle(style: Style, context: android.content.Context) {
+    val drawable = ContextCompat.getDrawable(context, R.drawable.ic_car_icon)
+    if (drawable != null) {
+        val bitmap = android.graphics.Bitmap.createBitmap(
+            drawable.intrinsicWidth, 
+            drawable.intrinsicHeight, 
+            android.graphics.Bitmap.Config.ARGB_8888
+        )
+        val canvas = android.graphics.Canvas(bitmap)
+        drawable.setBounds(0, 0, canvas.width, canvas.height)
+        drawable.draw(canvas)
+        style.addImage("car-icon", bitmap)
+    }
 }
 
 private fun addCarsLayer(style: Style) {
@@ -196,12 +437,7 @@ private fun addCarsLayer(style: Style) {
             PropertyFactory.iconIgnorePlacement(false),
             PropertyFactory.iconAnchor("center"),
             PropertyFactory.iconRotate(
-                interpolate(
-                    linear(),
-                    get("angulo"),
-                    stop(0f, 0f),
-                    stop(360f, 360f)
-                )
+                org.maplibre.android.style.expressions.Expression.get("angulo")
             )
         )
         style.addLayer(symbolLayer)
@@ -211,189 +447,40 @@ private fun addCarsLayer(style: Style) {
 private fun updateCarsSource(style: Style, autos: List<Auto>) {
     val source = style.getSource("cars-source") as? GeoJsonSource ?: return
     val features = autos.map { auto ->
-        Feature.fromGeometry(Point.fromLngLat(auto.lng, auto.lat)).apply {
-            addStringProperty("placa", auto.placa)
-            addNumberProperty("angulo", auto.angulo.toDouble())
+        val properties = JsonObject().apply {
+            addProperty("placa", auto.placa)
+            addProperty("angulo", auto.angulo)
         }
+        Feature.fromGeometry(
+            Point.fromLngLat(auto.lng, auto.lat),
+            properties
+        )
     }
     source.setGeoJson(FeatureCollection.fromFeatures(features))
 }
 
-@Composable
-fun BoxScope.MapOverlayUI(
-    autos: List<Auto>,
-    selectedCar: Auto?,
-    onFindClick: () -> Unit,
-    onCarSelected: (Auto) -> Unit,
-    onCloseCarInfo: () -> Unit
-) {
-    Surface(
-        modifier = Modifier.align(Alignment.TopCenter).padding(top = 40.dp, start = 16.dp, end = 16.dp).fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
-        shape = RoundedCornerShape(30.dp),
-        shadowElevation = 8.dp
-    ) {
-        Row(
-            modifier = Modifier.padding(vertical = 16.dp, horizontal = 20.dp).fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                "VIASIT",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Black,
-                color = MaterialTheme.colorScheme.primary
-            )
-        }
-    }
-
-    LargeFloatingActionButton(
-        onClick = onFindClick,
-        modifier = Modifier.align(Alignment.TopEnd).padding(top = 100.dp, end = 20.dp),
-        containerColor = MaterialTheme.colorScheme.primary,
-        contentColor = Color.White,
-        shape = CircleShape
-    ) {
-        Icon(Icons.Default.LocationOn, contentDescription = "Mi posición")
-    }
-
-    Box(modifier = Modifier.align(Alignment.BottomStart).padding(16.dp).fillMaxWidth(0.8f)) {
-        if (selectedCar != null) {
-            CarInfoCard(car = selectedCar, onClose = onCloseCarInfo)
-        } else if (autos.isNotEmpty()) {
-            CarListSimple(autos = autos, onCarClick = onCarSelected)
+private fun centerOnUser(map: MapLibreMap, context: android.content.Context) {
+    if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) 
+        == PackageManager.PERMISSION_GRANTED) {
+        map.locationComponent.lastKnownLocation?.let { location ->
+            map.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(location.latitude, location.longitude), 16.0))
         }
     }
 }
 
-@Composable
-fun CarListSimple(autos: List<Auto>, onCarClick: (Auto) -> Unit) {
-    Surface(
-        modifier = Modifier.heightIn(max = 200.dp),
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
-        shadowElevation = 12.dp
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                "Unidades: ${autos.size}",
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
+private fun enableLocationComponent(style: Style, map: MapLibreMap, context: android.content.Context) {
+    try {
+        val locationComponent = map.locationComponent
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) 
+            == PackageManager.PERMISSION_GRANTED) {
+            locationComponent.activateLocationComponent(
+                LocationComponentActivationOptions.builder(context, style).build()
             )
-            Spacer(modifier = Modifier.height(8.dp))
-            LazyColumn {
-                items(autos) { auto ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onCarClick(auto) }
-                            .padding(vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(10.dp)
-                                .background(MaterialTheme.colorScheme.primary, CircleShape)
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(
-                            auto.placa,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                    if (auto != autos.last()) {
-                        HorizontalDivider(
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
-                            thickness = 1.dp
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun CarInfoCard(car: Auto, onClose: () -> Unit) {
-    Card(
-        shape = RoundedCornerShape(20.dp),
-        elevation = CardDefaults.cardElevation(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-    ) {
-        Column(modifier = Modifier.padding(20.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    "Detalle del Auto",
-                    fontWeight = FontWeight.Black,
-                    fontSize = 18.sp,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                IconButton(onClick = onClose, modifier = Modifier.size(24.dp)) {
-                    Icon(
-                        Icons.Default.Close,
-                        contentDescription = "Cerrar",
-                        tint = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                "Placa: ${car.placa}",
-                fontSize = 22.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                "Línea: ${car.linea}",
-                fontSize = 15.sp,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(
-                onClick = onClose,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text("Cerrar", fontSize = 16.sp)
-            }
-        }
-    }
-}
-
-private fun enableLocationComponent(style: Style, map: MapLibreMap, context: Context) {
-    if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-        try {
-            val locationComponent = map.locationComponent
-            locationComponent.activateLocationComponent(LocationComponentActivationOptions.builder(context, style).build())
             locationComponent.isLocationComponentEnabled = true
-            locationComponent.cameraMode = CameraMode.TRACKING
             locationComponent.renderMode = RenderMode.COMPASS
-        } catch (e: Exception) { Log.e("Map", "Error localizacion") }
-    }
-}
-
-private fun centerOnUser(map: MapLibreMap, context: Context) {
-    if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return
-    
-    val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
-    
-    fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
-        .addOnSuccessListener { location ->
-            if (location != null) {
-                val userPos = LatLng(location.latitude, location.longitude)
-                map.animateCamera(CameraUpdateFactory.newLatLngZoom(userPos, 16.0), 1000)
-            } else {
-                map.locationComponent.lastKnownLocation?.let { loc ->
-                    map.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(loc.latitude, loc.longitude), 16.0), 1000)
-                }
-            }
+            locationComponent.cameraMode = CameraMode.TRACKING
         }
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
 }

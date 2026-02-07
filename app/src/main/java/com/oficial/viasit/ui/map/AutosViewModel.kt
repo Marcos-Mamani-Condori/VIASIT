@@ -1,4 +1,4 @@
-package com.oficial.viasit.viewmodels
+package com.oficial.viasit.ui.map
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -6,9 +6,8 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.oficial.viasit.AutosAplicacion
-import com.oficial.viasit.data.AutoRepository
-import com.oficial.viasit.model.Auto
-import kotlinx.coroutines.flow.SharingStarted
+import com.oficial.viasit.data.repository.AutoRepository
+import com.oficial.viasit.domain.model.Auto
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 

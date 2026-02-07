@@ -2,15 +2,15 @@ package com.oficial.viasit
 
 import android.app.Application
 import android.util.Log
-import com.oficial.viasit.data.AppDatabase
-import com.oficial.viasit.data.AutoRepository
-import com.oficial.viasit.data.PocketBaseRealtimeClient
+import com.oficial.viasit.data.local.AppDatabase
+import com.oficial.viasit.data.remote.PocketBaseRealtimeClient
+import com.oficial.viasit.data.repository.AutoRepository
+import com.oficial.viasit.data.repository.AuthRepository
 
 class AutosAplicacion : Application() {
 
     private val database by lazy { AppDatabase.getDatabase(this) }
 
-    // Cliente PocketBase con SDK oficial y Realtime
     private val pocketBaseClient by lazy { 
         PocketBaseRealtimeClient(database.autoData()) 
     }
@@ -22,15 +22,18 @@ class AutosAplicacion : Application() {
         )
     }
 
+    val authRepository: AuthRepository by lazy {
+        AuthRepository(applicationContext)
+    }
+
     override fun onCreate() {
         super.onCreate()
         instance = this
-        Log.d("AutosAplicacion", "Inicializado con PocketBase Kotlin SDK + Realtime")
+        Log.d("AutosAplicacion", "Inicializado")
     }
 
     override fun onTerminate() {
         super.onTerminate()
-        // Liberar recursos del cliente PocketBase
         pocketBaseClient.release()
         Log.d("AutosAplicacion", "Recursos liberados")
     }

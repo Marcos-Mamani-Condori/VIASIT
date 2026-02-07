@@ -1,8 +1,9 @@
-package com.oficial.viasit.data
+package com.oficial.viasit.data.remote
 
 import android.util.Log
 import com.oficial.viasit.BuildConfig
-import com.oficial.viasit.model.Auto
+import com.oficial.viasit.domain.model.Auto
+import com.oficial.viasit.data.local.AutoData
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.serialization.Serializable

@@ -1,6 +1,6 @@
 package com.oficial.viasit
 
-import com.oficial.viasit.model.Auto
+import com.oficial.viasit.domain.model.Auto
 import org.junit.Assert.*
 import org.junit.Test
 

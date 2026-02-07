@@ -1,4 +1,4 @@
-package com.oficial.viasit.model
+package com.oficial.viasit.domain.model
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
