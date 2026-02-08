@@ -76,7 +76,7 @@ class AuthViewModel(private val authRepository: AuthRepository) : ViewModel() {
 
     fun enterAsGuest() { authRepository.enterAsGuest() }
     fun logout() { authRepository.logout() }
-    fun toggleInService(isInService: Boolean) { authRepository.toggleInService(isInService) }
+    fun setInService(isInService: Boolean) { authRepository.setInService(isInService) }
     fun isLoggedIn(): Boolean = authRepository.isLoggedIn()
     fun isGuest(): Boolean = authRepository.isGuestMode()
     fun isDriver(): Boolean = authRepository.isDriver()

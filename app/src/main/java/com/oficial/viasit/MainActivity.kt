@@ -39,6 +39,9 @@ import com.oficial.viasit.service.LocationTrackingService
 import com.oficial.viasit.ui.auth.AuthScreen
 import com.oficial.viasit.ui.map.AutosViewModel
 import com.oficial.viasit.ui.theme.VIASITTheme
+import com.oficial.viasit.ui.vehicle.DriverDashboardScreen
+import com.oficial.viasit.ui.vehicle.RegisterVehicleScreen
+import com.oficial.viasit.ui.vehicle.DriverWelcomeScreen
 import com.oficial.viasit.viewmodels.AuthViewModel
 import org.maplibre.android.MapLibre
 import org.maplibre.android.camera.CameraUpdateFactory
@@ -54,11 +57,16 @@ import org.maplibre.android.style.layers.SymbolLayer
 import org.maplibre.android.style.sources.GeoJsonSource
 import org.maplibre.geojson.Feature
 import org.maplibre.geojson.FeatureCollection
-import org.maplibre.geojson.GeoJson
 import org.maplibre.geojson.Point
-import org.maplibre.geojson.gson.GeometryGeoJson
 import com.google.gson.JsonObject
 
+// Estados de navegación
+sealed class Screen {
+    data object Auth : Screen()
+    data object Map : Screen()
+    data object DriverDashboard : Screen()
+    data object DriverVehicleRegistration : Screen()
+}
 class MainActivity : ComponentActivity() {
 
     private val requestPermissionLauncher = registerForActivityResult(
@@ -106,53 +114,217 @@ fun VIASITApp() {
     val authViewModel: AuthViewModel = viewModel(factory = AuthViewModel.Factory)
     val authState by authViewModel.authState.collectAsState()
     val context = LocalContext.current
+
+    // Estados de navegación
+    var currentScreen by remember { mutableStateOf<Screen>(Screen.Auth) }
     
-    var showAuthScreen by remember { mutableStateOf(!authViewModel.isLoggedIn()) }
-    
-    LaunchedEffect(authState) {
-        showAuthScreen = authState is AuthState.Unauthenticated
+    // Verificación inicial del estado de autenticación
+    LaunchedEffect(Unit) {
+        // Verificar inmediatamente si hay una sesión activa
+        val currentState = authViewModel.authState.value
+        android.util.Log.d("VIASIT", "VIASITApp inicializado - estado: ${currentState.javaClass.simpleName}")
+        if (currentState is AuthState.Authenticated) {
+            val role = currentState.user.role
+            android.util.Log.d("VIASIT", "Usuario autenticado - role: $role")
+            val isDriver = role.lowercase() == "conductor"
+            android.util.Log.d("VIASIT", "Es conductor: $isDriver")
+            currentScreen = if (isDriver) Screen.DriverDashboard else Screen.Map
+        } else {
+            android.util.Log.d("VIASIT", "No autenticado - mostrando AuthScreen")
+            currentScreen = Screen.Auth
+        }
     }
-    
+
     LaunchedEffect(authState) {
         when (val state = authState) {
             is AuthState.Authenticated -> {
-                // Servicio de ubicación deshabilitado por ahora
-                // val intent = Intent(context, LocationTrackingService::class.java).apply {
-                //     action = LocationTrackingService.ACTION_START
-                //     putExtra("userId", user.id)
-                //     putExtra("userName", user.name)
-                //     putExtra("userRole", user.role)
-                //     putExtra("isInService", user.isInService)
-                // }
-                // context.startForegroundService(intent)
+                val role = state.user.role
+                android.util.Log.d("VIASIT", "authState cambiado a Authenticated - role: $role")
+                val isDriver = role.lowercase() == "conductor"
+                android.util.Log.d("VIASIT", "Es conductor: $isDriver")
+                currentScreen = if (isDriver) Screen.DriverDashboard else Screen.Map
             }
             is AuthState.Unauthenticated -> {
-                // Servicio de ubicación deshabilitado
-                // val intent = Intent(context, LocationTrackingService::class.java).apply {
-                //     action = LocationTrackingService.ACTION_STOP
-                // }
-                // context.startService(intent)
+                currentScreen = Screen.Auth
             }
             else -> {}
         }
     }
+
+    when (currentScreen) {
+        Screen.Auth -> {
+            AuthScreen(
+                onAuthSuccess = {
+                    // La navegación se maneja automáticamente por LaunchedEffect(authState)
+                    // que verifica el rol del usuario
+                }
+            )
+        }
+        Screen.Map -> {
+            MainMapScreen(
+                authViewModel = authViewModel,
+                onLogout = {
+                    authViewModel.logout()
+                    currentScreen = Screen.Auth
+                }
+            )
+        }
+        Screen.DriverDashboard -> {
+            DriverDashboardHandler(
+                authViewModel = authViewModel,
+                onNavigateToMap = {
+                    currentScreen = Screen.Map
+                },
+                onNavigateToRegisterVehicle = {
+                    currentScreen = Screen.DriverVehicleRegistration
+                },
+                onLogout = {
+                    authViewModel.logout()
+                    currentScreen = Screen.Auth
+                },
+                onVehicleNotFound = {
+                    // Si no tiene vehículo, ir directamente a registrar
+                    currentScreen = Screen.DriverVehicleRegistration
+                }
+            )
+        }
+        Screen.DriverVehicleRegistration -> {
+            DriverVehicleRegistrationScreen(
+                authViewModel = authViewModel,
+                onVehicleRegistered = {
+                    // Después de registrar, ir al dashboard
+                    currentScreen = Screen.DriverDashboard
+                },
+                onBackToDashboard = {
+                    currentScreen = Screen.DriverDashboard
+                }
+            )
+        }
+    }
+}
+
+@Composable
+fun DriverDashboardHandler(
+    authViewModel: AuthViewModel,
+    onNavigateToMap: () -> Unit,
+    onNavigateToRegisterVehicle: () -> Unit,
+    onLogout: () -> Unit,
+    onVehicleNotFound: () -> Unit
+) {
+    val authState by authViewModel.authState.collectAsState()
+    val autosViewModel: AutosViewModel = viewModel(factory = AutosViewModel.Factory)
     
-    if (showAuthScreen) {
-        AuthScreen(
-            onAuthSuccess = {
-                showAuthScreen = false
+    val currentUser = (authState as? AuthState.Authenticated)?.user
+    var vehicles by remember { mutableStateOf<List<Auto>>(emptyList()) }
+    var selectedVehicleId by remember { mutableStateOf<String?>(null) }
+    var isLoading by remember { mutableStateOf(true) }
+    var isInService by remember { mutableStateOf(false) }
+
+    // Cargar vehículos del conductor
+    LaunchedEffect(currentUser) {
+        if (currentUser != null && currentUser.role.lowercase() == "conductor") {
+            autosViewModel.getDriverAuto(currentUser.id) { auto ->
+                if (auto != null) {
+                    // Agregar a la lista si no existe
+                    if (vehicles.none { it.id == auto.id }) {
+                        vehicles = vehicles + auto
+                    }
+                    // Si no hay vehículo seleccionado, seleccionar este
+                    if (selectedVehicleId == null) {
+                        selectedVehicleId = auto.id
+                    }
+                }
+                isLoading = false
+                // Si no tiene ningún vehículo, ir directamente a registrar
+                if (vehicles.isEmpty()) {
+                    onVehicleNotFound()
+                }
             }
-        )
+            // También suscribirse a todos los cambios de autos para detectar vehículos del conductor
+            autosViewModel.startRealtimeSubscription()
+        } else {
+            isLoading = false
+        }
+    }
+
+    // Observar cambios en la lista de autos para detectar vehículos del conductor
+    val autos by autosViewModel.autosUiState.collectAsState()
+    LaunchedEffect(autos) {
+        if (currentUser != null) {
+            // Filtrar autos que pertenecen a este conductor
+            val driverAutos = autos.filter { auto -> 
+                auto.userId.contains(currentUser.id)
+            }
+            if (driverAutos.isNotEmpty()) {
+                vehicles = driverAutos
+                // Si no hay vehículo seleccionado, seleccionar el primero
+                if (selectedVehicleId == null && driverAutos.isNotEmpty()) {
+                    selectedVehicleId = driverAutos[0].id
+                }
+            }
+        }
+    }
+
+    if (isLoading) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator()
+        }
     } else {
-        MainMapScreen(
+        DriverDashboardScreen(
             authViewModel = authViewModel,
-            onLogout = {
-                authViewModel.logout()
-                showAuthScreen = true
-            }
+            vehicles = vehicles,
+            selectedVehicleId = selectedVehicleId,
+            isInService = isInService,
+            onToggleInService = { enabled ->
+                isInService = enabled
+                if (enabled && selectedVehicleId != null) {
+                    // Iniciar servicio de tracking con el vehículo seleccionado
+                    authViewModel.setInService(true)
+                } else {
+                    // Detener servicio de tracking
+                    authViewModel.setInService(false)
+                }
+            },
+            onSelectVehicle = { vehicle ->
+                selectedVehicleId = vehicle.id
+                // Si está en servicio, reiniciar con el nuevo vehículo
+                if (isInService) {
+                    authViewModel.setInService(false)
+                    authViewModel.setInService(true)
+                }
+            },
+            onNavigateToRegisterVehicle = onNavigateToRegisterVehicle,
+            onNavigateToMap = onNavigateToMap,
+            onNavigateToManageVehicle = onNavigateToRegisterVehicle,
+            onLogout = onLogout
         )
     }
 }
+
+/**
+ * Pantalla de registro de vehículo para conductores
+ */
+@Composable
+fun DriverVehicleRegistrationScreen(
+    authViewModel: AuthViewModel,
+    onVehicleRegistered: () -> Unit,
+    onBackToDashboard: () -> Unit
+) {
+    val autosViewModel: AutosViewModel = viewModel(factory = AutosViewModel.Factory)
+    
+    RegisterVehicleScreen(
+        authViewModel = authViewModel,
+        autosViewModel = autosViewModel,
+        onVehicleRegistered = onVehicleRegistered,
+        onGoToMap = onVehicleRegistered,
+        onBack = onBackToDashboard
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainMapScreen(
     authViewModel: AuthViewModel,
@@ -163,10 +335,10 @@ fun MainMapScreen(
     val autosViewModel: AutosViewModel = viewModel(factory = AutosViewModel.Factory)
     val autos by autosViewModel.autosUiState.collectAsState()
     val authState by authViewModel.authState.collectAsState()
-    
+
     var mapInstance by remember { mutableStateOf<MapLibreMap?>(null) }
     var selectedCar by remember { mutableStateOf<Auto?>(null) }
-    
+
     val currentUser = (authState as? AuthState.Authenticated)?.user
 
     val mapView = remember {
@@ -179,7 +351,7 @@ fun MainMapScreen(
                     updateCarsSource(style, autos)
                     enableLocationComponent(style, map, context)
                 }
-                
+
                 map.addOnMapClickListener { latLng ->
                     val screenPoint = map.projection.toScreenLocation(latLng)
                     val features = map.queryRenderedFeatures(screenPoint, "cars-layer")
@@ -237,16 +409,6 @@ fun MainMapScreen(
                 }
             },
             actions = {
-                // Controles de conductor deshabilitados
-                // if (currentUser?.userRole == UserRole.CONDUCTOR) {
-                //     IconButton(onClick = { showDriverControls = !showDriverControls }) {
-                //         Icon(
-                //             Icons.Default.DirectionsCar,
-                //             contentDescription = "Controles conductor",
-                //             tint = if (isInService) Color.Green else MaterialTheme.colorScheme.onSurface
-                //         )
-                //     }
-                // }
                 IconButton(onClick = onLogout) {
                     Icon(Icons.Default.Logout, contentDescription = "Cerrar sesión")
                 }
@@ -276,7 +438,7 @@ fun MainMapScreen(
                 CarListSimple(autos = autos, onCarClick = { car ->
                     selectedCar = car
                     mapInstance?.animateCamera(
-                        CameraUpdateFactory.newLatLngZoom(LatLng(car.lat, car.lng), 17.0), 
+                        CameraUpdateFactory.newLatLngZoom(LatLng(car.lat, car.lng), 17.0),
                         1000
                     )
                 })
@@ -315,7 +477,7 @@ private fun DriverControlsCard(
                     color = if (isInService) Color.Green else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                 )
             }
-            
+
             Switch(
                 checked = isInService,
                 onCheckedChange = onToggleService,
@@ -416,8 +578,8 @@ private fun addCarIconToStyle(style: Style, context: android.content.Context) {
     val drawable = ContextCompat.getDrawable(context, R.drawable.ic_car_icon)
     if (drawable != null) {
         val bitmap = android.graphics.Bitmap.createBitmap(
-            drawable.intrinsicWidth, 
-            drawable.intrinsicHeight, 
+            drawable.intrinsicWidth,
+            drawable.intrinsicHeight,
             android.graphics.Bitmap.Config.ARGB_8888
         )
         val canvas = android.graphics.Canvas(bitmap)
@@ -460,7 +622,7 @@ private fun updateCarsSource(style: Style, autos: List<Auto>) {
 }
 
 private fun centerOnUser(map: MapLibreMap, context: android.content.Context) {
-    if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) 
+    if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
         == PackageManager.PERMISSION_GRANTED) {
         map.locationComponent.lastKnownLocation?.let { location ->
             map.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(location.latitude, location.longitude), 16.0))
@@ -471,7 +633,7 @@ private fun centerOnUser(map: MapLibreMap, context: android.content.Context) {
 private fun enableLocationComponent(style: Style, map: MapLibreMap, context: android.content.Context) {
     try {
         val locationComponent = map.locationComponent
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) 
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
             == PackageManager.PERMISSION_GRANTED) {
             locationComponent.activateLocationComponent(
                 LocationComponentActivationOptions.builder(context, style).build()

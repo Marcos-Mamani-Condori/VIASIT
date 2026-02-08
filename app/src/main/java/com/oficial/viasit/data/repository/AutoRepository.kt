@@ -2,6 +2,7 @@ package com.oficial.viasit.data.repository
 
 import android.util.Log
 import com.oficial.viasit.domain.model.Auto
+import com.oficial.viasit.data.local.AutoEntity
 import com.oficial.viasit.data.local.AutoData
 import com.oficial.viasit.data.remote.PocketBaseRealtimeClient
 import kotlinx.coroutines.flow.StateFlow
@@ -53,5 +54,40 @@ class AutoRepository(
             Log.d(TAG, "Cargando ${cachedAutos.size} autos desde caché local")
         }
     }
-}
 
+    /**
+     * Registrar un nuevo auto
+     */
+    suspend fun registerAuto(
+        userId: String,
+        placa: String,
+        linea: String
+    ): Result<Auto> {
+        return pocketBaseClient.registerAuto(
+            userId = userId,
+            placa = placa,
+            linea = linea,
+            lat = 0.0,
+            lng = 0.0
+        )
+    }
+
+    /**
+     * Obtener el auto de un conductor específico
+     */
+    suspend fun getAutoByUserId(userId: String): Result<Auto?> {
+        return pocketBaseClient.getAutoByUserId(userId)
+    }
+
+    /**
+     * Actualizar ubicación del auto
+     */
+    suspend fun updateAutoLocation(
+        autoId: String,
+        lat: Double,
+        lng: Double,
+        angulo: Double
+    ): Result<Auto> {
+        return pocketBaseClient.updateAutoLocation(autoId, lat, lng, angulo)
+    }
+}

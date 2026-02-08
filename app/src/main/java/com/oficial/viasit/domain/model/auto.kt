@@ -1,16 +1,21 @@
 package com.oficial.viasit.domain.model
 
-import androidx.room.Entity
-import androidx.room.PrimaryKey
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
+/**
+ * Modelo de datos para vehículos (Auto)
+ * Usado para comunicación con PocketBase
+ * Room tiene su propia entidad en AutoData.kt (AutoEntity)
+ */
 @Serializable
-@Entity(tableName = "autos")
 data class Auto(
-    @PrimaryKey
     @SerialName("id")
     val id: String = "",
+
+    // Campo para PocketBase - relación múltiple como array
+    @SerialName("userid")
+    val userId: List<String> = emptyList(),
 
     @SerialName("placa")
     val placa: String = "",
@@ -37,10 +42,5 @@ data class Auto(
     val updated: String = "",
 
     @SerialName("collectionId")
-    val collectionId: String = "",
-
-    @SerialName("collectionName")
-    val collectionName: String = "autos"
+    val collectionId: String = ""
 )
-
-

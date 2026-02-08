@@ -23,15 +23,18 @@ class AuthRepository(context: Context) {
         return withContext(Dispatchers.IO) {
             _authState.value = AuthState.Loading
 
+            android.util.Log.d("AuthRepository", "login() llamado con: $email")
             val result = pocketBaseAuth.login(email, password)
 
             result.fold(
                 onSuccess = { user ->
+                    android.util.Log.d("AuthRepository", "login onSuccess - user: ${user.email}, role: ${user.role}")
                     saveUser(user, isGuest = false)
                     _authState.value = AuthState.Authenticated(user)
                     Result.success(user)
                 },
                 onFailure = { error ->
+                    android.util.Log.d("AuthRepository", "login onFailure - ${error.message}")
                     _authState.value = AuthState.Error(error.message ?: "Error login")
                     Result.failure(error)
                 }
@@ -85,7 +88,7 @@ class AuthRepository(context: Context) {
         _authState.value = AuthState.Unauthenticated
     }
 
-    fun toggleInService(isInService: Boolean) {
+    fun setInService(isInService: Boolean) {
         val current = getCurrentUser()
         current?.let {
             val updated = it.copy(isInService = isInService)
@@ -109,9 +112,11 @@ class AuthRepository(context: Context) {
     fun isInService(): Boolean = prefs.getBoolean("isInService", false)
 
     fun restoreSession() {
+        val user = getCurrentUser()
+        android.util.Log.d("AuthRepository", "restoreSession - isLoggedIn: ${isLoggedIn()}, isGuest: ${isGuestMode()}, user: ${user?.email}, role: ${user?.role}")
         when {
-            isGuestMode() -> _authState.value = AuthState.Authenticated(getCurrentUser()!!)
-            isLoggedIn() -> _authState.value = AuthState.Authenticated(getCurrentUser()!!)
+            isGuestMode() -> _authState.value = AuthState.Authenticated(user!!)
+            isLoggedIn() -> _authState.value = AuthState.Authenticated(user!!)
         }
     }
 

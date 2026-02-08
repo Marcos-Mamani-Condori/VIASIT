@@ -23,7 +23,7 @@ data class User(
     @SerialName("email")
     val email: String = "",
     
-    @SerialName("name")
+    @SerialName("username")
     val name: String = "",
     
     @SerialName("role")
@@ -147,7 +147,7 @@ data class RegisterRequest(
     @SerialName("passwordConfirm")
     val passwordConfirm: String,
     
-    @SerialName("name")
+    @SerialName("username")
     val name: String,
     
     @SerialName("phone")

@@ -6,6 +6,7 @@ import com.oficial.viasit.domain.model.User
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.json.Json
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
@@ -56,18 +57,27 @@ class PocketBaseAuthClient {
 
                 if (response.isSuccessful) {
                     val body = response.body?.string()
+                    android.util.Log.d("PocketBaseAuth", "Login response: $body")
                     val authResponse = json.decodeFromString<AuthResponse>(body ?: "")
                     authToken = authResponse.token
+                    
+                    // Convertir role de List<String> a String
+                    val roleString = if (authResponse.user.role.isNotEmpty()) {
+                        authResponse.user.role.first()
+                    } else {
+                        "USUARIO"
+                    }
+                    
                     val user = User(
                         id = authResponse.user.id,
                         email = authResponse.user.email,
                         name = authResponse.user.name,
                         phone = authResponse.user.phone,
-                        role = authResponse.user.role.firstOrNull() ?: "usuario",
+                        role = roleString,
                         isActive = true,
                         isInService = false
                     )
-                    Log.d(TAG, "Login exitoso: ${user.email}")
+                    Log.d(TAG, "Login exitoso: ${user.email}, role: ${user.role}")
                     Result.success(user)
                 } else {
                     val error = response.body?.string() ?: "Error desconocido"
@@ -115,12 +125,20 @@ class PocketBaseAuthClient {
                 if (response.isSuccessful) {
                     val body = response.body?.string()
                     val userResponse = json.decodeFromString<UserResponse>(body ?: "")
+                    
+                    // Convertir role de List<String> a String
+                    val roleString = if (userResponse.role.isNotEmpty()) {
+                        userResponse.role.first()
+                    } else {
+                        role
+                    }
+                    
                     val user = User(
                         id = userResponse.id,
                         email = userResponse.email,
                         name = userResponse.name,
                         phone = userResponse.phone,
-                        role = userResponse.role.firstOrNull() ?: role,
+                        role = roleString,
                         isActive = true,
                         isInService = false
                     )
@@ -157,12 +175,20 @@ class PocketBaseAuthClient {
                 if (response.isSuccessful) {
                     val body = response.body?.string()
                     val authResponse = json.decodeFromString<AuthResponse>(body ?: "")
+                    
+                    // Convertir role de List<String> a String
+                    val roleString = if (authResponse.user.role.isNotEmpty()) {
+                        authResponse.user.role.first()
+                    } else {
+                        "USUARIO"
+                    }
+                    
                     val user = User(
                         id = authResponse.user.id,
                         email = authResponse.user.email,
                         name = authResponse.user.name,
                         phone = authResponse.user.phone,
-                        role = authResponse.user.role.firstOrNull() ?: "usuario",
+                        role = roleString,
                         isActive = true,
                         isInService = false
                     )
@@ -198,7 +224,10 @@ class PocketBaseAuthClient {
  */
 @Serializable
 data class AuthResponse(
+    @SerialName("token")
     val token: String = "",
+    
+    @SerialName("record")
     val user: UserResponse = UserResponse()
 )
 
@@ -211,7 +240,7 @@ data class UserResponse(
     val email: String = "",
     val name: String = "",
     val phone: String = "",
-    val role: List<String> = emptyList(),
+    val role: List<String> = listOf("USUARIO"),  // PocketBase devuelve como array
     val created: String = "",
     val updated: String = ""
 )

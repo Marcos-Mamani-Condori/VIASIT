@@ -4,9 +4,9 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import com.oficial.viasit.domain.model.Auto
+import com.oficial.viasit.data.local.AutoEntity
 
-@Database(entities = [Auto::class], version = 2, exportSchema = false)
+@Database(entities = [AutoEntity::class], version = 3, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     
     abstract fun autoData(): AutoData
@@ -21,7 +21,7 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "viasit_database"
-                ).build()
+                ).fallbackToDestructiveMigration().build()
                 INSTANCE = instance
                 instance
             }

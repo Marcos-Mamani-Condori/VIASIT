@@ -4,11 +4,15 @@ import android.util.Log
 import com.oficial.viasit.BuildConfig
 import com.oficial.viasit.domain.model.Auto
 import com.oficial.viasit.data.local.AutoData
+import com.oficial.viasit.data.local.toAutos
+import com.oficial.viasit.data.local.toEntities
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import okhttp3.*
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.sse.EventSource
 import okhttp3.sse.EventSourceListener
 import okhttp3.sse.EventSources
@@ -244,8 +248,8 @@ class PocketBaseRealtimeClient(
         
         _autos.value = currentList
         
-        // Sincronizar con Room
-        autoDao?.insertOrUpdateAutos(currentList)
+        // Sincronizar con Room (convertir Auto a AutoEntity)
+        autoDao?.insertOrUpdateAutos(currentList.toEntities())
     }
 
     /**
@@ -295,8 +299,8 @@ class PocketBaseRealtimeClient(
                 val listResponse = json.decodeFromString<ListResponse>(body)
                 _autos.value = listResponse.items
                 
-                // Guardar en Room para caché offline
-                autoDao?.insertOrUpdateAutos(listResponse.items)
+                // Guardar en Room para caché offline (convertir Auto a AutoEntity)
+                autoDao?.insertOrUpdateAutos(listResponse.items.toEntities())
                 
                 Log.d(TAG, "Autos cargados: ${listResponse.items.size}")
             }
@@ -314,7 +318,8 @@ class PocketBaseRealtimeClient(
         try {
             autoDao?.getAllAutos()?.first()?.let { cachedAutos ->
                 if (cachedAutos.isNotEmpty()) {
-                    _autos.value = cachedAutos
+                    // Convertir AutoEntity a Auto
+                    _autos.value = cachedAutos.toAutos()
                     Log.d(TAG, "Datos cargados desde caché: ${cachedAutos.size} autos")
                 }
             }
@@ -324,4 +329,182 @@ class PocketBaseRealtimeClient(
     }
 
     fun isConnected(): Boolean = eventSource != null
+
+    /**
+     * Registrar un nuevo auto
+     */
+    suspend fun registerAuto(
+        userId: String,
+        placa: String,
+        linea: String,
+        lat: Double,
+        lng: Double
+    ): Result<Auto> {
+        return withContext(Dispatchers.IO) {
+            try {
+                val requestBody = """
+                    {
+                        "userid": ["$userId"],
+                        "placa": "$placa",
+                        "linea": "$linea",
+                        "lat": $lat,
+                        "lng": $lng,
+                        "angulo": 0
+                    }
+                """.trimIndent().toRequestBody("application/json".toMediaType())
+
+                val request = Request.Builder()
+                    .url("$BASE_URL/api/collections/$COLLECTION/records")
+                    .post(requestBody)
+                    .build()
+
+                val response = okHttpclient.newCall(request).execute()
+
+                if (response.isSuccessful) {
+                    val body = response.body?.string()
+                    val auto = json.decodeFromString<Auto>(body ?: "")
+                    Log.d(TAG, "Auto registrado: ${auto.placa}")
+                    Result.success(auto)
+                } else {
+                    val error = response.body?.string() ?: "Error desconocido"
+                    Log.e(TAG, "Error registerAuto: ${response.code} - $error")
+                    Result.failure(Exception("Error al registrar auto: ${response.code}"))
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error registerAuto", e)
+                Result.failure(e)
+            }
+        }
+    }
+
+    /**
+     * Obtener el auto de un conductor específico
+     */
+    suspend fun getAutoByUserId(userId: String): Result<Auto?> {
+        return withContext(Dispatchers.IO) {
+            try {
+                // Filtrar por userid (relación múltiple) - usar ?~ para "contains"
+                val url = "$BASE_URL/api/collections/$COLLECTION/records?perPage=1&filter=userid%3F~%20%27$userId%27"
+                Log.d(TAG, "getAutoByUserId URL: $url")
+
+                val request = Request.Builder()
+                    .url(url)
+                    .get()
+                    .build()
+
+                val response = okHttpclient.newCall(request).execute()
+
+                if (response.isSuccessful) {
+                    val body = response.body?.string()
+                    val listResponse = json.decodeFromString<ListResponse>(body ?: "")
+                    val auto = listResponse.items.firstOrNull()
+                    Log.d(TAG, "Auto del usuario $userId: ${auto?.placa ?: "no encontrado"}")
+                    Result.success(auto)
+                } else {
+                    val error = response.body?.string() ?: "Error desconocido"
+                    Log.e(TAG, "Error getAutoByUserId: ${response.code} - $error")
+                    Result.failure(Exception("Error al buscar auto: ${response.code}"))
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error getAutoByUserId", e)
+                Result.failure(e)
+            }
+        }
+    }
+
+    /**
+     * Actualizar ubicación del auto por ID
+     */
+    suspend fun updateAutoLocation(
+        autoId: String,
+        lat: Double,
+        lng: Double,
+        angulo: Double
+    ): Result<Auto> {
+        return withContext(Dispatchers.IO) {
+            try {
+                val requestBody = """
+                    {
+                        "lat": $lat,
+                        "lng": $lng,
+                        "angulo": $angulo
+                    }
+                """.trimIndent().toRequestBody("application/json".toMediaType())
+
+                val request = Request.Builder()
+                    .url("$BASE_URL/api/collections/$COLLECTION/records/$autoId")
+                    .patch(requestBody)
+                    .build()
+
+                val response = okHttpclient.newCall(request).execute()
+
+                if (response.isSuccessful) {
+                    val body = response.body?.string()
+                    val auto = json.decodeFromString<Auto>(body ?: "")
+                    Log.d(TAG, "Ubicación actualizada: ${auto.placa}")
+                    Result.success(auto)
+                } else {
+                    val error = response.body?.string() ?: "Error desconocido"
+                    Log.e(TAG, "Error updateAutoLocation: ${response.code} - $error")
+                    Result.failure(Exception("Error al actualizar ubicación: ${response.code}"))
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error updateAutoLocation", e)
+                Result.failure(e)
+            }
+        }
+    }
+
+    /**
+     * Actualizar ubicación del auto buscando por userId
+     * Este método es usado por LocationTrackingService
+     */
+    suspend fun updateAutoLocation(
+        userId: String,
+        lat: Double,
+        lng: Double,
+        angulo: Float,
+        velocidad: Float
+    ): Result<Unit> {
+        return withContext(Dispatchers.IO) {
+            try {
+                // Primero obtener el auto del usuario
+                val getResult = getAutoByUserId(userId)
+                val autoId = getResult.getOrNull()?.id
+                
+                if (autoId == null) {
+                    Log.w(TAG, "No se encontró auto para userId: $userId")
+                    return@withContext Result.failure(Exception("Auto no encontrado"))
+                }
+                
+                val requestBody = """
+                    {
+                        "lat": $lat,
+                        "lng": $lng,
+                        "angulo": $angulo,
+                        "velocidad": $velocidad
+                    }
+                """.trimIndent().toRequestBody("application/json".toMediaType())
+
+                val request = Request.Builder()
+                    .url("$BASE_URL/api/collections/$COLLECTION/records/$autoId")
+                    .patch(requestBody)
+                    .build()
+
+                val response = okHttpclient.newCall(request).execute()
+
+                if (response.isSuccessful) {
+                    Log.d(TAG, "Ubicación actualizada para userId $userId: ($lat, $lng)")
+                    Result.success(Unit)
+                } else {
+                    val error = response.body?.string() ?: "Error desconocido"
+                    Log.e(TAG, "Error updateAutoLocation: ${response.code} - $error")
+                    Result.failure(Exception("Error al actualizar ubicación: ${response.code}"))
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error updateAutoLocation", e)
+                Result.failure(e)
+            }
+        }
+    }
 }
