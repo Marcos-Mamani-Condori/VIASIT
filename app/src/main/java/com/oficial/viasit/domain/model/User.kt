@@ -5,15 +5,25 @@ import kotlinx.serialization.Serializable
 
 /**
  * User roles in the VIASIT application
+ * IMPORTANTE: Los valores deben coincidir exactamente con PocketBase schema
+ * Schema: maxSelect: 2, values: ["conductor", "usuario", "invitado", "ADMIN_PRINCIPAL", "ADMIN_LINEA"]
  */
 enum class UserRole {
-    INVITADO,   // Invitado - puede ver buses en el mapa
-    USUARIO,    // Usuario - puede enviar su ubicación
-    CONDUCTOR   // Conductor - puede activar "en servicio" y enviar ubicación
+    invitado,       // Invitado - puede ver buses en el mapa
+    usuario,        // Usuario - puede enviar su ubicación
+    conductor,      // Conductor - puede activar "en servicio" y enviar ubicación
+    ADMIN_LINEA,    // Admin de Línea - gestiona una línea específica
+    ADMIN_PRINCIPAL // Admin Principal - gestiona todas las líneas
 }
 
 /**
- * Domain model for authenticated users
+ * Modelo de datos para Usuarios
+ * Colección PocketBase: users (auth collection)
+ * 
+ * Schema:
+ * - phone: text
+ * - role: select (maxSelect: 2)
+ * - lineaId: relation a lineas (maxSelect: 1)
  */
 @Serializable
 data class User(
@@ -26,45 +36,63 @@ data class User(
     @SerialName("username")
     val name: String = "",
     
+    // PocketBase devuelve role como array con maxSelect: 2
     @SerialName("role")
-    val role: String = UserRole.USUARIO.name,
+    val role: List<String> = listOf(UserRole.usuario.name),
     
+    // Teléfono del usuario
     @SerialName("phone")
     val phone: String = "",
     
-    @SerialName("avatar")
-    val avatar: String = "",
-    
-    @SerialName("isInService")
-    val isInService: Boolean = false,
-    
-    @SerialName("isActive")
-    val isActive: Boolean = true,
+    // Línea asignada (relation a lineas) - para ADMIN_LINEA y conductores
+    // En PocketBase el campo se llama "lineaId"
+    @SerialName("lineaId")
+    val lineaId: String = "",
     
     @SerialName("created")
     val created: String = "",
     
     @SerialName("updated")
-    val updated: String = ""
+    val updated: String = "",
+    
+    @SerialName("collectionId")
+    val collectionId: String = "",
+    
+    @SerialName("collectionName")
+    val collectionName: String = "users"
 ) {
+    // Obtener el rol principal (primer elemento de la lista)
     val userRole: UserRole
         get() = try {
-            UserRole.valueOf(role)
+            if (role.isNotEmpty()) {
+                UserRole.valueOf(role.first())
+            } else {
+                UserRole.usuario
+            }
         } catch (e: Exception) {
-            UserRole.USUARIO
+            UserRole.usuario
         }
     
     val isDriver: Boolean
-        get() = userRole == UserRole.CONDUCTOR
+        get() = userRole == UserRole.conductor
     
     val isGuest: Boolean
-        get() = userRole == UserRole.INVITADO
+        get() = userRole == UserRole.invitado
     
     val canSendLocation: Boolean
-        get() = userRole == UserRole.USUARIO || userRole == UserRole.CONDUCTOR
+        get() = userRole == UserRole.usuario || userRole == UserRole.conductor
     
     val canToggleService: Boolean
-        get() = userRole == UserRole.CONDUCTOR
+        get() = userRole == UserRole.conductor
+    
+    val isAdmin: Boolean
+        get() = userRole == UserRole.ADMIN_LINEA || userRole == UserRole.ADMIN_PRINCIPAL
+    
+    val isAdminPrincipal: Boolean
+        get() = userRole == UserRole.ADMIN_PRINCIPAL
+    
+    val canManageLines: Boolean
+        get() = userRole == UserRole.ADMIN_PRINCIPAL
 }
 
 /**
@@ -106,7 +134,7 @@ data class UserLocation(
     val isInService: Boolean = false,
     
     @SerialName("userRole")
-    val userRole: String = UserRole.USUARIO.name
+    val userRole: String = UserRole.usuario.name
 )
 
 /**
@@ -154,7 +182,10 @@ data class RegisterRequest(
     val phone: String = "",
     
     @SerialName("role")
-    val role: String = "USUARIO"
+    val role: String = "usuario",
+    
+    @SerialName("invitationCode")
+    val invitationCode: String = ""
 )
 
 /**
@@ -167,4 +198,31 @@ data class AuthResponse(
     
     @SerialName("user")
     val user: User = User()
+)
+
+/**
+ * Admin registration request with invitation code
+ */
+@Serializable
+data class AdminRegisterRequest(
+    @SerialName("email")
+    val email: String,
+    
+    @SerialName("password")
+    val password: String,
+    
+    @SerialName("passwordConfirm")
+    val passwordConfirm: String,
+    
+    @SerialName("username")
+    val name: String,
+    
+    @SerialName("phone")
+    val phone: String = "",
+    
+    @SerialName("role")
+    val role: String = "ADMIN_LINEA",
+    
+    @SerialName("invitationCode")
+    val invitationCode: String
 )

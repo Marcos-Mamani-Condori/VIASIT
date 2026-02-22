@@ -81,7 +81,7 @@ class AutosViewModel(private val repository: AutoRepository) : ViewModel() {
             return
         }
         if (linea.isBlank()) {
-            _vehicleForm.update { it.copy(lineaError = "Línea requerida") }
+            _vehicleForm.update { it.copy(lineaError = "Codigo de invitacion requerido") }
             return
         }
 

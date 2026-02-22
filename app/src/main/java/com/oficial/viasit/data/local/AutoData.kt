@@ -8,13 +8,18 @@ import androidx.room.Upsert
 import com.oficial.viasit.domain.model.Auto
 import kotlinx.coroutines.flow.Flow
 
+/**
+ * Entidad Room para vehículos (Auto)
+ * NOTA: La línea del vehículo se obtiene del conductor (userId -> lineaId)
+ * No se almacena linea aquí para evitar redundancia.
+ */
 @Entity(tableName = "autos")
 data class AutoEntity(
     @PrimaryKey
     val id: String = "",
     val primaryUserId: String = "",
     val placa: String = "",
-    val linea: String = "",
+    val code: String = "",
     val lat: Double = 0.0,
     val lng: Double = 0.0,
     val angulo: Double = 0.0,
@@ -27,14 +32,14 @@ data class AutoEntity(
 
 /**
  * Convertir Auto (PocketBase) a AutoEntity (Room)
- * Toma el primer ID de usuario de la lista si existe
+ * userId ahora es un String (relación directa)
  */
 fun Auto.toEntity(): AutoEntity {
     return AutoEntity(
         id = this.id,
-        primaryUserId = this.userId.firstOrNull() ?: "",
+        primaryUserId = this.userId,
         placa = this.placa,
-        linea = this.linea,
+        code = this.code,
         lat = this.lat,
         lng = this.lng,
         angulo = this.angulo,
@@ -51,14 +56,14 @@ fun List<Auto>.toEntities(): List<AutoEntity> {
 
 /**
  * Convertir AutoEntity (Room) a Auto (PocketBase)
- * Crea un Auto con userId como lista con un solo elemento
+ * Crea un Auto con userId como String (relación directa)
  */
 fun AutoEntity.toAuto(): Auto {
     return Auto(
         id = this.id,
-        userId = if (this.primaryUserId.isNotEmpty()) listOf(this.primaryUserId) else emptyList(),
+        userId = this.primaryUserId,
         placa = this.placa,
-        linea = this.linea,
+        code = this.code,
         lat = this.lat,
         lng = this.lng,
         angulo = this.angulo,

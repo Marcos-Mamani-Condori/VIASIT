@@ -32,6 +32,7 @@ class AuthViewModel(private val authRepository: AuthRepository) : ViewModel() {
     fun updateRegisterName(name: String) { _registerForm.update { it.copy(name = name) } }
     fun updateRegisterPhone(phone: String) { _registerForm.update { it.copy(phone = phone) } }
     fun updateRegisterRole(role: String) { _registerForm.update { it.copy(role = role) } }
+    fun updateRegisterInvitationCode(code: String) { _registerForm.update { it.copy(invitationCode = code) } }
 
     fun login() {
         val form = _loginForm.value
@@ -61,7 +62,8 @@ class AuthViewModel(private val authRepository: AuthRepository) : ViewModel() {
                 passwordConfirm = form.confirmPassword,
                 name = form.name,
                 phone = form.phone,
-                role = form.role
+                role = form.role,
+                invitationCode = form.invitationCode
             ))
             result.fold(
                 onSuccess = { user ->
@@ -76,7 +78,8 @@ class AuthViewModel(private val authRepository: AuthRepository) : ViewModel() {
 
     fun enterAsGuest() { authRepository.enterAsGuest() }
     fun logout() { authRepository.logout() }
-    fun setInService(isInService: Boolean) { authRepository.setInService(isInService) }
+    fun setInService(isInService: Boolean, autoId: String = "") { authRepository.setInService(isInService, autoId) }
+    fun isInService(): Boolean = authRepository.isInService()
     fun isLoggedIn(): Boolean = authRepository.isLoggedIn()
     fun isGuest(): Boolean = authRepository.isGuestMode()
     fun isDriver(): Boolean = authRepository.isDriver()
@@ -100,10 +103,18 @@ class AuthViewModel(private val authRepository: AuthRepository) : ViewModel() {
             form.email.isBlank() -> { _registerForm.update { it.copy(emailError = "Email requerido") }; false }
             !emailRegex.matches(form.email) -> { _registerForm.update { it.copy(emailError = "Email invalido") }; false }
             form.password.isBlank() -> { _registerForm.update { it.copy(passwordError = "Contrasena requerida") }; false }
-            form.password.length < 6 -> { _registerForm.update { it.copy(passwordError = "Minimo 6 caracteres") }; false }
+            form.password.length < 8 -> { _registerForm.update { it.copy(passwordError = "Minimo 8 caracteres") }; false }
             form.confirmPassword != form.password -> { _registerForm.update { it.copy(confirmPasswordError = "No coinciden") }; false }
             form.name.isBlank() -> { _registerForm.update { it.copy(nameError = "Nombre requerido") }; false }
-            else -> { _registerForm.update { it.copy(emailError = null, passwordError = null, confirmPasswordError = null, nameError = null) }; true }
+            form.role == "conductor" && form.invitationCode.isBlank() -> {
+                _registerForm.update { it.copy(error = "Los conductores necesitan un código de invitación") }; false
+            }
+            else -> {
+                _registerForm.update {
+                    it.copy(emailError = null, passwordError = null, confirmPasswordError = null, nameError = null, error = null)
+                }
+                true
+            }
         }
     }
 
@@ -134,6 +145,7 @@ data class RegisterFormState(
     val name: String = "",
     val phone: String = "",
     val role: String = "usuario",
+    val invitationCode: String = "",
     val emailError: String? = null,
     val passwordError: String? = null,
     val confirmPasswordError: String? = null,

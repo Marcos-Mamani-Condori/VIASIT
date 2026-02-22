@@ -136,16 +136,16 @@ fun RegisterVehicleScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Campo línea
+                // Campo código de invitación
                 OutlinedTextField(
                     value = vehicleFormState.linea,
                     onValueChange = autosViewModel::updateLinea,
-                    label = { Text("Línea/Ruta") },
+                    label = { Text("Codigo de invitacion") },
                     leadingIcon = {
-                        Icon(Icons.Default.Route, contentDescription = null)
+                        Icon(Icons.Default.VpnKey, contentDescription = null)
                     },
                     isError = vehicleFormState.lineaError != null,
-                    supportingText = vehicleFormState.lineaError?.let { { Text(it) } },
+                    supportingText = vehicleFormState.lineaError?.let { { Text(it) } } ?: { Text("Codigo proporcionado por el admin de linea") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )

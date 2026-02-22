@@ -13,3 +13,11 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Archivos sensibles - NO SUBIR A GITHUB
+docs/
+*.keystore
+*.jks
+secrets.properties
+.env
+*.env

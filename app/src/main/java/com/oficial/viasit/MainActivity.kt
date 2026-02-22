@@ -43,6 +43,14 @@ import com.oficial.viasit.ui.vehicle.DriverDashboardScreen
 import com.oficial.viasit.ui.vehicle.RegisterVehicleScreen
 import com.oficial.viasit.ui.vehicle.DriverWelcomeScreen
 import com.oficial.viasit.viewmodels.AuthViewModel
+import com.oficial.viasit.ui.admin.AdminDashboardScreen
+import com.oficial.viasit.ui.admin.RegisterAdminScreen
+import com.oficial.viasit.ui.routes.RouteMapPickerScreen
+import com.oficial.viasit.ui.routes.RouteData
+import com.oficial.viasit.ui.routes.GeocodingService
+import com.oficial.viasit.ui.routes.SearchResult
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import org.maplibre.android.MapLibre
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
@@ -66,6 +74,9 @@ sealed class Screen {
     data object Map : Screen()
     data object DriverDashboard : Screen()
     data object DriverVehicleRegistration : Screen()
+    data object AdminDashboard : Screen()
+    data object RegisterAdmin : Screen()
+    data class RouteMapPicker(val lineaId: String, val lineaName: String) : Screen()
 }
 class MainActivity : ComponentActivity() {
 
@@ -120,15 +131,16 @@ fun VIASITApp() {
     
     // Verificación inicial del estado de autenticación
     LaunchedEffect(Unit) {
-        // Verificar inmediatamente si hay una sesión activa
         val currentState = authViewModel.authState.value
         android.util.Log.d("VIASIT", "VIASITApp inicializado - estado: ${currentState.javaClass.simpleName}")
         if (currentState is AuthState.Authenticated) {
-            val role = currentState.user.role
-            android.util.Log.d("VIASIT", "Usuario autenticado - role: $role")
-            val isDriver = role.lowercase() == "conductor"
-            android.util.Log.d("VIASIT", "Es conductor: $isDriver")
-            currentScreen = if (isDriver) Screen.DriverDashboard else Screen.Map
+            val userRole = currentState.user.userRole
+            android.util.Log.d("VIASIT", "Usuario autenticado - role: $userRole")
+            currentScreen = when (userRole) {
+                UserRole.conductor -> Screen.DriverDashboard
+                UserRole.ADMIN_PRINCIPAL, UserRole.ADMIN_LINEA -> Screen.AdminDashboard
+                else -> Screen.Map
+            }
         } else {
             android.util.Log.d("VIASIT", "No autenticado - mostrando AuthScreen")
             currentScreen = Screen.Auth
@@ -138,11 +150,13 @@ fun VIASITApp() {
     LaunchedEffect(authState) {
         when (val state = authState) {
             is AuthState.Authenticated -> {
-                val role = state.user.role
-                android.util.Log.d("VIASIT", "authState cambiado a Authenticated - role: $role")
-                val isDriver = role.lowercase() == "conductor"
-                android.util.Log.d("VIASIT", "Es conductor: $isDriver")
-                currentScreen = if (isDriver) Screen.DriverDashboard else Screen.Map
+                val userRole = state.user.userRole
+                android.util.Log.d("VIASIT", "authState cambiado a Authenticated - role: $userRole")
+                currentScreen = when (userRole) {
+                    UserRole.conductor -> Screen.DriverDashboard
+                    UserRole.ADMIN_PRINCIPAL, UserRole.ADMIN_LINEA -> Screen.AdminDashboard
+                    else -> Screen.Map
+                }
             }
             is AuthState.Unauthenticated -> {
                 currentScreen = Screen.Auth
@@ -157,6 +171,9 @@ fun VIASITApp() {
                 onAuthSuccess = {
                     // La navegación se maneja automáticamente por LaunchedEffect(authState)
                     // que verifica el rol del usuario
+                },
+                onRegisterAdmin = {
+                    currentScreen = Screen.RegisterAdmin
                 }
             )
         }
@@ -166,7 +183,11 @@ fun VIASITApp() {
                 onLogout = {
                     authViewModel.logout()
                     currentScreen = Screen.Auth
-                }
+                },
+                onBackToDashboard = if (authState is AuthState.Authenticated &&
+                    (authState as AuthState.Authenticated).user.userRole == UserRole.conductor) {
+                    { currentScreen = Screen.DriverDashboard }
+                } else null
             )
         }
         Screen.DriverDashboard -> {
@@ -200,6 +221,63 @@ fun VIASITApp() {
                 }
             )
         }
+        Screen.AdminDashboard -> {
+            val currentUser = (authState as? AuthState.Authenticated)?.user
+            if (currentUser != null && currentUser.isAdmin) {
+                AdminDashboardScreen(
+                    currentUser = currentUser,
+                    onLogout = {
+                        authViewModel.logout()
+                        currentScreen = Screen.Auth
+                    },
+                    onNavigateToRoutePicker = { lineaId, lineaName ->
+                        currentScreen = Screen.RouteMapPicker(lineaId, lineaName)
+                    }
+                )
+            } else {
+                // No tiene acceso, volver al mapa
+                currentScreen = Screen.Map
+            }
+        }
+        Screen.RegisterAdmin -> {
+            RegisterAdminScreen(
+                onRegisterSuccess = {
+                    // Después de registrar, ir al dashboard de admin
+                    currentScreen = Screen.AdminDashboard
+                },
+                onNavigateBack = {
+                    currentScreen = Screen.Auth
+                },
+                authState = authState
+            )
+        }
+        is Screen.RouteMapPicker -> {
+            val adminViewModel: com.oficial.viasit.viewmodels.AdminViewModel = viewModel()
+            val screen = currentScreen as Screen.RouteMapPicker
+            val currentUser = (authState as? AuthState.Authenticated)?.user
+            RouteMapPickerScreen(
+                lineaId = screen.lineaId,
+                lineaName = screen.lineaName,
+                onSaveRoute = { routeData ->
+                    // Create route with coordinates
+                    adminViewModel.createRutaWithCoords(
+                        name = routeData.name,
+                        description = routeData.description,
+                        startLat = routeData.startPoint?.lat ?: 0.0,
+                        startLng = routeData.startPoint?.lng ?: 0.0,
+                        endLat = routeData.endPoint?.lat ?: 0.0,
+                        endLng = routeData.endPoint?.lng ?: 0.0,
+                        lineaId = screen.lineaId,
+                        currentUserId = currentUser?.id ?: ""
+                    )
+                    // Go back to admin dashboard
+                    currentScreen = Screen.AdminDashboard
+                },
+                onBack = {
+                    currentScreen = Screen.AdminDashboard
+                }
+            )
+        }
     }
 }
 
@@ -214,15 +292,26 @@ fun DriverDashboardHandler(
     val authState by authViewModel.authState.collectAsState()
     val autosViewModel: AutosViewModel = viewModel(factory = AutosViewModel.Factory)
     
+    // Esperar a que el estado de autenticación esté disponible
+    var isAuthRestored by remember { mutableStateOf(false) }
+    
+    LaunchedEffect(authState) {
+        if (authState is AuthState.Authenticated) {
+            isAuthRestored = true
+        }
+    }
+    
     val currentUser = (authState as? AuthState.Authenticated)?.user
     var vehicles by remember { mutableStateOf<List<Auto>>(emptyList()) }
     var selectedVehicleId by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(true) }
-    var isInService by remember { mutableStateOf(false) }
+    
+    // El estado de servicio viene de SharedPreferences (local), no del modelo User
+    val isInService: Boolean = authViewModel.isInService()
 
     // Cargar vehículos del conductor
     LaunchedEffect(currentUser) {
-        if (currentUser != null && currentUser.role.lowercase() == "conductor") {
+        if (currentUser != null && currentUser.userRole == UserRole.conductor) {
             autosViewModel.getDriverAuto(currentUser.id) { auto ->
                 if (auto != null) {
                     // Agregar a la lista si no existe
@@ -265,7 +354,8 @@ fun DriverDashboardHandler(
         }
     }
 
-    if (isLoading) {
+    // Mostrar loading hasta que la autenticación esté restaurada
+    if (isLoading || !isAuthRestored || currentUser == null) {
         Box(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
@@ -279,21 +369,22 @@ fun DriverDashboardHandler(
             selectedVehicleId = selectedVehicleId,
             isInService = isInService,
             onToggleInService = { enabled ->
-                isInService = enabled
+                // isInService es solo lectura, viene del usuario
                 if (enabled && selectedVehicleId != null) {
                     // Iniciar servicio de tracking con el vehículo seleccionado
-                    authViewModel.setInService(true)
+                    authViewModel.setInService(true, selectedVehicleId!!)
                 } else {
                     // Detener servicio de tracking
                     authViewModel.setInService(false)
                 }
             },
             onSelectVehicle = { vehicle ->
+                val previousVehicleId = selectedVehicleId
                 selectedVehicleId = vehicle.id
                 // Si está en servicio, reiniciar con el nuevo vehículo
                 if (isInService) {
                     authViewModel.setInService(false)
-                    authViewModel.setInService(true)
+                    authViewModel.setInService(true, vehicle.id)
                 }
             },
             onNavigateToRegisterVehicle = onNavigateToRegisterVehicle,
@@ -328,18 +419,38 @@ fun DriverVehicleRegistrationScreen(
 @Composable
 fun MainMapScreen(
     authViewModel: AuthViewModel,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    onBackToDashboard: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val autosViewModel: AutosViewModel = viewModel(factory = AutosViewModel.Factory)
     val autos by autosViewModel.autosUiState.collectAsState()
     val authState by authViewModel.authState.collectAsState()
+    val scope = rememberCoroutineScope()
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
 
     var mapInstance by remember { mutableStateOf<MapLibreMap?>(null) }
     var selectedCar by remember { mutableStateOf<Auto?>(null) }
+    
+    // Search state
+    val geocodingService = remember { GeocodingService() }
+    var searchQuery by remember { mutableStateOf("") }
+    var searchResults by remember { mutableStateOf<List<SearchResult>>(emptyList()) }
+    var isSearching by remember { mutableStateOf(false) }
+    var showSearchResults by remember { mutableStateOf(false) }
+    var searchJob by remember { mutableStateOf<Job?>(null) }
 
     val currentUser = (authState as? AuthState.Authenticated)?.user
+    val isDriver = currentUser?.userRole == UserRole.conductor
+    val isInService = authViewModel.isInService()
+    
+    // Tu vehículo propio (si eres conductor y estás en servicio)
+    val myVehicle: Auto? = if (isDriver && isInService) {
+        autos.find { auto -> 
+            auto.userId.contains(currentUser?.id ?: "")
+        }
+    } else null
 
     val mapView = remember {
         MapView(context).apply {
@@ -390,40 +501,194 @@ fun MainMapScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         AndroidView({ mapView }, modifier = Modifier.fillMaxSize())
 
-        TopAppBar(
-            title = {
-                Column {
-                    Text(
-                        "VIASIT",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Black,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    currentUser?.let { user ->
+        // Top section with search
+        Column(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
+        ) {
+            TopAppBar(
+                title = {
+                    Column {
                         Text(
-                            text = user.name,
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                            "VIASIT",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Black,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        currentUser?.let { user ->
+                            Text(
+                                text = user.name,
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                            )
+                            if (isDriver && isInService) {
+                                Text(
+                                    text = "🟢 En servicio",
+                                    fontSize = 11.sp,
+                                    color = Color(0xFF4CAF50)
+                                )
+                            }
+                        }
+                    }
+                },
+                navigationIcon = {
+                    if (onBackToDashboard != null) {
+                        IconButton(onClick = onBackToDashboard!!) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = "Volver al dashboard")
+                        }
+                    }
+                },
+                actions = {
+                    IconButton(onClick = onLogout) {
+                        Icon(Icons.Default.Logout, contentDescription = "Cerrar sesión")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
+                )
+            )
+            
+            // Search bar
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
+                ),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.Search,
+                        contentDescription = "Buscar",
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                        modifier = Modifier.padding(start = 12.dp)
+                    )
+                    
+                    TextField(
+                        value = searchQuery,
+                        onValueChange = { newQuery ->
+                            searchQuery = newQuery
+                            searchJob?.cancel()
+                            if (newQuery.length >= 3) {
+                                searchJob = scope.launch {
+                                    kotlinx.coroutines.delay(500)
+                                    isSearching = true
+                                    showSearchResults = true
+                                    geocodingService.search(newQuery).fold(
+                                        onSuccess = { results ->
+                                            searchResults = results
+                                            isSearching = false
+                                        },
+                                        onFailure = {
+                                            searchResults = emptyList()
+                                            isSearching = false
+                                        }
+                                    )
+                                }
+                            } else {
+                                searchResults = emptyList()
+                                showSearchResults = false
+                            }
+                        },
+                        placeholder = { Text("Buscar lugar...", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)) },
+                        singleLine = true,
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            cursorColor = MaterialTheme.colorScheme.primary,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent
+                        ),
+                        modifier = Modifier.weight(1f)
+                    )
+                    
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = {
+                            searchQuery = ""
+                            searchResults = emptyList()
+                            showSearchResults = false
+                            focusManager.clearFocus()
+                        }) {
+                            Icon(Icons.Default.Clear, "Limpiar", tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
+                        }
+                    }
+                    
+                    if (isSearching) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp).padding(end = 8.dp),
+                            color = MaterialTheme.colorScheme.primary,
+                            strokeWidth = 2.dp
                         )
                     }
                 }
-            },
-            actions = {
-                IconButton(onClick = onLogout) {
-                    Icon(Icons.Default.Logout, contentDescription = "Cerrar sesión")
+            }
+            
+            // Search results
+            if (showSearchResults && searchResults.isNotEmpty()) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .heightIn(max = 200.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    LazyColumn {
+                        items(searchResults) { result ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        mapInstance?.animateCamera(
+                                            CameraUpdateFactory.newLatLngZoom(
+                                                LatLng(result.lat, result.lon),
+                                                16.0
+                                            )
+                                        )
+                                        showSearchResults = false
+                                        searchQuery = ""
+                                        focusManager.clearFocus()
+                                    }
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Default.LocationOn,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    result.name,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1
+                                )
+                            }
+                        }
+                    }
                 }
-            },
-            colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
-            ),
-            modifier = Modifier.align(Alignment.TopCenter)
-        )
+            }
+        }
 
         LargeFloatingActionButton(
             onClick = { mapInstance?.let { centerOnUser(it, context) } },
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .padding(top = 150.dp, end = 20.dp),
+                .padding(top = 200.dp, end = 20.dp),
             containerColor = MaterialTheme.colorScheme.primary,
             contentColor = Color.White,
             shape = CircleShape
@@ -435,13 +700,72 @@ fun MainMapScreen(
             if (selectedCar != null) {
                 CarInfoCard(car = selectedCar!!, onClose = { selectedCar = null })
             } else if (autos.isNotEmpty()) {
-                CarListSimple(autos = autos, onCarClick = { car ->
-                    selectedCar = car
-                    mapInstance?.animateCamera(
-                        CameraUpdateFactory.newLatLngZoom(LatLng(car.lat, car.lng), 17.0),
-                        1000
-                    )
-                })
+                // Banner indicando que es tu vehículo
+                if (myVehicle != null) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.DirectionsCar,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = "TU AUTO",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = myVehicle.placa,
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                            }
+                        }
+                    }
+                }
+                
+                // Lista de vehículos (excluyendo el propio si es conductor, solo activos)
+                val vehiclesToShow = if (isDriver && isInService) {
+                    autos.filter { it.id != myVehicle?.id && it.isActive() }
+                } else {
+                    autos.filter { it.isActive() }
+                }
+                
+                if (vehiclesToShow.isNotEmpty()) {
+                    CarListSimple(autos = vehiclesToShow, onCarClick = { car ->
+                        selectedCar = car
+                        mapInstance?.animateCamera(
+                            CameraUpdateFactory.newLatLngZoom(LatLng(car.lat, car.lng), 17.0),
+                            1000
+                        )
+                    })
+                } else {
+                    // Mensaje cuando no hay vehículos activos
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        )
+                    ) {
+                        Text(
+                            text = if (isDriver && isInService) "Solo estás tú en servicio" else "No hay vehículos activos",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(16.dp)
+                        )
+                    }
+                }
             }
         }
     }
@@ -511,27 +835,50 @@ fun CarListSimple(autos: List<Auto>, onCarClick: (Auto) -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 items(autos.take(5)) { auto ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onCarClick(auto) }
-                            .padding(vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            Icons.Default.DirectionsCar,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = auto.placa,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
+                    CarListItem(auto = auto, onClick = { onCarClick(auto) })
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun CarListItem(auto: Auto, onClick: () -> Unit) {
+    val isActive = auto.isActive()
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Indicador de estado (punto verde/rojo)
+        Icon(
+            imageVector = Icons.Default.Circle,
+            contentDescription = null,
+            tint = if (isActive) Color(0xFF4CAF50) else Color(0xFFE53935),
+            modifier = Modifier.size(10.dp)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Icon(
+            Icons.Default.DirectionsCar,
+            contentDescription = null,
+            tint = if (isActive) Color(0xFF4CAF50) else Color(0xFFE53935),
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Column {
+            Text(
+                text = auto.placa,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = auto.getLastUpdateText(),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+            )
         }
     }
 }
@@ -562,7 +909,7 @@ fun CarInfoCard(car: Auto, onClose: () -> Unit) {
             }
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Línea: ${car.linea}",
+                text = "Placa: ${car.placa}",
                 style = MaterialTheme.typography.bodyMedium
             )
             Text(

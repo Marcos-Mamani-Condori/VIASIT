@@ -10,6 +10,10 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -330,23 +334,218 @@ class PocketBaseRealtimeClient(
 
     fun isConnected(): Boolean = eventSource != null
 
+    // ============ Métodos Genéricos para Admin ============
+
+    /**
+     * Crear un registro en cualquier colección
+     */
+    suspend fun createRecord(collection: String, data: Map<String, Any>, authToken: String? = null): Result<String> {
+        return withContext(Dispatchers.IO) {
+            try {
+                val jsonBody = buildJsonString(data)
+                val requestBody = jsonBody.toRequestBody("application/json".toMediaType())
+
+                val requestBuilder = Request.Builder()
+                    .url("$BASE_URL/api/collections/$collection/records")
+                    .post(requestBody)
+                
+                if (authToken != null) {
+                    requestBuilder.header("Authorization", "Bearer $authToken")
+                }
+
+                val response = okHttpclient.newCall(requestBuilder.build()).execute()
+
+                if (response.isSuccessful) {
+                    val body = response.body?.string()
+                    Result.success(body ?: "{}")
+                } else {
+                    val error = response.body?.string() ?: "Error desconocido"
+                    Result.failure(Exception("Error creando registro: ${response.code} - $error"))
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error createRecord", e)
+                Result.failure(e)
+            }
+        }
+    }
+
+    /**
+     * Actualizar un registro
+     */
+    suspend fun updateRecord(collection: String, recordId: String, data: Map<String, Any>, authToken: String? = null): Result<String> {
+        return withContext(Dispatchers.IO) {
+            try {
+                val jsonBody = buildJsonString(data)
+                val requestBody = jsonBody.toRequestBody("application/json".toMediaType())
+
+                val requestBuilder = Request.Builder()
+                    .url("$BASE_URL/api/collections/$collection/records/$recordId")
+                    .patch(requestBody)
+                
+                if (authToken != null) {
+                    requestBuilder.header("Authorization", "Bearer $authToken")
+                }
+
+                val response = okHttpclient.newCall(requestBuilder.build()).execute()
+
+                if (response.isSuccessful) {
+                    val body = response.body?.string()
+                    Result.success(body ?: "{}")
+                } else {
+                    val error = response.body?.string() ?: "Error desconocido"
+                    Result.failure(Exception("Error actualizando registro: ${response.code} - $error"))
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error updateRecord", e)
+                Result.failure(e)
+            }
+        }
+    }
+
+    /**
+     * Eliminar un registro
+     */
+    suspend fun deleteRecord(collection: String, recordId: String, authToken: String? = null): Result<Unit> {
+        return withContext(Dispatchers.IO) {
+            try {
+                val requestBuilder = Request.Builder()
+                    .url("$BASE_URL/api/collections/$collection/records/$recordId")
+                    .delete()
+                
+                if (authToken != null) {
+                    requestBuilder.header("Authorization", "Bearer $authToken")
+                }
+
+                val response = okHttpclient.newCall(requestBuilder.build()).execute()
+
+                if (response.isSuccessful) {
+                    Result.success(Unit)
+                } else {
+                    val error = response.body?.string() ?: "Error desconocido"
+                    Result.failure(Exception("Error eliminando registro: ${response.code} - $error"))
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error deleteRecord", e)
+                Result.failure(e)
+            }
+        }
+    }
+
+    /**
+     * Obtener un registro por ID
+     */
+    suspend fun getRecord(collection: String, recordId: String, authToken: String? = null): Result<String> {
+        return withContext(Dispatchers.IO) {
+            try {
+                val url = "$BASE_URL/api/collections/$collection/records/$recordId"
+
+                val requestBuilder = Request.Builder()
+                    .url(url)
+                    .get()
+                
+                if (authToken != null) {
+                    requestBuilder.header("Authorization", "Bearer $authToken")
+                }
+
+                val response = okHttpclient.newCall(requestBuilder.build()).execute()
+
+                if (response.isSuccessful) {
+                    val body = response.body?.string()
+                    Result.success(body ?: "{}")
+                } else {
+                    val error = response.body?.string() ?: "Error desconocido"
+                    Result.failure(Exception("Error obteniendo registro: ${response.code} - $error"))
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error getRecord", e)
+                Result.failure(e)
+            }
+        }
+    }
+
+    /**
+     * Obtener lista de registros con filtros opcionales
+     */
+    suspend fun getList(
+        collection: String,
+        page: Int = 1,
+        perPage: Int = 30,
+        filter: String = "",
+        sort: String = "",
+        authToken: String? = null
+    ): Result<String> {
+        return withContext(Dispatchers.IO) {
+            try {
+                var url = "$BASE_URL/api/collections/$collection/records?page=$page&perPage=$perPage"
+                if (filter.isNotEmpty()) {
+                    url += "&filter=${java.net.URLEncoder.encode(filter, "UTF-8")}"
+                }
+                if (sort.isNotEmpty()) {
+                    url += "&sort=${java.net.URLEncoder.encode(sort, "UTF-8")}"
+                }
+
+                val requestBuilder = Request.Builder()
+                    .url(url)
+                    .get()
+                
+                if (authToken != null) {
+                    requestBuilder.header("Authorization", "Bearer $authToken")
+                }
+
+                val response = okHttpclient.newCall(requestBuilder.build()).execute()
+
+                if (response.isSuccessful) {
+                    val body = response.body?.string()
+                    Result.success(body ?: "{}")
+                } else {
+                    val error = response.body?.string() ?: "Error desconocido"
+                    Result.failure(Exception("Error obtiendo lista: ${response.code} - $error"))
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error getList", e)
+                Result.failure(e)
+            }
+        }
+    }
+
+    /**
+     * Construir string JSON desde Map
+     */
+    private fun buildJsonString(data: Map<String, Any>): String {
+        return data.entries.joinToString(",", "{", "}") { (key, value) ->
+            "\"$key\": ${when (value) {
+                is String -> "\"$value\""
+                is Boolean -> value.toString()
+                is Number -> value.toString()
+                else -> "\"$value\""
+            }}"
+        }
+    }
+
     /**
      * Registrar un nuevo auto
+     * NOTA: La línea se asigna al usuario (linea_id en users), no al vehículo
      */
     suspend fun registerAuto(
         userId: String,
         placa: String,
-        linea: String,
+        lineaCode: String,
         lat: Double,
         lng: Double
     ): Result<Auto> {
         return withContext(Dispatchers.IO) {
             try {
+                // Primero validar el código de invitación y obtener el ID de la línea
+                val lineaId = validateInvitationCode(lineaCode)
+                if (lineaId == null) {
+                    return@withContext Result.failure(Exception("Codigo de invitacion invalido o expirado"))
+                }
+
+                // Crear el vehículo SIN linea_id (se obtiene del usuario)
                 val requestBody = """
                     {
-                        "userid": ["$userId"],
+                        "userid": "$userId",
                         "placa": "$placa",
-                        "linea": "$linea",
                         "lat": $lat,
                         "lng": $lng,
                         "angulo": 0
@@ -364,6 +563,10 @@ class PocketBaseRealtimeClient(
                     val body = response.body?.string()
                     val auto = json.decodeFromString<Auto>(body ?: "")
                     Log.d(TAG, "Auto registrado: ${auto.placa}")
+                    
+                    // Actualizar el linea_id del usuario
+                    updateUserLinea(userId, lineaId)
+                    
                     Result.success(auto)
                 } else {
                     val error = response.body?.string() ?: "Error desconocido"
@@ -376,6 +579,87 @@ class PocketBaseRealtimeClient(
             }
         }
     }
+    
+    /**
+     * Actualizar el linea_id del usuario
+     */
+    private suspend fun updateUserLinea(userId: String, lineaId: String): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                val requestBody = """
+                    {
+                        "linea_id": "$lineaId"
+                    }
+                """.trimIndent().toRequestBody("application/json".toMediaType())
+
+                val request = Request.Builder()
+                    .url("$BASE_URL/api/collections/users/records/$userId")
+                    .patch(requestBody)
+                    .build()
+
+                val response = okHttpclient.newCall(request).execute()
+                if (response.isSuccessful) {
+                    Log.d(TAG, "Usuario actualizado con linea_id: $lineaId")
+                    true
+                } else {
+                    Log.e(TAG, "Error actualizando usuario: ${response.code}")
+                    false
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error updateUserLinea", e)
+                false
+            }
+        }
+    }
+
+    /**
+     * Validar código de invitación y obtener el ID de la línea
+     */
+    private suspend fun validateInvitationCode(code: String): String? {
+        return withContext(Dispatchers.IO) {
+            try {
+                // Filtro combinado: code y isUsed=false en una sola query
+                val filter = java.net.URLEncoder.encode("code=\"$code\" && isUsed=false", "UTF-8")
+                val request = Request.Builder()
+                    .url("$BASE_URL/api/collections/vehicle_invitation_codes/records?perPage=1&filter=$filter")
+                    .get()
+                    .build()
+
+                val response = okHttpclient.newCall(request).execute()
+
+                if (response.isSuccessful) {
+                    val body = response.body?.string()
+                    val jsonResponse = json.decodeFromString<JsonObject>(body ?: "{}")
+                    val items = jsonResponse["items"]?.jsonArray
+                    
+                    if (items != null && items.isNotEmpty()) {
+                        val invitation = items[0].jsonObject
+                        // Verificar si no ha expirado
+                        val expiresAt = invitation["expiresAt"]?.jsonPrimitive?.content
+                        if (expiresAt != null) {
+                            val expirationDate = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).parse(expiresAt)
+                            if (expirationDate != null && expirationDate.before(java.util.Date())) {
+                                Log.w(TAG, "Codigo de invitacion expirado")
+                                return@withContext null
+                            }
+                        }
+                        // Retornar el ID de la línea (campo linea_id en PocketBase)
+                        val lineaId = invitation["linea_id"]?.jsonPrimitive?.content
+                        Log.d(TAG, "Codigo valido para linea: $lineaId")
+                        return@withContext lineaId
+                    }
+                    Log.w(TAG, "Codigo de invitacion no encontrado")
+                    null
+                } else {
+                    Log.e(TAG, "Error validating invitation code: ${response.code}")
+                    null
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error validateInvitationCode", e)
+                null
+            }
+        }
+    }
 
     /**
      * Obtener el auto de un conductor específico
@@ -383,8 +667,8 @@ class PocketBaseRealtimeClient(
     suspend fun getAutoByUserId(userId: String): Result<Auto?> {
         return withContext(Dispatchers.IO) {
             try {
-                // Filtrar por userid (relación múltiple) - usar ?~ para "contains"
-                val url = "$BASE_URL/api/collections/$COLLECTION/records?perPage=1&filter=userid%3F~%20%27$userId%27"
+                // Filtrar por userid (relación simple) - usar = para coincidencia exacta
+                val url = "$BASE_URL/api/collections/$COLLECTION/records?perPage=1&filter=userid%3D%27$userId%27"
                 Log.d(TAG, "getAutoByUserId URL: $url")
 
                 val request = Request.Builder()
@@ -463,8 +747,7 @@ class PocketBaseRealtimeClient(
         userId: String,
         lat: Double,
         lng: Double,
-        angulo: Float,
-        velocidad: Float
+        angulo: Float
     ): Result<Unit> {
         return withContext(Dispatchers.IO) {
             try {
@@ -481,8 +764,7 @@ class PocketBaseRealtimeClient(
                     {
                         "lat": $lat,
                         "lng": $lng,
-                        "angulo": $angulo,
-                        "velocidad": $velocidad
+                        "angulo": $angulo
                     }
                 """.trimIndent().toRequestBody("application/json".toMediaType())
 

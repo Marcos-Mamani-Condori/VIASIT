@@ -33,6 +33,47 @@ class PocketBaseAuthClient {
         isLenient = true
     }
 
+    /**
+     * Construir string JSON desde parámetros
+     */
+    private fun buildJsonString(
+        email: String,
+        password: String,
+        passwordConfirm: String,
+        name: String,
+        phone: String,
+        role: String,
+        invitationCode: String = "",
+        lineaId: String = ""
+    ): String {
+        val map = mutableMapOf<String, Any>(
+            "email" to email,
+            "password" to password,
+            "passwordConfirm" to passwordConfirm,
+            "name" to name,
+            "phone" to phone,
+            "role" to listOf(role)  // PocketBase espera un array de roles
+        )
+        if (invitationCode.isNotEmpty()) {
+            map["invitationCode"] = invitationCode
+        }
+        if (lineaId.isNotEmpty()) {
+            map["lineaId"] = lineaId  // PocketBase users collection usa camelCase
+            Log.d(TAG, "Agregando lineaId al JSON: $lineaId")
+        }
+        
+        val jsonString = map.entries.joinToString(",", "{", "}") { (key, value) ->
+            "\"$key\": ${when (value) {
+                is String -> "\"$value\""
+                is List<*> -> "[${value.joinToString(",") { "\"$it\"" }}]"
+                is Boolean -> value.toString()
+                else -> value
+            }}"
+        }
+        Log.d(TAG, "JSON construido: $jsonString")
+        return jsonString
+    }
+
     private var authToken: String? = null
 
     /**
@@ -61,23 +102,15 @@ class PocketBaseAuthClient {
                     val authResponse = json.decodeFromString<AuthResponse>(body ?: "")
                     authToken = authResponse.token
                     
-                    // Convertir role de List<String> a String
-                    val roleString = if (authResponse.user.role.isNotEmpty()) {
-                        authResponse.user.role.first()
-                    } else {
-                        "USUARIO"
-                    }
-                    
                     val user = User(
                         id = authResponse.user.id,
                         email = authResponse.user.email,
                         name = authResponse.user.name,
                         phone = authResponse.user.phone,
-                        role = roleString,
-                        isActive = true,
-                        isInService = false
+                        role = authResponse.user.role,
+                        lineaId = authResponse.user.lineaId
                     )
-                    Log.d(TAG, "Login exitoso: ${user.email}, role: ${user.role}")
+                    Log.d(TAG, "Login exitoso: ${user.email}, role: ${user.role}, lineaId: ${user.lineaId}")
                     Result.success(user)
                 } else {
                     val error = response.body?.string() ?: "Error desconocido"
@@ -100,20 +133,39 @@ class PocketBaseAuthClient {
         passwordConfirm: String,
         name: String,
         phone: String = "",
-        role: String = "USUARIO"
+        role: String = "usuario"
+    ): Result<User> {
+        return registerAdmin(email, password, passwordConfirm, name, phone, role, "")
+    }
+
+    /**
+     * Register de administrador con código de invitación
+     */
+    suspend fun registerAdmin(
+        email: String,
+        password: String,
+        passwordConfirm: String,
+        name: String,
+        phone: String = "",
+        role: String = "ADMIN_LINEA",
+        invitationCode: String = "",
+        lineaId: String = ""
     ): Result<User> {
         return withContext(Dispatchers.IO) {
             try {
-                val requestBody = """
-                    {
-                        "email": "$email",
-                        "password": "$password",
-                        "passwordConfirm": "$passwordConfirm",
-                        "name": "$name",
-                        "phone": "$phone",
-                        "role": "$role"
-                    }
-                """.trimIndent().toRequestBody("application/json".toMediaType())
+                // Construir JSON
+                val jsonBody = buildJsonString(
+                    email = email,
+                    password = password,
+                    passwordConfirm = passwordConfirm,
+                    name = name,
+                    phone = phone,
+                    role = role,
+                    invitationCode = invitationCode,
+                    lineaId = lineaId
+                )
+                
+                val requestBody = jsonBody.toRequestBody("application/json".toMediaType())
 
                 val request = Request.Builder()
                     .url("$BASE_URL/api/collections/users/records")
@@ -126,23 +178,15 @@ class PocketBaseAuthClient {
                     val body = response.body?.string()
                     val userResponse = json.decodeFromString<UserResponse>(body ?: "")
                     
-                    // Convertir role de List<String> a String
-                    val roleString = if (userResponse.role.isNotEmpty()) {
-                        userResponse.role.first()
-                    } else {
-                        role
-                    }
-                    
                     val user = User(
                         id = userResponse.id,
                         email = userResponse.email,
                         name = userResponse.name,
                         phone = userResponse.phone,
-                        role = roleString,
-                        isActive = true,
-                        isInService = false
+                        role = userResponse.role,
+                        lineaId = userResponse.lineaId
                     )
-                    Log.d(TAG, "Register exitoso: ${user.email}")
+                    Log.d(TAG, "Register exitoso: ${user.email}, lineaId: ${user.lineaId}")
                     Result.success(user)
                 } else {
                     val error = response.body?.string() ?: "Error desconocido"
@@ -167,7 +211,7 @@ class PocketBaseAuthClient {
                 val request = Request.Builder()
                     .url("$BASE_URL/api/collections/users/auth-refresh")
                     .post("".toRequestBody("application/json".toMediaType()))
-                    .header("Authorization", token)
+                    .header("Authorization", "Bearer $token")
                     .build()
 
                 val response = okHttpclient.newCall(request).execute()
@@ -176,25 +220,16 @@ class PocketBaseAuthClient {
                     val body = response.body?.string()
                     val authResponse = json.decodeFromString<AuthResponse>(body ?: "")
                     
-                    // Convertir role de List<String> a String
-                    val roleString = if (authResponse.user.role.isNotEmpty()) {
-                        authResponse.user.role.first()
-                    } else {
-                        "USUARIO"
-                    }
-                    
                     val user = User(
                         id = authResponse.user.id,
                         email = authResponse.user.email,
                         name = authResponse.user.name,
                         phone = authResponse.user.phone,
-                        role = roleString,
-                        isActive = true,
-                        isInService = false
+                        role = authResponse.user.role
                     )
                     Result.success(user)
                 } else {
-                    Result.failure(Exception("Error获取用户"))
+                    Result.failure(Exception("Error al obtener usuario: ${response.code}"))
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error getCurrentUser", e)
@@ -240,7 +275,8 @@ data class UserResponse(
     val email: String = "",
     val name: String = "",
     val phone: String = "",
-    val role: List<String> = listOf("USUARIO"),  // PocketBase devuelve como array
+    val role: List<String> = listOf("usuario"),  // PocketBase devuelve como array
+    val lineaId: String = "",  // PocketBase users usa camelCase, no snake_case
     val created: String = "",
     val updated: String = ""
 )

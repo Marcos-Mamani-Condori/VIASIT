@@ -2,19 +2,52 @@ package com.oficial.viasit.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Colores verde para el tema
-val Green80 = Color(0xFFA5D6A7)
-val GreenGrey80 = Color(0xFFB0BEC5)
-val Teal80 = Color(0xFF80CBC4)
+// ─── Paleta VIASIT ───────────────────────────────────────────────────────────
+// Inspirada en apps de transporte premium (Citymapper, Transit, Moovit)
+// Azul índigo profundo + acento ámbar vibrante + fondo carbón
 
-val Green40 = Color(0xFF4CAF50)
-val GreenGrey40 = Color(0xFF546E7A)
-val Teal40 = Color(0xFF009688)
+// Primario — Azul índigo eléctrico
+val Brand500 = Color(0xFF3D5AFE)   // botones, links activos
+val Brand400 = Color(0xFF536DFE)   // hover / pressed
+val Brand300 = Color(0xFF8187FF)   // tint suave
+val Brand700 = Color(0xFF0031CA)   // dark variant
 
-// Modo oscuro
-val DarkPrimary = Color(0xFF69F0AE)
-val DarkSecondary = Color(0xFF80CBC4)
-val DarkTertiary = Color(0xFF4CAF50)
-val DarkBackground = Color(0xFF121212)
-val DarkSurface = Color(0xFF1E1E1E)
-val DarkSurfaceVariant = Color(0xFF2C2C2C)
+// Acento — Ámbar cálido (para estados "en servicio", badges)
+val Amber400 = Color(0xFFFFCA28)
+val Amber500 = Color(0xFFFFB300)
+val Amber200 = Color(0xFFFFE082)
+
+// Éxito / Activo
+val Emerald300 = Color(0xFF6EE7B7)
+val Emerald400 = Color(0xFF34D399)
+val Emerald500 = Color(0xFF10B981)
+val Emerald900 = Color(0xFF064E3B)
+
+// Info / Vehículos
+val Cyan400 = Color(0xFF22D3EE)
+val Cyan500 = Color(0xFF06B6D4)
+
+// Error
+val Rose500 = Color(0xFFF43F5E)
+val Rose900 = Color(0xFF881337)
+
+// ─── Neutros oscuros (dark mode) ─────────────────────────────────────────────
+val Slate950 = Color(0xFF0A0F1E)   // fondo principal — casi negro azulado
+val Slate900 = Color(0xFF0F172A)   // fondo secundario
+val Slate800 = Color(0xFF1E293B)   // cards / superficies
+val Slate700 = Color(0xFF334155)   // bordes, dividers
+val Slate600 = Color(0xFF475569)   // texto deshabilitado
+val Slate400 = Color(0xFF94A3B8)   // texto secundario
+val Slate200 = Color(0xFFE2E8F0)   // texto primario en dark
+val Slate50  = Color(0xFFF8FAFC)   // blanco suave
+
+// ─── Neutros claros (light mode) ─────────────────────────────────────────────
+val Gray50  = Color(0xFFF9FAFB)
+val Gray100 = Color(0xFFF3F4F6)
+val Gray200 = Color(0xFFE5E7EB)
+val Gray700 = Color(0xFF374151)
+val Gray900 = Color(0xFF111827)
+
+// ─── Superficies con tinte ───────────────────────────────────────────────────
+val SurfaceTinted = Color(0xFF131929)   // cards con tinte azul muy sutil
+val SurfaceElevated = Color(0xFF1A2236) // cards elevadas

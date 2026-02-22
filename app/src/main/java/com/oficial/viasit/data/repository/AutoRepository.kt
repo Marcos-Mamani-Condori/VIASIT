@@ -61,12 +61,12 @@ class AutoRepository(
     suspend fun registerAuto(
         userId: String,
         placa: String,
-        linea: String
+        lineaCode: String
     ): Result<Auto> {
         return pocketBaseClient.registerAuto(
             userId = userId,
             placa = placa,
-            linea = linea,
+            lineaCode = lineaCode,
             lat = 0.0,
             lng = 0.0
         )

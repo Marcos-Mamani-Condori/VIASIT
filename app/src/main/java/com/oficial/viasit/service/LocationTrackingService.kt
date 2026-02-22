@@ -65,8 +65,9 @@ class LocationTrackingService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private var userId: String = ""
+    private var autoId: String = ""
     private var userName: String = ""
-    private var userRole: UserRole = UserRole.USUARIO
+    private var userRole: UserRole = UserRole.usuario
     private var isInService: Boolean = false
     private var isTracking: Boolean = false
     
@@ -75,6 +76,9 @@ class LocationTrackingService : Service() {
     private var lastLocationTime: Long = 0
     private var totalDistanceMoved: Float = 0f
     private var currentInterval: Long = INTERVAL_MOVING
+    
+    // Para cálculo de bearing cuando GPS no lo proporciona
+    private var previousLocationForBearing: Location? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -88,23 +92,27 @@ class LocationTrackingService : Service() {
         when (intent?.action) {
             ACTION_START -> {
                 userId = intent.getStringExtra("userId") ?: ""
+                autoId = intent.getStringExtra("autoId") ?: ""
                 userName = intent.getStringExtra("userName") ?: ""
                 userRole = try {
-                    UserRole.valueOf(intent.getStringExtra("userRole") ?: UserRole.USUARIO.name)
+                    UserRole.valueOf(intent.getStringExtra("userRole") ?: UserRole.usuario.name)
                 } catch (e: Exception) {
-                    UserRole.USUARIO
+                    UserRole.usuario
                 }
                 isInService = intent.getBooleanExtra("isInService", false)
+                android.util.Log.d("LocationTrackingService", "ACTION_START - autoId: $autoId, userId: $userId, isInService: $isInService")
                 startForeground(NOTIFICATION_ID, createNotification())
                 startLocationTracking()
             }
             ACTION_STOP -> {
+                android.util.Log.d("LocationTrackingService", "ACTION_STOP")
                 stopLocationTracking()
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
             }
             ACTION_UPDATE_SERVICE_STATUS -> {
                 isInService = intent.getBooleanExtra("isInService", false)
+                android.util.Log.d("LocationTrackingService", "ACTION_UPDATE_SERVICE_STATUS - isInService: $isInService")
                 updateNotification()
             }
         }
@@ -134,7 +142,7 @@ class LocationTrackingService : Service() {
         )
         
         val status = if (isInService) "En servicio" else "Fuera de servicio"
-        val role = if (userRole == UserRole.CONDUCTOR) "Conductor" else "Usuario"
+        val role = if (userRole == UserRole.conductor) "Conductor" else "Usuario"
         val text = if (isInService) "$role: $userName - Enviando ubicación" else "$role: $userName"
         
         return NotificationCompat.Builder(this, CHANNEL_ID)
@@ -223,18 +231,52 @@ class LocationTrackingService : Service() {
 
     private suspend fun sendLocationToPocketBase(location: Location) {
         try {
-            // Send to autos collection with location fields
+            // Verificar que tenemos un autoId válido
+            if (autoId.isEmpty()) {
+                android.util.Log.w("LocationTrackingService", "No hay autoId válido, no se puede enviar ubicación")
+                return
+            }
+            
+            // Calcular bearing (ángulo) - usar GPS bearing o calcular desde posición anterior
+            val bearing = calculateBearing(location)
+            
+            // Send to autos collection with location fields using autoId directly
             pocketBaseClient.updateAutoLocation(
-                userId = userId,
+                autoId = autoId,
                 lat = location.latitude,
                 lng = location.longitude,
-                angulo = location.bearing,
-                velocidad = location.speed
+                angulo = bearing
             )
+            android.util.Log.d("LocationTrackingService", "Ubicación enviada: lat=${location.latitude}, lng=${location.longitude}, bearing=$bearing")
         } catch (e: Exception) {
             // Log error but don't crash service
-            e.printStackTrace()
+            android.util.Log.e("LocationTrackingService", "Error enviando ubicación", e)
         }
+    }
+    
+    /**
+     * Calcula el bearing (ángulo de movimiento) usando GPS o posiciones anteriores
+     */
+    private fun calculateBearing(location: Location): Double {
+        // Si el GPS proporciona bearing válido (no 0 cuando está en movimiento)
+        if (location.bearing > 0f && location.hasBearing()) {
+            previousLocationForBearing = location
+            return location.bearing.toDouble()
+        }
+        
+        // Fallback: calcular bearing desde la última posición conocida
+        previousLocationForBearing?.let { prev ->
+            val result = FloatArray(1)
+            Location.distanceBetween(
+                prev.latitude, prev.longitude,
+                location.latitude, location.longitude,
+                result
+            )
+            // result[0] contiene el bearing
+            return result[0].toDouble()
+        }
+        
+        return 0.0
     }
 
     private fun startLocationTracking() {
