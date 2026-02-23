@@ -79,7 +79,8 @@ class AuthViewModel(private val authRepository: AuthRepository) : ViewModel() {
     fun enterAsGuest() { authRepository.enterAsGuest() }
     fun logout() { authRepository.logout() }
     fun setInService(isInService: Boolean, autoId: String = "") { authRepository.setInService(isInService, autoId) }
-    fun isInService(): Boolean = authRepository.isInService()
+    // StateFlow reactivo — no lee disco en cada recomposición
+    val isInService: StateFlow<Boolean> = authRepository.isInService
     fun isLoggedIn(): Boolean = authRepository.isLoggedIn()
     fun isGuest(): Boolean = authRepository.isGuestMode()
     fun isDriver(): Boolean = authRepository.isDriver()

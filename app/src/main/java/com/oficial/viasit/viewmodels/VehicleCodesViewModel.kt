@@ -1,0 +1,67 @@
+package com.oficial.viasit.viewmodels
+
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
+import com.oficial.viasit.AutosAplicacion
+import com.oficial.viasit.data.repository.AdminRepository
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
+
+class VehicleCodesViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val adminRepository: AdminRepository = (application as AutosAplicacion).adminRepository
+
+    companion object {
+        val Factory: ViewModelProvider.Factory = object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T =
+                VehicleCodesViewModel(AutosAplicacion.instance) as T
+        }
+    }
+
+    fun generateVehicleInvitationCode(
+        lineaId: String, creadoPor: String, expiresInHours: Int = 72,
+        currentUserId: String = "", state: MutableStateFlow<AdminUiState>, onLog: (String, String) -> Unit
+    ) {
+        viewModelScope.launch {
+            state.value = state.value.copy(isLoading = true, error = null, generatedVehicleCode = null)
+            adminRepository.generateVehicleInvitationCode(lineaId, creadoPor, expiresInHours).fold(
+                onSuccess = { code ->
+                    state.value = state.value.copy(isLoading = false, generatedVehicleCode = code.code, successMessage = "Código generado: ${code.code}")
+                    if (currentUserId.isNotEmpty()) onLog(currentUserId, "Generó código de vehículo: ${code.code} (línea: $lineaId)")
+                    loadVehicleInvitationCodes(lineaId, state)
+                },
+                onFailure = { state.value = state.value.copy(isLoading = false, error = it.message ?: "Error al generar código") }
+            )
+        }
+    }
+
+    fun loadVehicleInvitationCodes(lineaId: String, state: MutableStateFlow<AdminUiState>) {
+        viewModelScope.launch {
+            state.value = state.value.copy(isLoading = true, error = null)
+            adminRepository.getVehicleInvitationCodesByLinea(lineaId).fold(
+                onSuccess = { codes -> state.value = state.value.copy(isLoading = false, vehicleCodes = codes) },
+                onFailure = { state.value = state.value.copy(isLoading = false, error = it.message ?: "Error al cargar códigos") }
+            )
+        }
+    }
+
+    fun deleteVehicleInvitationCode(
+        codeId: String, lineaId: String, currentUserId: String = "",
+        state: MutableStateFlow<AdminUiState>, onLog: (String, String) -> Unit
+    ) {
+        viewModelScope.launch {
+            state.value = state.value.copy(isLoading = true, error = null)
+            adminRepository.deleteVehicleInvitationCode(codeId).fold(
+                onSuccess = {
+                    state.value = state.value.copy(isLoading = false, successMessage = "Código eliminado")
+                    if (currentUserId.isNotEmpty()) onLog(currentUserId, "Eliminó código de vehículo: $codeId")
+                    loadVehicleInvitationCodes(lineaId, state)
+                },
+                onFailure = { state.value = state.value.copy(isLoading = false, error = it.message ?: "Error al eliminar código") }
+            )
+        }
+    }
+}

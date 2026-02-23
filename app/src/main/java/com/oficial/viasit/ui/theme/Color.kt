@@ -37,6 +37,7 @@ val Slate900 = Color(0xFF0F172A)   // fondo secundario
 val Slate800 = Color(0xFF1E293B)   // cards / superficies
 val Slate700 = Color(0xFF334155)   // bordes, dividers
 val Slate600 = Color(0xFF475569)   // texto deshabilitado
+val Slate500 = Color(0xFF64748B)   // texto muy deshabilitado / iconos inactivos
 val Slate400 = Color(0xFF94A3B8)   // texto secundario
 val Slate200 = Color(0xFFE2E8F0)   // texto primario en dark
 val Slate50  = Color(0xFFF8FAFC)   // blanco suave

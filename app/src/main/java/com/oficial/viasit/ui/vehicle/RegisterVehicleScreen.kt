@@ -85,7 +85,7 @@ fun RegisterVehicleScreen(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Text(
-                    text = "Ingresa los datos de tu vehículo para comenzar a operar",
+                    text = "Ingresa la placa de tu vehículo para comenzar a operar",
                     fontSize = 14.sp,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                     modifier = Modifier.padding(horizontal = 16.dp)
@@ -136,19 +136,33 @@ fun RegisterVehicleScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Campo código de invitación
-                OutlinedTextField(
-                    value = vehicleFormState.linea,
-                    onValueChange = autosViewModel::updateLinea,
-                    label = { Text("Codigo de invitacion") },
-                    leadingIcon = {
-                        Icon(Icons.Default.VpnKey, contentDescription = null)
-                    },
-                    isError = vehicleFormState.lineaError != null,
-                    supportingText = vehicleFormState.lineaError?.let { { Text(it) } } ?: { Text("Codigo proporcionado por el admin de linea") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                // Mostrar información de la línea asignada
+                currentUser?.lineaId?.let { lineaId ->
+                    if (lineaId.isNotEmpty()) {
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Línea asignada correctamente",
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                        }
+                    }
+                }
 
                 Spacer(modifier = Modifier.height(32.dp))
 
@@ -156,12 +170,21 @@ fun RegisterVehicleScreen(
                 Button(
                     onClick = {
                         currentUser?.let { user ->
-                            autosViewModel.registerVehicle(
-                                userId = user.id,
-                                placa = vehicleFormState.placa,
-                                linea = vehicleFormState.linea,
-                                onSuccess = onVehicleRegistered
-                            )
+                            android.util.Log.d("RegisterVehicleScreen", "Usuario: id=${user.id}, name=${user.name}, lineaId=${user.lineaId}")
+                            // Usar el lineaId del usuario (ya asignado al registrarse)
+                            val lineaId = user.lineaId
+                            if (lineaId.isNullOrEmpty()) {
+                                android.util.Log.w("RegisterVehicleScreen", "lineaId es null o vacío!")
+                                autosViewModel.setError("No tienes una línea asignada. Contacta al administrador.")
+                            } else {
+                                android.util.Log.d("RegisterVehicleScreen", "Registrando vehículo con lineaId: $lineaId")
+                                autosViewModel.registerVehicle(
+                                    userId = user.id,
+                                    placa = vehicleFormState.placa,
+                                    linea = lineaId,
+                                    onSuccess = onVehicleRegistered
+                                )
+                            }
                         }
                     },
                     enabled = !vehicleFormState.isLoading,
@@ -184,12 +207,15 @@ fun RegisterVehicleScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Botón ir al mapa sin registrar
+                // Botón ir al dashboard sin registrar
                 TextButton(
-                    onClick = onGoToMap
+                    onClick = {
+                        android.util.Log.d("RegisterVehicleScreen", "Botón 'Ir al dashboard' presionado")
+                        onGoToMap()
+                    }
                 ) {
                     Text(
-                        text = "Ir al mapa sin registrar vehículo",
+                        text = "Ir al dashboard sin registrar vehículo",
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
                 }

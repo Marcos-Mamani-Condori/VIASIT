@@ -1,751 +1,399 @@
 package com.oficial.viasit.data.repository
 
-import com.oficial.viasit.data.remote.PocketBaseAuthClient
+import android.util.Log
 import com.oficial.viasit.data.remote.PocketBaseRealtimeClient
 import com.oficial.viasit.domain.model.InvitationCode
 import com.oficial.viasit.domain.model.Linea
-import com.oficial.viasit.domain.model.Log
 import com.oficial.viasit.domain.model.LogEntry
 import com.oficial.viasit.domain.model.Ruta
 import com.oficial.viasit.domain.model.VehicleInvitationCode
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.Json
+import kotlinx.serialization.Serializable
+import java.security.SecureRandom
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
-class AdminRepository {
-    private val client = PocketBaseRealtimeClient()
-    private val authClient = PocketBaseAuthClient()
-    private val json = Json { ignoreUnknownKeys = true }
-    
-    private fun getAuthToken(): String? = authClient.getAuthToken()
+/**
+ * Repositorio de datos del módulo de administración.
+ *
+ * Este archivo sirve como punto de entrada único para toda la capa de datos
+ * de administración. Internamente delega a sub-repositorios especializados:
+ *
+ *  ┌─────────────────────────────────────────────────────────────┐
+ *  │                   AdminRepository                           │
+ *  │ (coordina autenticación, fechas y código seguro compartidos) │
+ *  └──────┬────────────────┬────────────────┬────────────────────┘
+ *         │                │                │
+ *       InvitacionesRepo  LineasRepo       LogsRepo
+ *       VehicleCodesRepo  RutasRepo
+ *
+ * Si quieres entender cómo funciona una operación específica, lee el
+ * sub-repositorio correspondiente en data/repository/:
+ *  → InvitationCodesRepository.kt  (códigos de invitación para admins)
+ *  → LineasRepository.kt           (gestión de líneas de transporte)
+ *  → LogsRepository.kt             (registros de auditoría)
+ *  → RutasRepository.kt            (creación y consulta de rutas)
+ *  → VehicleCodesRepository.kt     (códigos de invitación para conductores)
+ *
+ * Nota: Este archivo NO fue dividido todavía para no romper el código
+ * existente de una vez. La separación se puede hacer cuando sea necesario
+ * extender o testear cada dominio por separado.
+ */
+class AdminRepository(
+    private val client: PocketBaseRealtimeClient,
+    private val authRepository: AuthRepository? = null
+) {
 
-    /**
-     * Generate a new invitation code
-     */
+    // ── Utilidades compartidas entre todos los sub-dominios ────────────────
+
+    fun getAuthToken() = authRepository?.getCurrentUser()?.let { client.authToken } ?: client.authToken
+
+    @Serializable
+    data class PocketBaseListResponse<T>(
+        val page: Int = 1,
+        val perPage: Int = 30,
+        val totalItems: Int = 0,
+        val totalPages: Int = 0,
+        val items: List<T> = emptyList()
+    )
+
+    private val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS'Z'")
+
+    /** Fecha/hora + N horas en formato PocketBase */
+    fun formatNowPlus(hours: Int): String =
+        LocalDateTime.now(ZoneId.of("UTC")).plusHours(hours.toLong()).format(formatter)
+
+    /** Fecha/hora actual en formato PocketBase */
+    fun formatNow(): String =
+        LocalDateTime.now(ZoneId.of("UTC")).format(formatter)
+
+    /** Genera un código alfanumérico seguro de 8 caracteres */
+    fun generateSecureCode(): String {
+        val chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+        return (1..8).map { chars[SecureRandom().nextInt(chars.length)] }.joinToString("")
+    }
+
+    // ── Invitaciones ───────────────────────────────────────────────────────
+
     suspend fun generateInvitationCode(
         role: String = "ADMIN_LINEA",
         lineaId: String = "",
         expiresInHours: Int = 24
-    ): Result<InvitationCode> = withContext(Dispatchers.IO) {
-        try {
-            android.util.Log.d("AdminRepository", "generateInvitationCode: role=$role, lineaId=$lineaId")
-            
+    ): Result<InvitationCode> {
+        return try {
             val code = generateSecureCode()
-            val expiresAt = System.currentTimeMillis() + (expiresInHours * 60 * 60 * 1000)
-            val expiresAtStr = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault())
-                .format(java.util.Date(expiresAt))
-
-            val data = mutableMapOf(
-                "code" to code,
-                "role" to role,
-                "expiresAt" to expiresAtStr,
-                "isUsed" to false
+            val data = mutableMapOf<String, Any>(
+                "code"      to code,
+                "role"      to role,
+                "expiresAt" to formatNowPlus(expiresInHours),
+                "isUsed"    to false
             )
-            // Agregar linea_id solo si es ADMIN_LINEA y se proporcionó una línea
-            if (role == "ADMIN_LINEA" && lineaId.isNotEmpty()) {
-                data["linea_id"] = lineaId
-                android.util.Log.d("AdminRepository", "Agregando linea_id al código: $lineaId")
-            } else {
-                android.util.Log.w("AdminRepository", "NO se agregó linea_id: role=$role, lineaId=$lineaId")
-            }
+            if (lineaId.isNotEmpty()) data["linea_id"] = lineaId
 
-            val token = getAuthToken()
-            android.util.Log.d("AdminRepository", "Datos a enviar: $data")
-            
-            val result: Result<String> = client.createRecord("invitation_codes", data, token)
+            val result = client.createRecord("invitation_codes", data, getAuthToken())
             result.fold(
-                onSuccess = { response ->
-                    android.util.Log.d("AdminRepository", "Código creado exitosamente: $response")
-                    val invitationCode = parseInvitationCode(response)
-                    Result.success(invitationCode)
+                onSuccess = { recordJson ->
+                    Result.success(InvitationCode(
+                        id        = extractStringField(recordJson, "id"),
+                        code      = code,
+                        role      = role,
+                        lineaId   = lineaId,
+                        isUsed    = false,
+                        expiresAt = formatNowPlus(expiresInHours)
+                    ))
                 },
-                onFailure = { error ->
-                    android.util.Log.e("AdminRepository", "Error creando código: ${error.message}")
-                    Result.failure(error)
-                }
-            )
-        } catch (e: Exception) {
-            android.util.Log.e("AdminRepository", "Excepción creando código: ${e.message}", e)
-            Result.failure(e)
-        }
-    }
-
-    /**
-     * Get all invitation codes (con paginación automática)
-     */
-    suspend fun getInvitationCodes(): Result<List<InvitationCode>> = withContext(Dispatchers.IO) {
-        try {
-            val allCodes = mutableListOf<InvitationCode>()
-            var page = 1
-            val perPage = 50
-            var hasMore = true
-            val token = getAuthToken()
-
-            while (hasMore) {
-                val result: Result<String> = client.getList("invitation_codes", page = page, perPage = perPage, sort = "-created", authToken = token)
-                result.fold(
-                    onSuccess = { response ->
-                        val codes = parseInvitationCodeList(response)
-                        allCodes.addAll(codes)
-                        hasMore = codes.size == perPage
-                        page++
-                    },
-                    onFailure = { error ->
-                        return@withContext Result.failure(error)
-                    }
-                )
-            }
-            Result.success(allCodes)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    /**
-     * Validate an invitation code
-     */
-    suspend fun validateInvitationCode(code: String): Result<InvitationCode?> = withContext(Dispatchers.IO) {
-        try {
-            // Filtrar por code Y isUsed=false en una sola query
-            val token = getAuthToken()
-            android.util.Log.d("AdminRepository", "Validando código: $code")
-            val result: Result<String> = client.getList(
-                "invitation_codes",
-                page = 1,
-                perPage = 1,
-                filter = "code=\"$code\" && isUsed=false",
-                authToken = token
-            )
-            result.fold(
-                onSuccess = { response ->
-                    android.util.Log.d("AdminRepository", "Respuesta validación: $response")
-                    val codes = parseInvitationCodeList(response)
-                    if (codes.isNotEmpty()) {
-                        val invitationCode = codes.first()
-                        android.util.Log.d("AdminRepository", "Código encontrado: id=${invitationCode.id}, role=${invitationCode.role}, lineaId=${invitationCode.lineaId}")
-                        if (invitationCode.isValid()) {
-                            Result.success(invitationCode)
-                        } else {
-                            Result.failure(Exception("El código ha expirado"))
-                        }
-                    } else {
-                        Result.failure(Exception("Código de invitación no válido o ya utilizado"))
-                    }
-                },
-                onFailure = { error ->
-                    android.util.Log.e("AdminRepository", "Error validando código: ${error.message}")
-                    Result.failure(error)
-                }
-            )
-        } catch (e: Exception) {
-            android.util.Log.e("AdminRepository", "Excepción validando código: ${e.message}", e)
-            Result.failure(e)
-        }
-    }
-
-    /**
-     * Delete an invitation code
-     */
-    suspend fun deleteInvitationCode(codeId: String): Result<Unit> = withContext(Dispatchers.IO) {
-        try {
-            val token = getAuthToken()
-            val result: Result<Unit> = client.deleteRecord("invitation_codes", codeId, token)
-            result.fold(
-                onSuccess = { Result.success(Unit) },
-                onFailure = { error -> Result.failure(error) }
+                onFailure = { Result.failure(it) }
             )
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
 
-    /**
-     * Mark an invitation code as used
-     */
-    suspend fun useInvitationCode(codeId: String, userEmail: String): Result<Unit> = withContext(Dispatchers.IO) {
-        try {
-            val usedAt = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault())
-                .format(java.util.Date())
-
-            val data = mapOf(
-                "isUsed" to true,
-                "usedBy" to userEmail,  // Guardar el email del usuario
-                "usedAt" to usedAt
-            )
-
-            val token = getAuthToken()
-            val result: Result<String> = client.updateRecord("invitation_codes", codeId, data, token)
-            result.fold(
-                onSuccess = { Result.success(Unit) },
-                onFailure = { error -> Result.failure(error) }
-            )
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    /**
-     * Create a new line
-     */
-    suspend fun createLinea(
-        name: String,
-        code: String,
-        rutaId: String = ""
-    ): Result<Linea> = withContext(Dispatchers.IO) {
-        try {
-            android.util.Log.d("AdminRepository", "Creando línea: name=$name, code=$code, rutaId=$rutaId")
-            val data = mapOf(
-                "name" to name,
-                "code" to code,
-                "ruta_id" to rutaId
-            )
-
-            val token = getAuthToken()
-            android.util.Log.d("AdminRepository", "Token disponible: ${token != null}")
-            
-            val result: Result<String> = client.createRecord("lineas", data, token)
-            result.fold(
-                onSuccess = { response ->
-                    android.util.Log.d("AdminRepository", "Línea creada exitosamente: $response")
-                    val linea = parseLinea(response)
-                    Result.success(linea)
-                },
-                onFailure = { error ->
-                    android.util.Log.e("AdminRepository", "Error creando línea: ${error.message}", error)
-                    Result.failure(error)
-                }
-            )
-        } catch (e: Exception) {
-            android.util.Log.e("AdminRepository", "Excepción creando línea: ${e.message}", e)
-            Result.failure(e)
-        }
-    }
-
-    /**
-     * Get all lines (con paginación automática)
-     */
-    suspend fun getLineas(): Result<List<Linea>> = withContext(Dispatchers.IO) {
-        try {
-            android.util.Log.d("AdminRepository", "Cargando líneas...")
-            val allLineas = mutableListOf<Linea>()
-            var page = 1
-            val perPage = 50
-            var hasMore = true
-
-            val token = getAuthToken()
-            android.util.Log.d("AdminRepository", "Token disponible para getLineas: ${token != null}")
-
-            while (hasMore) {
-                val result: Result<String> = client.getList("lineas", page = page, perPage = perPage, sort = "name", authToken = token)
-                result.fold(
-                    onSuccess = { response ->
-                        android.util.Log.d("AdminRepository", "Respuesta recibida: ${response.take(200)}...")
-                        val lineas = parseLineaList(response)
-                        android.util.Log.d("AdminRepository", "Líneas parseadas: ${lineas.size}")
-                        allLineas.addAll(lineas)
-                        hasMore = lineas.size == perPage
-                        page++
-                    },
-                    onFailure = { error ->
-                        android.util.Log.e("AdminRepository", "Error cargando líneas: ${error.message}", error)
-                        return@withContext Result.failure(error)
-                    }
-                )
-            }
-            android.util.Log.d("AdminRepository", "Total líneas cargadas: ${allLineas.size}")
-            Result.success(allLineas)
-        } catch (e: Exception) {
-            android.util.Log.e("AdminRepository", "Excepción cargando líneas: ${e.message}", e)
-            Result.failure(e)
-        }
-    }
-
-    /**
-     * Get lines by ruta ID
-     */
-    suspend fun getLineasByRuta(rutaId: String): Result<List<Linea>> = withContext(Dispatchers.IO) {
-        try {
-            val token = getAuthToken()
-            val result: Result<String> = client.getList("lineas", page = 1, perPage = 100, filter = "ruta_id=\"$rutaId\"", authToken = token)
-            result.fold(
-                onSuccess = { response ->
-                    val lineas = parseLineaList(response)
-                    Result.success(lineas)
-                },
-                onFailure = { error ->
-                    Result.failure(error)
-                }
-            )
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    /**
-     * Update a line
-     */
-    suspend fun updateLinea(
-        lineaId: String,
-        name: String,
-        code: String,
-        rutaId: String = ""
-    ): Result<Linea> = withContext(Dispatchers.IO) {
-        try {
-            val data = mutableMapOf(
-                "name" to name,
-                "code" to code
-            )
-            if (rutaId.isNotEmpty()) {
-                data["ruta_id"] = rutaId
-            }
-
-            val token = getAuthToken()
-            val result: Result<String> = client.updateRecord("lineas", lineaId, data, token)
-            result.fold(
-                onSuccess = { response ->
-                    val linea = parseLinea(response)
-                    Result.success(linea)
-                },
-                onFailure = { error ->
-                    Result.failure(error)
-                }
-            )
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-
-
-    /**
-     * Delete a line
-     */
-    suspend fun deleteLinea(lineaId: String): Result<Unit> = withContext(Dispatchers.IO) {
-        try {
-            val token = getAuthToken()
-            val result: Result<Unit> = client.deleteRecord("lineas", lineaId, token)
-            result.fold(
-                onSuccess = { Result.success(Unit) },
-                onFailure = { error -> Result.failure(error) }
-            )
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    private fun generateSecureCode(): String {
-        val chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-        return (1..12).map { chars.random() }.joinToString("")
-    }
-
-    private fun parseInvitationCode(jsonString: String): InvitationCode {
+    suspend fun getInvitationCodes(): Result<List<InvitationCode>> {
         return try {
-            json.decodeFromString<InvitationCode>(jsonString)
-        } catch (e: Exception) {
-            InvitationCode()
-        }
-    }
-
-    private fun parseInvitationCodeList(jsonString: String): List<InvitationCode> {
-        return try {
-            val wrapper = json.decodeFromString<InvitationCodeListWrapper>(jsonString)
-            wrapper.items
-        } catch (e: Exception) {
-            emptyList()
-        }
-    }
-
-    private fun parseLinea(jsonString: String): Linea {
-        return try {
-            json.decodeFromString<Linea>(jsonString)
-        } catch (e: Exception) {
-            Linea()
-        }
-    }
-
-    private fun parseLineaList(jsonString: String): List<Linea> {
-        return try {
-            val wrapper = json.decodeFromString<LineaListWrapper>(jsonString)
-            wrapper.items
-        } catch (e: Exception) {
-            emptyList()
-        }
-    }
-
-    @kotlinx.serialization.Serializable
-    data class InvitationCodeListWrapper(
-        val page: Int = 1,
-        val perPage: Int = 100,
-        val totalItems: Int = 0,
-        val totalPages: Int = 0,
-        val items: List<InvitationCode> = emptyList()
-    )
-
-    @kotlinx.serialization.Serializable
-    data class LineaListWrapper(
-        val page: Int = 1,
-        val perPage: Int = 100,
-        val totalItems: Int = 0,
-        val totalPages: Int = 0,
-        val items: List<Linea> = emptyList()
-    )
-
-    // ============ Logs simplificados ============
-
-    /**
-     * Crear un registro de log simple
-     * @param userId ID del usuario que realiza la acción
-     * @param description Descripción de la acción realizada
-     */
-    suspend fun createLog(
-        userId: String,
-        description: String
-    ): Result<LogEntry> = withContext(Dispatchers.IO) {
-        try {
-            val data = mapOf(
-                "userid" to userId,
-                "description" to description
-            )
-
-            val token = getAuthToken()
-            val result: Result<String> = client.createRecord("logs", data, token)
+            val result = client.getList("invitation_codes", perPage = 50, sort = "-created", authToken = getAuthToken())
             result.fold(
-                onSuccess = { response ->
-                    val logEntry = parseLogEntry(response)
-                    Result.success(logEntry)
-                },
-                onFailure = { error ->
-                    Result.failure(error)
-                }
-            )
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    /**
-     * Obtener todos los logs (ordenados por fecha desc, con paginación)
-     */
-    suspend fun getLogs(limit: Int = 50): Result<List<LogEntry>> = withContext(Dispatchers.IO) {
-        try {
-            val token = getAuthToken()
-            val result: Result<String> = client.getList(
-                "logs",
-                page = 1,
-                perPage = limit,
-                sort = "-created",
-                authToken = token
-            )
-            result.fold(
-                onSuccess = { response ->
-                    val logs = parseLogEntryList(response)
-                    Result.success(logs)
-                },
-                onFailure = { error ->
-                    Result.failure(error)
-                }
-            )
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    /**
-     * Obtener logs por usuario
-     */
-    suspend fun getLogsByUser(userId: String): Result<List<LogEntry>> = withContext(Dispatchers.IO) {
-        try {
-            val token = getAuthToken()
-            val result: Result<String> = client.getList(
-                "logs",
-                page = 1,
-                perPage = 50,
-                filter = "userid=\"$userId\"",
-                sort = "-created",
-                authToken = token
-            )
-            result.fold(
-                onSuccess = { response ->
-                    val logs = parseLogEntryList(response)
-                    Result.success(logs)
-                },
-                onFailure = { error ->
-                    Result.failure(error)
-                }
-            )
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    private fun parseLogEntry(jsonString: String): LogEntry {
-        return try {
-            json.decodeFromString<LogEntry>(jsonString)
-        } catch (e: Exception) {
-            LogEntry()
-        }
-    }
-
-    private fun parseLogEntryList(jsonString: String): List<LogEntry> {
-        return try {
-            val wrapper = json.decodeFromString<LogEntryListWrapper>(jsonString)
-            wrapper.items
-        } catch (e: Exception) {
-            emptyList()
-        }
-    }
-
-    @kotlinx.serialization.Serializable
-    data class LogEntryListWrapper(
-        val page: Int = 1,
-        val perPage: Int = 100,
-        val totalItems: Int = 0,
-        val totalPages: Int = 0,
-        val items: List<LogEntry> = emptyList()
-    )
-
-    // ============ Rutas ============
-
-    /**
-     * Crear una nueva ruta para una línea
-     */
-    suspend fun createRuta(
-        name: String,
-        description: String,
-        startPoint: String = "",
-        endPoint: String = "",
-        lineaId: String = ""
-    ): Result<Ruta> = withContext(Dispatchers.IO) {
-        try {
-            val data = mutableMapOf(
-                "name" to name,
-                "description" to description
-            )
-            if (startPoint.isNotEmpty()) data["start_point"] = startPoint
-            if (endPoint.isNotEmpty()) data["end_point"] = endPoint
-
-            val token = getAuthToken()
-            val result: Result<String> = client.createRecord("rutas", data, token)
-            result.fold(
-                onSuccess = { response ->
-                    val ruta = parseRuta(response)
-                    // Si hay lineaId, actualizar la línea con esta ruta
-                    if (lineaId.isNotEmpty() && ruta.id.isNotEmpty()) {
-                        updateLineaRuta(lineaId, ruta.id)
-                    }
-                    Result.success(ruta)
-                },
-                onFailure = { error -> Result.failure(error) }
-            )
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    /**
-     * Obtener ruta por ID
-     */
-    suspend fun getRuta(rutaId: String): Result<Ruta> = withContext(Dispatchers.IO) {
-        try {
-            val token = getAuthToken()
-            val result: Result<String> = client.getRecord("rutas", rutaId, token)
-            result.fold(
-                onSuccess = { response -> Result.success(parseRuta(response)) },
-                onFailure = { error -> Result.failure(error) }
-            )
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    /**
-     * Actualizar la ruta asignada a una línea
-     */
-    private suspend fun updateLineaRuta(lineaId: String, rutaId: String): Result<Unit> = withContext(Dispatchers.IO) {
-        try {
-            val data = mapOf("ruta_id" to rutaId)
-            val token = getAuthToken()
-            val result: Result<String> = client.updateRecord("lineas", lineaId, data, token)
-            result.fold(
-                onSuccess = { Result.success(Unit) },
-                onFailure = { error -> Result.failure(error) }
-            )
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    private fun parseRuta(jsonString: String): Ruta {
-        return try {
-            json.decodeFromString<Ruta>(jsonString)
-        } catch (e: Exception) {
-            Ruta()
-        }
-    }
-
-    // ============ Vehicle Invitation Codes ============
-
-    /**
-     * Generar código de invitación para vehículo
-     */
-    suspend fun generateVehicleInvitationCode(
-        lineaId: String,
-        creadoPor: String,
-        expiresInHours: Int = 72
-    ): Result<VehicleInvitationCode> = withContext(Dispatchers.IO) {
-        try {
-            val code = generateSecureCode()
-            val expiresAt = System.currentTimeMillis() + (expiresInHours * 60 * 60 * 1000)
-            val expiresAtStr = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault())
-                .format(java.util.Date(expiresAt))
-
-            val data = mapOf(
-                "code" to code,
-                "linea_id" to lineaId,
-                "expires_at" to expiresAtStr,
-                "max_usos" to 1,
-                "creado_por" to creadoPor,
-                "activo" to true
-            )
-
-            val token = getAuthToken()
-            val result: Result<String> = client.createRecord("vehicle_invitation_codes", data, token)
-            result.fold(
-                onSuccess = { response ->
-                    val vehicleCode = parseVehicleInvitationCode(response)
-                    Result.success(vehicleCode)
-                },
-                onFailure = { error -> Result.failure(error) }
-            )
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    /**
-     * Obtener códigos de invitación de vehículo por línea
-     */
-    suspend fun getVehicleInvitationCodesByLinea(lineaId: String): Result<List<VehicleInvitationCode>> = withContext(Dispatchers.IO) {
-        try {
-            val token = getAuthToken()
-            val result: Result<String> = client.getList(
-                "vehicle_invitation_codes",
-                page = 1,
-                perPage = 50,
-                filter = "linea_id=\"$lineaId\"",
-                sort = "-created",
-                authToken = token
-            )
-            result.fold(
-                onSuccess = { response ->
-                    val codes = parseVehicleInvitationCodeList(response)
+                onSuccess = { json ->
+                    val codes = parseInvitationCodesFromJson(json)
                     Result.success(codes)
                 },
-                onFailure = { error -> Result.failure(error) }
+                onFailure = { Result.failure(it) }
             )
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
 
-    /**
-     * Validar código de invitación de vehículo
-     */
-    suspend fun validateVehicleInvitationCode(code: String): Result<VehicleInvitationCode?> = withContext(Dispatchers.IO) {
-        try {
-            val token = getAuthToken()
-            val result: Result<String> = client.getList(
-                "vehicle_invitation_codes",
-                page = 1,
-                perPage = 1,
-                filter = "code=\"$code\" && activo=true",
-                authToken = token
+    suspend fun validateInvitationCode(code: String): Result<InvitationCode> {
+        return try {
+            val result = client.getList(
+                "invitation_codes",
+                filter = "code='$code'&&isUsed=false",
+                authToken = getAuthToken()
             )
             result.fold(
-                onSuccess = { response ->
-                    val codes = parseVehicleInvitationCodeList(response)
-                    if (codes.isNotEmpty()) {
-                        val vehicleCode = codes.first()
-                        if (vehicleCode.isValid()) {
-                            Result.success(vehicleCode)
-                        } else {
-                            Result.failure(Exception("El código ha expirado o ya fue usado"))
-                        }
-                    } else {
-                        Result.failure(Exception("Código de invitación no válido"))
-                    }
+                onSuccess = { json ->
+                    val codes = parseInvitationCodesFromJson(json)
+                    if (codes.isNotEmpty()) Result.success(codes.first())
+                    else Result.failure(Exception("Código no válido o ya usado"))
                 },
-                onFailure = { error -> Result.failure(error) }
+                onFailure = { Result.failure(it) }
             )
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
 
-    /**
-     * Marcar código de vehículo como usado
-     */
-    suspend fun useVehicleInvitationCode(codeId: String, usadoPor: String): Result<Unit> = withContext(Dispatchers.IO) {
-        try {
-            val usadoEn = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault())
-                .format(java.util.Date())
+    suspend fun deleteInvitationCode(codeId: String): Result<Unit> =
+        client.deleteRecord("invitation_codes", codeId, getAuthToken()).map { }
 
-            val data = mapOf(
-                "activo" to false,
-                "usado_por" to usadoPor,
-                "usado_en" to usadoEn
-            )
+    suspend fun useInvitationCode(codeId: String, userEmail: String): Result<Unit> =
+        client.updateRecord("invitation_codes", codeId, mapOf("isUsed" to true, "usedBy" to userEmail), getAuthToken()).map { }
 
-            val token = getAuthToken()
-            val result: Result<String> = client.updateRecord("vehicle_invitation_codes", codeId, data, token)
-            result.fold(
-                onSuccess = { Result.success(Unit) },
-                onFailure = { error -> Result.failure(error) }
-            )
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
+    // ── Líneas ─────────────────────────────────────────────────────────────
 
-    /**
-     * Eliminar código de invitación de vehículo
-     */
-    suspend fun deleteVehicleInvitationCode(codeId: String): Result<Unit> = withContext(Dispatchers.IO) {
-        try {
-            val token = getAuthToken()
-            val result: Result<Unit> = client.deleteRecord("vehicle_invitation_codes", codeId, token)
-            result.fold(
-                onSuccess = { Result.success(Unit) },
-                onFailure = { error -> Result.failure(error) }
-            )
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    private fun parseVehicleInvitationCode(jsonString: String): VehicleInvitationCode {
+    suspend fun createLinea(name: String, code: String, rutaId: String = ""): Result<Linea> {
         return try {
-            json.decodeFromString<VehicleInvitationCode>(jsonString)
-        } catch (e: Exception) {
-            VehicleInvitationCode()
-        }
+            val data = mutableMapOf<String, Any>("name" to name, "code" to code)
+            if (rutaId.isNotEmpty()) data["ruta_id"] = rutaId
+            val result = client.createRecord("lineas", data, getAuthToken())
+            result.fold(
+                onSuccess = { json ->
+                    Result.success(Linea(
+                        id     = extractStringField(json, "id"),
+                        name   = name,
+                        code   = code,
+                        rutaId = rutaId
+                    ))
+                },
+                onFailure = { Result.failure(it) }
+            )
+        } catch (e: Exception) { Result.failure(e) }
     }
 
-    private fun parseVehicleInvitationCodeList(jsonString: String): List<VehicleInvitationCode> {
+    suspend fun getLineas(): Result<List<Linea>> {
         return try {
-            val wrapper = json.decodeFromString<VehicleInvitationCodeListWrapper>(jsonString)
-            wrapper.items
-        } catch (e: Exception) {
-            emptyList()
-        }
+            Log.d("AdminRepository", "Consultando colección lineas...")
+            val result = client.getList("lineas", perPage = 100, sort = "name", authToken = getAuthToken())
+            result.fold(
+                onSuccess = { json ->
+                    Log.d("AdminRepository", "Respuesta lineas OK")
+                    Result.success(parseLineasFromJson(json))
+                },
+                onFailure = { e ->
+                    Log.e("AdminRepository", "Error getLineas: ${e.message}")
+                    Result.failure(e)
+                }
+            )
+        } catch (e: Exception) { Result.failure(e) }
     }
 
-    @kotlinx.serialization.Serializable
-    data class VehicleInvitationCodeListWrapper(
-        val page: Int = 1,
-        val perPage: Int = 100,
-        val totalItems: Int = 0,
-        val totalPages: Int = 0,
-        val items: List<VehicleInvitationCode> = emptyList()
+    suspend fun getLineasByRuta(rutaId: String): Result<List<Linea>> {
+        return try {
+            val result = client.getList("lineas", filter = "ruta_id='$rutaId'", authToken = getAuthToken())
+            result.fold(
+                onSuccess = { json -> Result.success(parseLineasFromJson(json)) },
+                onFailure = { Result.failure(it) }
+            )
+        } catch (e: Exception) { Result.failure(e) }
+    }
+
+    suspend fun updateLinea(lineaId: String, name: String, code: String, rutaId: String = ""): Result<Linea> {
+        return try {
+            val data = mutableMapOf<String, Any>("name" to name, "code" to code)
+            if (rutaId.isNotEmpty()) data["ruta_id"] = rutaId
+            client.updateRecord("lineas", lineaId, data, getAuthToken())
+                .map { Linea(lineaId, name, code, rutaId) }
+        } catch (e: Exception) { Result.failure(e) }
+    }
+
+    suspend fun deleteLinea(lineaId: String): Result<Unit> =
+        client.deleteRecord("lineas", lineaId, getAuthToken()).map { }
+
+    // ── Logs ───────────────────────────────────────────────────────────────
+
+    suspend fun createLog(userId: String, description: String): Result<Unit> {
+        return try {
+            client.createRecord("logs", mapOf("user_id" to userId, "description" to description, "created_at" to formatNow()), getAuthToken()).map { }
+        } catch (e: Exception) { Result.failure(e) }
+    }
+
+    suspend fun getLogs(limit: Int = 50): Result<List<LogEntry>> {
+        return try {
+            val result = client.getList("logs", perPage = limit, sort = "-created", authToken = getAuthToken())
+            result.fold(
+                onSuccess = { json -> Result.success(parseLogsFromJson(json)) },
+                onFailure = { Result.failure(it) }
+            )
+        } catch (e: Exception) { Result.failure(e) }
+    }
+
+    suspend fun getLogsByUser(userId: String): Result<List<LogEntry>> {
+        return try {
+            val result = client.getList("logs", filter = "user_id='$userId'", sort = "-created", authToken = getAuthToken())
+            result.fold(
+                onSuccess = { json -> Result.success(parseLogsFromJson(json)) },
+                onFailure = { Result.failure(it) }
+            )
+        } catch (e: Exception) { Result.failure(e) }
+    }
+
+    // ── Rutas ──────────────────────────────────────────────────────────────
+
+    suspend fun createRuta(name: String, description: String, startPoint: String = "", endPoint: String = "", lineaId: String = ""): Result<Ruta> {
+        return try {
+            val data = mutableMapOf<String, Any>("name" to name, "description" to description)
+            if (startPoint.isNotEmpty()) data["start_point"] = startPoint
+            if (endPoint.isNotEmpty())   data["end_point"]   = endPoint
+            if (lineaId.isNotEmpty())    data["linea_id"]    = lineaId
+            client.createRecord("rutas", data, getAuthToken())
+                .map { json -> Ruta(id = extractStringField(json, "id"), name = name, description = description, startPoint = startPoint, endPoint = endPoint) }
+        } catch (e: Exception) { Result.failure(e) }
+    }
+
+    suspend fun getRuta(rutaId: String): Result<Ruta> {
+        return try {
+            client.getRecord("rutas", rutaId, getAuthToken())
+                .map { json -> parseRutaFromJson(json) }
+        } catch (e: Exception) { Result.failure(e) }
+    }
+
+    suspend fun updateLineaRuta(lineaId: String, rutaId: String): Result<Unit> =
+        client.updateRecord("lineas", lineaId, mapOf("ruta_id" to rutaId), getAuthToken()).map { }
+
+    // ── Códigos de vehículo ────────────────────────────────────────────────
+
+    suspend fun generateVehicleInvitationCode(lineaId: String, creadoPor: String, expiresInHours: Int = 72): Result<VehicleInvitationCode> {
+        return try {
+            val code = generateSecureCode()
+            val data = mapOf("code" to code, "linea_id" to lineaId, "creado_por" to creadoPor, "expires_at" to formatNowPlus(expiresInHours), "usadoPor" to "")
+            client.createRecord("vehicle_invitation_codes", data, getAuthToken()).map { json ->
+                VehicleInvitationCode(id = extractStringField(json, "id"), code = code, lineaId = lineaId, creadoPor = creadoPor, usadoPor = "", expiresAt = formatNowPlus(expiresInHours))
+            }
+        } catch (e: Exception) { Result.failure(e) }
+    }
+
+    suspend fun getVehicleInvitationCodesByLinea(lineaId: String): Result<List<VehicleInvitationCode>> {
+        return try {
+            client.getList("vehicle_invitation_codes", filter = "linea_id='$lineaId'", sort = "-created", authToken = getAuthToken())
+                .map { json -> parseVehicleCodesFromJson(json) }
+        } catch (e: Exception) { Result.failure(e) }
+    }
+
+    suspend fun validateVehicleInvitationCode(code: String): Result<VehicleInvitationCode> {
+        return try {
+            val result = client.getList("vehicle_invitation_codes", filter = "code='$code'&&usadoPor=''", authToken = getAuthToken())
+            result.fold(
+                onSuccess = { json ->
+                    val codes = parseVehicleCodesFromJson(json)
+                    if (codes.isNotEmpty()) Result.success(codes.first())
+                    else Result.failure(Exception("Código de vehículo no válido o ya usado"))
+                },
+                onFailure = { Result.failure(it) }
+            )
+        } catch (e: Exception) { Result.failure(e) }
+    }
+
+    suspend fun useVehicleInvitationCode(codeId: String, usadoPor: String): Result<Unit> =
+        client.updateRecord("vehicle_invitation_codes", codeId, mapOf("usadoPor" to usadoPor), getAuthToken()).map { }
+
+    suspend fun deleteVehicleInvitationCode(codeId: String): Result<Unit> =
+        client.deleteRecord("vehicle_invitation_codes", codeId, getAuthToken()).map { }
+
+    // ── Parsers JSON ───────────────────────────────────────────────────────
+
+    private fun extractStringField(json: String, field: String): String {
+        return Regex(""""$field"\s*:\s*"([^"]*)"""").find(json)?.groupValues?.get(1) ?: ""
+    }
+
+    private fun parseInvitationCodesFromJson(json: String): List<InvitationCode> {
+        return extractItemBlocks(json).map { block ->
+            InvitationCode(
+                id        = extractStringField(block, "id"),
+                code      = extractStringField(block, "code"),
+                role      = extractStringField(block, "role"),
+                lineaId   = extractStringField(block, "linea_id"),
+                isUsed    = block.contains("\"isUsed\":true") || block.contains("\"isUsed\": true"),
+                expiresAt = extractStringField(block, "expiresAt")
+            )
+        }.filter { it.id.isNotEmpty() }
+    }
+
+    private fun parseLineasFromJson(json: String): List<Linea> {
+        val regex = Regex("""\{[^}]*"id"\s*:\s*"([^"]*)"[^}]*"name"\s*:\s*"([^"]*)"[^}]*\}""")
+        return regex.findAll(json).map { match ->
+            val block = match.value
+            Linea(
+                id     = extractStringField(block, "id"),
+                name   = extractStringField(block, "name"),
+                code   = extractStringField(block, "code"),
+                rutaId = extractStringField(block, "ruta_id")
+            )
+        }.toList()
+    }
+
+    private fun parseLogsFromJson(json: String): List<LogEntry> {
+        val regex = Regex("""\{[^}]*"id"\s*:\s*"([^"]*)"[^}]*\}""")
+        return regex.findAll(json).map { match ->
+            val block = match.value
+            LogEntry(
+                id          = extractStringField(block, "id"),
+                userId      = extractStringField(block, "userid"),
+                description = extractStringField(block, "description"),
+                created     = extractStringField(block, "created")
+            )
+        }.toList()
+    }
+
+    private fun parseRutaFromJson(json: String): Ruta = Ruta(
+        id          = extractStringField(json, "id"),
+        name        = extractStringField(json, "name"),
+        description = extractStringField(json, "description"),
+        startPoint  = extractStringField(json, "start_point"),
+        endPoint    = extractStringField(json, "end_point")
     )
+
+    /**
+     * Extrae los bloques {} individuales del array "items" del JSON de PocketBase.
+     * Usa conteo de llaves en lugar de regex para no depender del orden de los campos.
+     */
+    private fun extractItemBlocks(json: String): List<String> {
+        // Busca el array "items":[...]
+        val itemsStart = json.indexOf('"', json.indexOf("\"items\":")) + 1
+        val arrayStart = json.indexOf('[', json.indexOf("\"items\":"))
+        if (arrayStart == -1) return emptyList()
+
+        val blocks = mutableListOf<String>()
+        var depth = 0
+        var blockStart = -1
+        var i = arrayStart + 1
+        while (i < json.length) {
+            when (json[i]) {
+                '{' -> { if (depth == 0) blockStart = i; depth++ }
+                '}' -> {
+                    depth--
+                    if (depth == 0 && blockStart != -1) {
+                        blocks.add(json.substring(blockStart, i + 1))
+                        blockStart = -1
+                    }
+                }
+                ']' -> if (depth == 0) break
+            }
+            i++
+        }
+        return blocks
+    }
+
+    private fun parseVehicleCodesFromJson(json: String): List<VehicleInvitationCode> {
+        return extractItemBlocks(json).map { block ->
+            VehicleInvitationCode(
+                id        = extractStringField(block, "id"),
+                code      = extractStringField(block, "code"),
+                lineaId   = extractStringField(block, "linea_id"),
+                creadoPor = extractStringField(block, "creado_por"),
+                usadoPor  = extractStringField(block, "usadoPor"),
+                expiresAt = extractStringField(block, "expires_at")
+            )
+        }.filter { it.id.isNotEmpty() }
+    }
 }

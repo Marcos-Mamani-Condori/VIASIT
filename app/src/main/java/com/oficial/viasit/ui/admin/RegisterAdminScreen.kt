@@ -59,12 +59,12 @@ fun RegisterAdminScreen(
 
     val scope = rememberCoroutineScope()
     val authClient = remember { PocketBaseAuthClient() }
-    val adminRepository = remember { AdminRepository() }
+    val adminRepository = remember { AutosAplicacion.instance.adminRepository }
     val authRepository = remember { AutosAplicacion.instance.authRepository }
 
-    // Auto-validate cuando el código tiene longitud suficiente
+    // Auto-validate cuando el código tiene longitud suficiente (8 caracteres)
     LaunchedEffect(invitationCode) {
-        if (invitationCode.length >= 12) {
+        if (invitationCode.length >= 8) {
             val result = adminRepository.validateInvitationCode(invitationCode)
             result.fold(
                 onSuccess = { code ->
@@ -273,7 +273,7 @@ fun RegisterAdminScreen(
                     value = invitationCode,
                     onValueChange = { invitationCode = it.uppercase() },
                     label = { Text("Ingresa el código") },
-                    placeholder = { Text("XXXXXXXXXXXX", color = Slate600) },
+                    placeholder = { Text("XXXXXXXX", color = Slate600) },
                     singleLine = true,
                     isError = invitationCode.isNotEmpty() && !codeValidated,
                     supportingText = when {

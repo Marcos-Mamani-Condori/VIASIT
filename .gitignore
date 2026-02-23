@@ -21,3 +21,7 @@ docs/
 secrets.properties
 .env
 *.env
+
+# Python demo
+.venv/
+demo/__pycache__/

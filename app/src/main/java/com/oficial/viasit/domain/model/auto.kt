@@ -2,6 +2,55 @@ package com.oficial.viasit.domain.model
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.serialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+
+/**
+ * Serializador personalizado para manejar userid que puede ser:
+ * - String: "lvb2ka1s47ap07u"
+ * - JsonObject: {"id": "lvb2ka1s47ap07u", ...} (relación expandida)
+ * - JsonArray: ["lvb2ka1s47ap07u"] (relación múltiple con un elemento)
+ */
+object UserIdSerializer : KSerializer<String> {
+    override val descriptor: SerialDescriptor = serialDescriptor<String>()
+    
+    override fun serialize(encoder: Encoder, value: String) {
+        encoder.encodeString(value)
+    }
+    
+    override fun deserialize(decoder: Decoder): String {
+        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder 
+            ?: return decoder.decodeString()
+        val element = jsonDecoder.decodeJsonElement()
+        return when (element) {
+            is JsonPrimitive -> element.content
+            is JsonObject -> element["id"]?.let { 
+                (it as? JsonPrimitive)?.content ?: ""
+            } ?: ""
+            is kotlinx.serialization.json.JsonArray -> {
+                // Si es un array, tomar el primer elemento
+                if (element.isEmpty()) ""
+                else {
+                    val first = element[0]
+                    when (first) {
+                        is JsonPrimitive -> first.content
+                        is JsonObject -> first["id"]?.let { 
+                            (it as? JsonPrimitive)?.content ?: ""
+                        } ?: ""
+                        else -> ""
+                    }
+                }
+            }
+            else -> ""
+        }
+    }
+}
 
 /**
  * Modelo de datos para Vehículos (Autos)
@@ -25,6 +74,8 @@ data class Auto(
     val id: String = "",
 
     // Relación con el usuario conductor (relation a users)
+    // Puede ser un String (ID) o un JsonObject (relación expandida)
+    @Serializable(UserIdSerializer::class)
     @SerialName("userid")
     val userId: String = "",
     

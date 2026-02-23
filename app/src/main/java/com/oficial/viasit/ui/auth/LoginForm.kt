@@ -1,0 +1,116 @@
+package com.oficial.viasit.ui.auth
+
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import com.oficial.viasit.ui.theme.*
+
+/**
+ * Formulario de inicio de sesión.
+ *
+ * Campos: correo electrónico + contraseña con toggle de visibilidad.
+ *
+ * Acciones adicionales:
+ *  - "Ver mapa como invitado" — acceso sin cuenta
+ *  - "Regístrate" — navega al formulario de registro
+ *  - "Registrar administrador" — acceso especial para admins
+ */
+@Composable
+fun LoginForm(
+    email: String,
+    password: String,
+    emailError: String?,
+    passwordError: String?,
+    isLoading: Boolean,
+    error: String?,
+    onEmailChange: (String) -> Unit,
+    onPasswordChange: (String) -> Unit,
+    onLoginClick: () -> Unit,
+    onShowRegister: () -> Unit,
+    onGuestClick: () -> Unit,
+    onRegisterAdmin: () -> Unit = {}
+) {
+    var passwordVisible by remember { mutableStateOf(false) }
+
+    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text("Bienvenido", style = MaterialTheme.typography.headlineMedium, color = Color.White)
+        Text("Inicia sesión para continuar", style = MaterialTheme.typography.bodyMedium, color = Slate400)
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        error?.let { ErrorCard(it) }
+
+        ViasitTextField(
+            value = email, onValueChange = onEmailChange, label = "Correo electrónico",
+            leadingIcon = { Icon(Icons.Default.Email, null, tint = if (emailError != null) Rose500 else Slate400, modifier = Modifier.size(20.dp)) },
+            isError = emailError != null, supportingText = emailError,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+        )
+
+        ViasitTextField(
+            value = password, onValueChange = onPasswordChange, label = "Contraseña",
+            leadingIcon = { Icon(Icons.Default.Lock, null, tint = if (passwordError != null) Rose500 else Slate400, modifier = Modifier.size(20.dp)) },
+            trailingIcon = {
+                IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                    Icon(if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility, null, tint = Slate400, modifier = Modifier.size(20.dp))
+                }
+            },
+            isError = passwordError != null, supportingText = passwordError,
+            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
+        )
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        ViasitPrimaryButton(text = "Iniciar sesión", onClick = onLoginClick, isLoading = isLoading)
+
+        // Divisor "o"
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            HorizontalDivider(modifier = Modifier.weight(1f), color = Slate700)
+            Text("o", style = MaterialTheme.typography.bodySmall, color = Slate600)
+            HorizontalDivider(modifier = Modifier.weight(1f), color = Slate700)
+        }
+
+        // Botón invitado
+        OutlinedButton(
+            onClick  = onGuestClick,
+            modifier = Modifier.fillMaxWidth().height(50.dp),
+            shape    = RoundedCornerShape(14.dp),
+            colors   = ButtonDefaults.outlinedButtonColors(contentColor = Slate200),
+            border   = BorderStroke(1.dp, Slate700)
+        ) {
+            Icon(Icons.Default.Visibility, null, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Ver mapa como invitado", style = MaterialTheme.typography.labelLarge)
+        }
+
+        // Link a registro
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+            Text("¿No tienes cuenta? ", style = MaterialTheme.typography.bodySmall, color = Slate400)
+            Text("Regístrate", style = MaterialTheme.typography.bodySmall, color = Brand400, fontWeight = FontWeight.SemiBold, modifier = Modifier.clickable { onShowRegister() })
+        }
+
+        // Acceso admin
+        Text(
+            text = "Registrar administrador",
+            style = MaterialTheme.typography.labelMedium, color = Brand400, fontWeight = FontWeight.Medium,
+            modifier = Modifier.fillMaxWidth().clickable { onRegisterAdmin() }.padding(vertical = 12.dp),
+            textAlign = TextAlign.Center
+        )
+    }
+}

@@ -11,6 +11,7 @@ import android.location.Location
 import android.os.Build
 import android.os.IBinder
 import android.os.Looper
+import android.util.Log
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import com.google.android.gms.location.FusedLocationProviderClient
@@ -19,6 +20,7 @@ import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
+import com.oficial.viasit.AutosAplicacion
 import com.oficial.viasit.MainActivity
 import com.oficial.viasit.R
 import com.oficial.viasit.data.remote.PocketBaseRealtimeClient
@@ -30,16 +32,20 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 /**
- * Servicio de tracking de ubicación optimizado para enviar coordenadas a PocketBase
- * 
+ * Servicio de tracking de ubicación optimizado para enviar coordenadas a PocketBase.
+ *
+ * FIXES aplicados:
+ * - Usa el cliente PocketBase compartido de AutosAplicacion (Fix 4) en lugar de crear
+ *   una tercera instancia de OkHttpClient.
+ * - calculateBearing() ahora usa FloatArray(2) donde result[1] es el bearing real (Fix 3).
+ * - updateLocationRequest() solo re-registra si el intervalo cambió (Fix 9).
+ *
  * Características:
  * - Umbral de distancia mínimo de 10 metros antes de enviar actualización
  * - Intervalos adaptativos basados en velocidad:
  *   - En movimiento (>5 km/h): 5 segundos
  *   - Lentamente (1-5 km/h): 10 segundos
  *   - Detenido (<1 km/h): 30 segundos
- *   - Detenido >5 minutos: Detener tracking completamente
- * - Solo envía ubicación cuando "En servicio" está activo
  */
 class LocationTrackingService : Service() {
 
@@ -49,19 +55,20 @@ class LocationTrackingService : Service() {
         const val ACTION_STOP = "ACTION_STOP"
         const val ACTION_UPDATE_SERVICE_STATUS = "ACTION_UPDATE_SERVICE_STATUS"
         private const val CHANNEL_ID = "location_channel"
-        
+        private const val TAG = "LocationTrackingService"
+
         // Configuration
         private const val MIN_DISTANCE_METERS = 10f
-        private const val INTERVAL_MOVING = 5000L      // 5 seconds - moving
-        private const val INTERVAL_SLOW = 10000L       // 10 seconds - slow
+        private const val INTERVAL_MOVING  = 5000L      // 5 seconds - moving fast
+        private const val INTERVAL_SLOW    = 10000L     // 10 seconds - moving slow
         private const val INTERVAL_STOPPED = 30000L     // 30 seconds - stopped
-        private const val STOPPED_THRESHOLD_MS = 300000L // 5 minutes stopped = stop tracking
     }
 
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var locationCallback: LocationCallback
+    // Usa el cliente compartido en vez de crear una instancia nueva (evita 3er OkHttpClient)
     private lateinit var pocketBaseClient: PocketBaseRealtimeClient
-    
+
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private var userId: String = ""
@@ -70,20 +77,21 @@ class LocationTrackingService : Service() {
     private var userRole: UserRole = UserRole.usuario
     private var isInService: Boolean = false
     private var isTracking: Boolean = false
-    
+
     // Tracking state
     private var lastLocation: Location? = null
     private var lastLocationTime: Long = 0
-    private var totalDistanceMoved: Float = 0f
     private var currentInterval: Long = INTERVAL_MOVING
-    
-    // Para cálculo de bearing cuando GPS no lo proporciona
+    // Fix 9: solo llama updateLocationRequest cuando el intervalo realmente cambia
+    private var lastRequestedInterval: Long = -1L
+
     private var previousLocationForBearing: Location? = null
 
     override fun onCreate() {
         super.onCreate()
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
-        pocketBaseClient = PocketBaseRealtimeClient()
+        // Reutiliza el cliente compartido; no crea OkHttpClient extra
+        pocketBaseClient = AutosAplicacion.instance.pocketBaseClient
         createNotificationChannel()
         setupLocationCallback()
     }
@@ -100,36 +108,31 @@ class LocationTrackingService : Service() {
                     UserRole.usuario
                 }
                 isInService = intent.getBooleanExtra("isInService", false)
-                android.util.Log.d("LocationTrackingService", "ACTION_START - autoId: $autoId, userId: $userId, isInService: $isInService")
+                Log.d(TAG, "ACTION_START - autoId: $autoId, userId: $userId, isInService: $isInService")
                 startForeground(NOTIFICATION_ID, createNotification())
                 startLocationTracking()
             }
             ACTION_STOP -> {
-                android.util.Log.d("LocationTrackingService", "ACTION_STOP")
+                Log.d(TAG, "ACTION_STOP")
                 stopLocationTracking()
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
             }
             ACTION_UPDATE_SERVICE_STATUS -> {
                 isInService = intent.getBooleanExtra("isInService", false)
-                android.util.Log.d("LocationTrackingService", "ACTION_UPDATE_SERVICE_STATUS - isInService: $isInService")
+                Log.d(TAG, "ACTION_UPDATE_SERVICE_STATUS - isInService: $isInService")
                 updateNotification()
             }
         }
         return START_STICKY
     }
 
-    override fun onBind(intent: Intent?): IBinder? {
-        return null
-    }
+    override fun onBind(intent: Intent?): IBinder? = null
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID, "Location", NotificationManager.IMPORTANCE_LOW
-            )
-            val notificationManager = getSystemService(NotificationManager::class.java)
-            notificationManager.createNotificationChannel(channel)
+            val channel = NotificationChannel(CHANNEL_ID, "Location", NotificationManager.IMPORTANCE_LOW)
+            getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
         }
     }
 
@@ -140,11 +143,10 @@ class LocationTrackingService : Service() {
         val pendingIntent = PendingIntent.getActivity(
             this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        
         val status = if (isInService) "En servicio" else "Fuera de servicio"
         val role = if (userRole == UserRole.conductor) "Conductor" else "Usuario"
         val text = if (isInService) "$role: $userName - Enviando ubicación" else "$role: $userName"
-        
+
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("VIASIT - $status")
             .setContentText(text)
@@ -156,164 +158,135 @@ class LocationTrackingService : Service() {
     }
 
     private fun updateNotification() {
-        val notificationManager = getSystemService(NotificationManager::class.java)
-        notificationManager.notify(NOTIFICATION_ID, createNotification())
+        getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, createNotification())
     }
 
     private fun setupLocationCallback() {
         locationCallback = object : LocationCallback() {
             override fun onLocationResult(result: LocationResult) {
-                result.lastLocation?.let { location ->
-                    processLocation(location)
-                }
+                result.lastLocation?.let { processLocation(it) }
             }
         }
     }
 
     private fun processLocation(location: Location) {
-        // Only send to PocketBase if "En servicio" is active
-        if (!isInService || userId.isEmpty()) {
-            return
-        }
+        if (!isInService || userId.isEmpty()) return
 
         val now = System.currentTimeMillis()
-        
-        // Check if we should send update based on distance
         val shouldSend = shouldSendUpdate(location)
-        
+
         if (shouldSend) {
-            // Send to PocketBase
-            serviceScope.launch {
-                sendLocationToPocketBase(location)
-            }
-            
-            // Calculate speed and adapt interval
-            updateTrackingState(location, now)
-        } else {
-            // Still update state for speed calculation but don't send
-            updateTrackingState(location, now)
+            serviceScope.launch { sendLocationToPocketBase(location) }
         }
+        updateTrackingState(location, now)
     }
 
     private fun shouldSendUpdate(currentLocation: Location): Boolean {
-        // First location always sent
-        if (lastLocation == null) {
-            return true
-        }
-        
-        // Check distance threshold (10 meters minimum)
-        val distance = lastLocation!!.distanceTo(currentLocation)
-        return distance >= MIN_DISTANCE_METERS
+        if (lastLocation == null) return true
+        return lastLocation!!.distanceTo(currentLocation) >= MIN_DISTANCE_METERS
     }
 
     private fun updateTrackingState(location: Location, now: Long) {
         val previousLocation = lastLocation
         lastLocation = location
         lastLocationTime = now
-        
+
         if (previousLocation != null) {
-            totalDistanceMoved += previousLocation.distanceTo(location)
-            
-            // Calculate speed in km/h
             val speedKmH = location.speed * 3.6f
-            
-            // Adapt interval based on speed
-            currentInterval = when {
-                speedKmH > 5 -> INTERVAL_MOVING     // Moving fast
-                speedKmH > 1 -> INTERVAL_SLOW       // Moving slow
-                else -> INTERVAL_STOPPED            // Stopped
+            val newInterval = when {
+                speedKmH > 5 -> INTERVAL_MOVING
+                speedKmH > 1 -> INTERVAL_SLOW
+                else         -> INTERVAL_STOPPED
             }
-            
-            // Update location request with new interval
-            updateLocationRequest(currentInterval)
+            // Fix 9: solo actualiza si el intervalo realmente cambió (evita remove+add innecesario)
+            if (newInterval != lastRequestedInterval) {
+                currentInterval = newInterval
+                updateLocationRequest(newInterval)
+            }
         }
     }
 
     private suspend fun sendLocationToPocketBase(location: Location) {
         try {
-            // Verificar que tenemos un autoId válido
             if (autoId.isEmpty()) {
-                android.util.Log.w("LocationTrackingService", "No hay autoId válido, no se puede enviar ubicación")
+                Log.w(TAG, "No hay autoId válido, no se puede enviar ubicación")
                 return
             }
-            
-            // Calcular bearing (ángulo) - usar GPS bearing o calcular desde posición anterior
             val bearing = calculateBearing(location)
-            
-            // Send to autos collection with location fields using autoId directly
             pocketBaseClient.updateAutoLocation(
                 autoId = autoId,
                 lat = location.latitude,
                 lng = location.longitude,
                 angulo = bearing
             )
-            android.util.Log.d("LocationTrackingService", "Ubicación enviada: lat=${location.latitude}, lng=${location.longitude}, bearing=$bearing")
+            Log.d(TAG, "Ubicación enviada: lat=${location.latitude}, lng=${location.longitude}, bearing=$bearing")
         } catch (e: Exception) {
-            // Log error but don't crash service
-            android.util.Log.e("LocationTrackingService", "Error enviando ubicación", e)
+            Log.e(TAG, "Error enviando ubicación", e)
         }
     }
-    
+
     /**
-     * Calcula el bearing (ángulo de movimiento) usando GPS o posiciones anteriores
+     * Calcula el bearing (ángulo de movimiento).
+     *
+     * FIX: Location.distanceBetween con array de 2 elementos:
+     *   result[0] = distancia en metros
+     *   result[1] = bearing inicial (el que necesitamos)
+     * Antes se usaba FloatArray(1) que solo da la distancia, nunca el bearing.
      */
     private fun calculateBearing(location: Location): Double {
-        // Si el GPS proporciona bearing válido (no 0 cuando está en movimiento)
-        if (location.bearing > 0f && location.hasBearing()) {
+        // Primero usar el bearing del GPS si es válido
+        if (location.hasBearing() && location.bearing > 0f) {
             previousLocationForBearing = location
             return location.bearing.toDouble()
         }
-        
-        // Fallback: calcular bearing desde la última posición conocida
+
+        // Fallback: calcular desde la última posición conocida
         previousLocationForBearing?.let { prev ->
-            val result = FloatArray(1)
+            val result = FloatArray(2) // [0]=distancia, [1]=bearing inicial
             Location.distanceBetween(
                 prev.latitude, prev.longitude,
                 location.latitude, location.longitude,
                 result
             )
-            // result[0] contiene el bearing
-            return result[0].toDouble()
+            previousLocationForBearing = location
+            return result[1].toDouble() // result[1] es el bearing, NO result[0]
         }
-        
+
         return 0.0
     }
 
     private fun startLocationTracking() {
         if (isTracking) return
-        if (!isInService) {
-            // Still start tracking but won't send updates until "En servicio" is true
-        }
-        
-        // Set initial interval
         currentInterval = INTERVAL_MOVING
-        
+        lastRequestedInterval = INTERVAL_MOVING
+
         val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, currentInterval)
             .setMinUpdateIntervalMillis(currentInterval / 2)
             .setMinUpdateDistanceMeters(MIN_DISTANCE_METERS)
             .build()
-        
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) 
+
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
             == PackageManager.PERMISSION_GRANTED) {
             fusedLocationClient.requestLocationUpdates(request, locationCallback, Looper.getMainLooper())
             isTracking = true
+            Log.d(TAG, "Location tracking iniciado")
         }
     }
 
     private fun updateLocationRequest(newInterval: Long) {
         if (!isTracking) return
-        
-        // Remove and re-add with new interval
+        lastRequestedInterval = newInterval
+
         fusedLocationClient.removeLocationUpdates(locationCallback)
-        
         val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, newInterval)
             .setMinUpdateIntervalMillis(newInterval / 2)
             .setMinUpdateDistanceMeters(MIN_DISTANCE_METERS)
             .build()
-        
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) 
+
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
             == PackageManager.PERMISSION_GRANTED) {
             fusedLocationClient.requestLocationUpdates(request, locationCallback, Looper.getMainLooper())
+            Log.d(TAG, "Intervalo de tracking actualizado: ${newInterval}ms")
         }
     }
 
@@ -321,6 +294,7 @@ class LocationTrackingService : Service() {
         fusedLocationClient.removeLocationUpdates(locationCallback)
         isTracking = false
         lastLocation = null
+        lastRequestedInterval = -1L
     }
 
     override fun onDestroy() {

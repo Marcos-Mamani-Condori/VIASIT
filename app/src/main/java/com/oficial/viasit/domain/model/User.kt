@@ -33,7 +33,7 @@ data class User(
     @SerialName("email")
     val email: String = "",
     
-    @SerialName("username")
+    @SerialName("name")
     val name: String = "",
     
     // PocketBase devuelve role como array con maxSelect: 2
@@ -96,48 +96,6 @@ data class User(
 }
 
 /**
- * Domain model for user location
- */
-@Serializable
-data class UserLocation(
-    @SerialName("id")
-    val id: String = "",
-    
-    @SerialName("userId")
-    val userId: String = "",
-    
-    @SerialName("userName")
-    val userName: String = "",
-    
-    @SerialName("lat")
-    val lat: Double = 0.0,
-    
-    @SerialName("lng")
-    val lng: Double = 0.0,
-    
-    @SerialName("accuracy")
-    val accuracy: Float = 0f,
-    
-    @SerialName("altitude")
-    val altitude: Double = 0.0,
-    
-    @SerialName("speed")
-    val speed: Float = 0f,
-    
-    @SerialName("bearing")
-    val bearing: Double = 0.0,
-    
-    @SerialName("timestamp")
-    val timestamp: Long = System.currentTimeMillis(),
-    
-    @SerialName("isInService")
-    val isInService: Boolean = false,
-    
-    @SerialName("userRole")
-    val userRole: String = UserRole.usuario.name
-)
-
-/**
  * Authentication state
  */
 @Serializable
@@ -175,7 +133,7 @@ data class RegisterRequest(
     @SerialName("passwordConfirm")
     val passwordConfirm: String,
     
-    @SerialName("username")
+    @SerialName("name")
     val name: String,
     
     @SerialName("phone")
@@ -214,7 +172,7 @@ data class AdminRegisterRequest(
     @SerialName("passwordConfirm")
     val passwordConfirm: String,
     
-    @SerialName("username")
+    @SerialName("name")
     val name: String,
     
     @SerialName("phone")

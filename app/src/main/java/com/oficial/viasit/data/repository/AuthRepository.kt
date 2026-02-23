@@ -13,6 +13,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 class AuthRepository(context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences("auth", Context.MODE_PRIVATE)
@@ -20,8 +25,9 @@ class AuthRepository(context: Context) {
     val authState: StateFlow<AuthState> = _authState
     private val context: Context = context.applicationContext
 
-    // Estado local de "en servicio" (no se guarda en PocketBase, solo local)
-    private var _isInService: Boolean = false
+    // Estado "en servicio" expuesto como StateFlow para evitar lectura de disco en cada recomposición
+    private val _isInService = MutableStateFlow(prefs.getBoolean("isInService", false))
+    val isInService: StateFlow<Boolean> = _isInService
 
     private val pocketBaseAuth = PocketBaseAuthClient()
 
@@ -52,19 +58,33 @@ class AuthRepository(context: Context) {
         return withContext(Dispatchers.IO) {
             _authState.value = AuthState.Loading
 
+            // Si es conductor con código de invitación, validar y obtener lineaId
+            var lineaId = ""
+            if (request.role == "conductor" && request.invitationCode.isNotBlank()) {
+                val lineaResult = validateVehicleInvitationCode(request.invitationCode)
+                if (lineaResult == null) {
+                    _authState.value = AuthState.Error("Código de invitación inválido o expirado")
+                    return@withContext Result.failure(Exception("Código de invitación inválido o expirado"))
+                }
+                lineaId = lineaResult
+            }
+
             val result = pocketBaseAuth.register(
                 email = request.email,
                 password = request.password,
                 passwordConfirm = request.passwordConfirm,
                 name = request.name,
                 phone = request.phone,
-                role = request.role
-                // Nota: invitationCode no se envía al registrar usuarios normales (usuario/conductor)
-                // Solo se usa en RegisterAdminScreen para ADMIN_LINEA
+                role = request.role,
+                lineaId = lineaId
             )
 
             result.fold(
                 onSuccess = { user ->
+                    // Si se usó código, marcarlo como usado
+                    if (lineaId.isNotEmpty()) {
+                        markVehicleCodeAsUsed(request.invitationCode, request.email)
+                    }
                     saveUser(user, isGuest = false)
                     _authState.value = AuthState.Authenticated(user)
                     Result.success(user)
@@ -74,6 +94,139 @@ class AuthRepository(context: Context) {
                     Result.failure(error)
                 }
             )
+        }
+    }
+
+    private val httpClient by lazy { com.oficial.viasit.data.remote.PocketBaseHttpClient.create() }
+
+    private suspend fun validateVehicleInvitationCode(code: String): String? {
+        return try {
+            // NO codificar aquí - PocketBaseHttpClient ya codifica el filtro
+            // Usar isUsed (camelCase) según el schema oficial de PocketBase
+            val filter = "code=\"$code\" && isUsed=false"
+            android.util.Log.d("AuthRepository", "Validando código: $code con filtro: $filter")
+            
+            val result = httpClient.getList(
+                collection = "vehicle_invitation_codes",
+                perPage = 1,
+                filter = filter
+            )
+            
+            result.fold(
+                onSuccess = { body ->
+                    android.util.Log.d("AuthRepository", "Respuesta del servidor: $body")
+                    val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+                    val obj = json.decodeFromString<kotlinx.serialization.json.JsonObject>(body)
+                    val items = obj["items"]?.jsonArray ?: return@fold null
+                    if (items.isEmpty()) {
+                        android.util.Log.w("AuthRepository", "No se encontraron códigos con ese filtro")
+                        return@fold null
+                    }
+                    
+                    val inv = items[0].jsonObject
+                    android.util.Log.d("AuthRepository", "Código encontrado: ${inv}")
+                    
+                    val expiresAt = inv["expiresAt"]?.jsonPrimitive?.content
+                    
+                    // linea_id puede ser un string (ID) o un objeto (relación expandida)
+                    val lineaId = try {
+                        val lineaElement = inv["linea_id"]
+                        when {
+                            lineaElement == null -> {
+                                android.util.Log.w("AuthRepository", "linea_id es null en el JSON")
+                                null
+                            }
+                            lineaElement.jsonPrimitive.isString -> {
+                                lineaElement.jsonPrimitive.content.also {
+                                    android.util.Log.d("AuthRepository", "linea_id como string: $it")
+                                }
+                            }
+                            else -> {
+                                // Es un objeto (relación expandida), obtener el ID
+                                lineaElement.jsonObject["id"]?.jsonPrimitive?.content.also {
+                                    android.util.Log.d("AuthRepository", "linea_id como objeto, ID: $it")
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.e("AuthRepository", "Error extrayendo linea_id: ${e.message}")
+                        null
+                    }
+                    
+                    android.util.Log.d("AuthRepository", "expiresAt: $expiresAt, lineaId: $lineaId")
+                    
+                    if (lineaId == null) {
+                        android.util.Log.w("AuthRepository", "linea_id es null")
+                        return@fold null
+                    }
+                    
+                    // Verificar expiración
+                    if (expiresAt != null && expiresAt.isNotEmpty()) {
+                        try {
+                            val exp = java.time.OffsetDateTime.parse(expiresAt).toInstant()
+                            if (exp.isBefore(java.time.Instant.now())) {
+                                android.util.Log.w("AuthRepository", "Código expirado: $expiresAt")
+                                return@fold null
+                            }
+                        } catch (e: Exception) {
+                            android.util.Log.e("AuthRepository", "Error parseando fecha: $expiresAt", e)
+                        }
+                    }
+                    
+                    android.util.Log.d("AuthRepository", "Código válido, lineaId: $lineaId")
+                    lineaId
+                },
+                onFailure = { error ->
+                    android.util.Log.e("AuthRepository", "Error en la petición", error)
+                    null
+                }
+            )
+        } catch (e: Exception) {
+            android.util.Log.e("AuthRepository", "Error validando código de vehículo", e)
+            null
+        }
+    }
+
+    private suspend fun markVehicleCodeAsUsed(code: String, userEmail: String) {
+        try {
+            // NO codificar aquí - PocketBaseHttpClient ya codifica el filtro
+            val filter = "code=\"$code\""
+            android.util.Log.d("AuthRepository", "Marcando código como usado: $code")
+            
+            val result = httpClient.getList(
+                collection = "vehicle_invitation_codes",
+                perPage = 1,
+                filter = filter
+            )
+            
+            result.fold(
+                onSuccess = { body ->
+                    android.util.Log.d("AuthRepository", "Respuesta: $body")
+                    val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+                    val obj = json.decodeFromString<kotlinx.serialization.json.JsonObject>(body)
+                    val items = obj["items"]?.jsonArray ?: return@fold
+                    if (items.isEmpty()) {
+                        android.util.Log.w("AuthRepository", "No se encontró el código para marcar")
+                        return@fold
+                    }
+                    
+                    val codeId = items[0].jsonObject["id"]?.jsonPrimitive?.content ?: return@fold
+                    android.util.Log.d("AuthRepository", "ID del código: $codeId")
+                    
+                    // Marcar como usado (usar isUsed que es el nombre del campo en PocketBase)
+                    val updateResult = httpClient.updateRecord(
+                        collection = "vehicle_invitation_codes",
+                        recordId = codeId,
+                        data = mapOf("isUsed" to true, "usado_por" to userEmail)
+                    )
+                    android.util.Log.d("AuthRepository", "Código marcado como usado: $updateResult")
+                },
+                onFailure = { error ->
+                    android.util.Log.e("AuthRepository", "Error buscando código: ${error.message}")
+                }
+            )
+        } catch (e: Exception) {
+            android.util.Log.e("AuthRepository", "Error marcando código como usado", e)
         }
     }
 
@@ -90,22 +243,22 @@ class AuthRepository(context: Context) {
 
     fun logout() {
         // Detener servicio de tracking
-        _isInService = false
+        _isInService.value = false
         stopLocationTrackingService()
         pocketBaseAuth.logout()
         prefs.edit().clear().apply()
         _authState.value = AuthState.Unauthenticated
     }
 
-    fun setInService(isInService: Boolean, autoId: String = "") {
-        _isInService = isInService
+    fun setInService(inService: Boolean, autoId: String = "") {
+        _isInService.value = inService
         val current = getCurrentUser()
         current?.let {
-            android.util.Log.d("AuthRepository", "setInService: $isInService, autoId: $autoId")
-            prefs.edit().putBoolean("isInService", isInService).apply()
+            android.util.Log.d("AuthRepository", "setInService: $inService, autoId: $autoId")
+            prefs.edit().putBoolean("isInService", inService).apply()
 
             // Iniciar o detener el servicio de tracking
-            if (isInService) {
+            if (inService) {
                 startLocationTrackingService(
                     userId = it.id,
                     userName = it.name,
@@ -156,15 +309,21 @@ class AuthRepository(context: Context) {
             UserRole.usuario
         }
     }
-    fun isInService(): Boolean = prefs.getBoolean("isInService", false)
+    /** Expone el token de sesión activo para que AdminRepository lo use */
+    fun getAuthToken(): String? = pocketBaseAuth.getAuthToken()
 
     fun restoreSession() {
         val user = getCurrentUser()
         android.util.Log.d("AuthRepository", "restoreSession - isLoggedIn: ${isLoggedIn()}, isGuest: ${isGuestMode()}")
         android.util.Log.d("AuthRepository", "restoreSession - user: ${user?.email}, role: ${user?.role}")
+        if (user == null) {
+            android.util.Log.w("AuthRepository", "restoreSession: user es null, limpiando sesión corrupta")
+            prefs.edit().clear().apply()
+            return
+        }
         when {
-            isGuestMode() -> _authState.value = AuthState.Authenticated(user!!)
-            isLoggedIn() -> _authState.value = AuthState.Authenticated(user!!)
+            isGuestMode() -> _authState.value = AuthState.Authenticated(user)
+            isLoggedIn()  -> _authState.value = AuthState.Authenticated(user)
         }
     }
 

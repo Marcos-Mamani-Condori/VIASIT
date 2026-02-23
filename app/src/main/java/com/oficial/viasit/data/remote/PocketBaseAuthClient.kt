@@ -7,6 +7,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
@@ -14,7 +15,11 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.concurrent.TimeUnit
 
 /**
- * Cliente de autenticación para PocketBase
+ * Cliente de autenticación para PocketBase.
+ *
+ * FIX: buildJsonString() eliminada. Ahora se usan clases serializables con
+ * kotlinx.serialization para construir los cuerpos JSON correctamente, escapando
+ * cualquier carácter especial en contraseñas/emails.
  */
 class PocketBaseAuthClient {
     companion object {
@@ -33,83 +38,47 @@ class PocketBaseAuthClient {
         isLenient = true
     }
 
-    /**
-     * Construir string JSON desde parámetros
-     */
-    private fun buildJsonString(
-        email: String,
-        password: String,
-        passwordConfirm: String,
-        name: String,
-        phone: String,
-        role: String,
-        invitationCode: String = "",
-        lineaId: String = ""
-    ): String {
-        val map = mutableMapOf<String, Any>(
-            "email" to email,
-            "password" to password,
-            "passwordConfirm" to passwordConfirm,
-            "name" to name,
-            "phone" to phone,
-            "role" to listOf(role)  // PocketBase espera un array de roles
-        )
-        if (invitationCode.isNotEmpty()) {
-            map["invitationCode"] = invitationCode
-        }
-        if (lineaId.isNotEmpty()) {
-            map["lineaId"] = lineaId  // PocketBase users collection usa camelCase
-            Log.d(TAG, "Agregando lineaId al JSON: $lineaId")
-        }
-        
-        val jsonString = map.entries.joinToString(",", "{", "}") { (key, value) ->
-            "\"$key\": ${when (value) {
-                is String -> "\"$value\""
-                is List<*> -> "[${value.joinToString(",") { "\"$it\"" }}]"
-                is Boolean -> value.toString()
-                else -> value
-            }}"
-        }
-        Log.d(TAG, "JSON construido: $jsonString")
-        return jsonString
-    }
-
     private var authToken: String? = null
 
-    /**
-     * Login con email y password
-     */
+    // ============ Clases de request serializables ============
+
+    @Serializable
+    private data class LoginRequest(
+        val identity: String,
+        val password: String
+    )
+
+    @Serializable
+    private data class RegisterRequest(
+        val email: String,
+        val password: String,
+        val passwordConfirm: String,
+        val name: String,
+        val phone: String,
+        val role: List<String>,
+        val lineaId: String? = null
+    )
+
+    // ============ Auth methods ============
+
     suspend fun login(email: String, password: String): Result<User> {
         return withContext(Dispatchers.IO) {
             try {
-                val requestBody = """
-                    {
-                        "identity": "$email",
-                        "password": "$password"
-                    }
-                """.trimIndent().toRequestBody("application/json".toMediaType())
+                val body = json.encodeToString(LoginRequest(email, password))
+                    .toRequestBody("application/json".toMediaType())
 
                 val request = Request.Builder()
                     .url("$BASE_URL/api/collections/users/auth-with-password")
-                    .post(requestBody)
+                    .post(body)
                     .build()
 
                 val response = okHttpclient.newCall(request).execute()
-
                 if (response.isSuccessful) {
-                    val body = response.body?.string()
-                    android.util.Log.d("PocketBaseAuth", "Login response: $body")
-                    val authResponse = json.decodeFromString<AuthResponse>(body ?: "")
+                    val responseBody = response.body?.string() ?: ""
+                    Log.d(TAG, "Login response: $responseBody")
+                    val authResponse = json.decodeFromString<AuthResponse>(responseBody)
                     authToken = authResponse.token
-                    
-                    val user = User(
-                        id = authResponse.user.id,
-                        email = authResponse.user.email,
-                        name = authResponse.user.name,
-                        phone = authResponse.user.phone,
-                        role = authResponse.user.role,
-                        lineaId = authResponse.user.lineaId
-                    )
+                    val user = authResponse.user.toDomain()
                     Log.d(TAG, "Login exitoso: ${user.email}, role: ${user.role}, lineaId: ${user.lineaId}")
                     Result.success(user)
                 } else {
@@ -124,23 +93,16 @@ class PocketBaseAuthClient {
         }
     }
 
-    /**
-     * Register con datos de usuario
-     */
     suspend fun register(
         email: String,
         password: String,
         passwordConfirm: String,
         name: String,
         phone: String = "",
-        role: String = "usuario"
-    ): Result<User> {
-        return registerAdmin(email, password, passwordConfirm, name, phone, role, "")
-    }
+        role: String = "usuario",
+        lineaId: String = ""
+    ): Result<User> = registerAdmin(email, password, passwordConfirm, name, phone, role, "", lineaId)
 
-    /**
-     * Register de administrador con código de invitación
-     */
     suspend fun registerAdmin(
         email: String,
         password: String,
@@ -153,39 +115,28 @@ class PocketBaseAuthClient {
     ): Result<User> {
         return withContext(Dispatchers.IO) {
             try {
-                // Construir JSON
-                val jsonBody = buildJsonString(
+                val reqObj = RegisterRequest(
                     email = email,
                     password = password,
                     passwordConfirm = passwordConfirm,
                     name = name,
                     phone = phone,
-                    role = role,
-                    invitationCode = invitationCode,
-                    lineaId = lineaId
+                    role = listOf(role),
+                    lineaId = lineaId.ifEmpty { null }
                 )
+                val body = json.encodeToString(reqObj).toRequestBody("application/json".toMediaType())
                 
-                val requestBody = jsonBody.toRequestBody("application/json".toMediaType())
+                Log.d(TAG, "Registrando usuario: email=$email, name=$name, role=$role, lineaId=$lineaId")
 
                 val request = Request.Builder()
                     .url("$BASE_URL/api/collections/users/records")
-                    .post(requestBody)
+                    .post(body)
                     .build()
 
                 val response = okHttpclient.newCall(request).execute()
-
                 if (response.isSuccessful) {
-                    val body = response.body?.string()
-                    val userResponse = json.decodeFromString<UserResponse>(body ?: "")
-                    
-                    val user = User(
-                        id = userResponse.id,
-                        email = userResponse.email,
-                        name = userResponse.name,
-                        phone = userResponse.phone,
-                        role = userResponse.role,
-                        lineaId = userResponse.lineaId
-                    )
+                    val userResponse = json.decodeFromString<UserResponse>(response.body?.string() ?: "")
+                    val user = userResponse.toDomain()
                     Log.d(TAG, "Register exitoso: ${user.email}, lineaId: ${user.lineaId}")
                     Result.success(user)
                 } else {
@@ -200,34 +151,19 @@ class PocketBaseAuthClient {
         }
     }
 
-    /**
-     * Obtener usuario actual
-     */
     suspend fun getCurrentUser(): Result<User> {
         return withContext(Dispatchers.IO) {
             try {
                 val token = authToken ?: return@withContext Result.failure(Exception("No hay token"))
-
                 val request = Request.Builder()
                     .url("$BASE_URL/api/collections/users/auth-refresh")
                     .post("".toRequestBody("application/json".toMediaType()))
                     .header("Authorization", "Bearer $token")
                     .build()
-
                 val response = okHttpclient.newCall(request).execute()
-
                 if (response.isSuccessful) {
-                    val body = response.body?.string()
-                    val authResponse = json.decodeFromString<AuthResponse>(body ?: "")
-                    
-                    val user = User(
-                        id = authResponse.user.id,
-                        email = authResponse.user.email,
-                        name = authResponse.user.name,
-                        phone = authResponse.user.phone,
-                        role = authResponse.user.role
-                    )
-                    Result.success(user)
+                    val authResponse = json.decodeFromString<AuthResponse>(response.body?.string() ?: "")
+                    Result.success(authResponse.user.toDomain())
                 } else {
                     Result.failure(Exception("Error al obtener usuario: ${response.code}"))
                 }
@@ -238,45 +174,40 @@ class PocketBaseAuthClient {
         }
     }
 
-    /**
-     * Logout
-     */
     fun logout() {
         authToken = null
         Log.d(TAG, "Logout exitoso")
     }
 
-    /**
-     * Verificar si está autenticado
-     */
     fun isAuthenticated(): Boolean = authToken != null
-
     fun getAuthToken(): String? = authToken
 }
 
-/**
- * Respuesta de autenticación de PocketBase
- */
+// ============ Modelos de respuesta ============
+
 @Serializable
 data class AuthResponse(
-    @SerialName("token")
-    val token: String = "",
-    
-    @SerialName("record")
-    val user: UserResponse = UserResponse()
+    @SerialName("token") val token: String = "",
+    @SerialName("record") val user: UserResponse = UserResponse()
 )
 
-/**
- * Respuesta de usuario de PocketBase
- */
 @Serializable
 data class UserResponse(
     val id: String = "",
     val email: String = "",
     val name: String = "",
     val phone: String = "",
-    val role: List<String> = listOf("usuario"),  // PocketBase devuelve como array
-    val lineaId: String = "",  // PocketBase users usa camelCase, no snake_case
+    val role: List<String> = listOf("usuario"),
+    val lineaId: String? = null,
     val created: String = "",
     val updated: String = ""
-)
+) {
+    fun toDomain() = com.oficial.viasit.domain.model.User(
+        id = id,
+        email = email,
+        name = name,
+        phone = phone,
+        role = role,
+        lineaId = lineaId ?: ""
+    )
+}
