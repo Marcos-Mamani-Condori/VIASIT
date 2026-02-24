@@ -1,16 +1,21 @@
 package com.oficial.viasit.ui.routes
 
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.double
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 
-/**
- * Resultado de búsqueda de ubicación
- */
+/** Resultado de búsqueda de ubicación */
 @Serializable
 data class SearchResult(
     val name: String,
@@ -21,113 +26,128 @@ data class SearchResult(
 )
 
 /**
- * Servicio de geocoding usando Nominatim (OpenStreetMap)
- * API gratuita con límite de uso razonable
+ * Servicio de geocoding usando Nominatim (OpenStreetMap).
+ *
+ * Mejoras sobre la versión anterior:
+ *  - Usa kotlinx.serialization en lugar de regex manuales (más robusto)
+ *  - viewbox centrado en La Paz, Bolivia para mejorar resultados locales
+ *  - Agrega "La Paz, Bolivia" al query si no viene ya especificado
+ *  - countrycodes=bo siempre activo
  */
 class GeocodingService {
+
+    companion object {
+        private const val TAG = "GeocodingService"
+        // Bounding box de La Paz: sur-oeste, nor-este
+        private const val VIEWBOX = "-68.25,-16.60,-67.95,-16.40"
+    }
+
     private val client = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(10, TimeUnit.SECONDS)
         .build()
-    
-    private val json = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-    }
-    
+
+    private val json = Json { ignoreUnknownKeys = true; isLenient = true }
+
     /**
-     * Buscar ubicaciones por texto
-     * @param query Texto de búsqueda (calle, ciudad, lugar)
-     * @param countryCodes Códigos de país para limitar búsqueda (ej: "bo" para Bolivia)
-     * @return Lista de resultados
+     * Busca lugares en La Paz, Bolivia.
+     * Si el query no menciona La Paz, se le agrega automáticamente para mejorar resultados.
      */
     suspend fun search(
         query: String,
-        countryCodes: String = "bo",
         limit: Int = 5
     ): Result<List<SearchResult>> = withContext(Dispatchers.IO) {
         try {
+            // Si la búsqueda ya tiene "la paz" o "bolivia" no agregar, si no, añadirlo
+            val enrichedQuery = if (
+                query.contains("la paz", ignoreCase = true) ||
+                query.contains("bolivia", ignoreCase = true)
+            ) query else "$query, La Paz, Bolivia"
+
             val url = buildString {
                 append("https://nominatim.openstreetmap.org/search?")
                 append("format=json")
-                append("&q=${java.net.URLEncoder.encode(query, "UTF-8")}")
+                append("&q=${URLEncoder.encode(enrichedQuery, "UTF-8")}")
                 append("&limit=$limit")
-                if (countryCodes.isNotEmpty()) {
-                    append("&countrycodes=$countryCodes")
-                }
+                append("&countrycodes=bo")
+                append("&viewbox=$VIEWBOX")
+                append("&bounded=0")          // bounded=0: prioriza el viewbox pero no limita
                 append("&addressdetails=1")
+                append("&accept-language=es")
             }
-            
+
+            Log.d(TAG, "Search URL: $url")
+
             val request = Request.Builder()
                 .url(url)
-                .header("User-Agent", "VIASIT App")
+                .header("User-Agent", "VIASIT-Android/1.0")
                 .header("Accept-Language", "es")
                 .build()
-            
+
             val response = client.newCall(request).execute()
-            
-            if (response.isSuccessful) {
-                val body = response.body?.string() ?: return@withContext Result.failure(Exception("Empty response"))
-                
-                // Parse JSON array manually
-                val results = parseSearchResults(body)
-                Result.success(results)
-            } else {
-                Result.failure(Exception("Error: ${response.code}"))
+
+            if (!response.isSuccessful) {
+                return@withContext Result.failure(Exception("HTTP ${response.code}"))
             }
+
+            val body = response.body?.string()
+                ?: return@withContext Result.failure(Exception("Respuesta vacía"))
+
+            Log.d(TAG, "Response: ${body.take(200)}")
+
+            val results = parseWithKotlinxSerialization(body)
+            Result.success(results)
+
         } catch (e: Exception) {
+            Log.e(TAG, "Error en búsqueda: ${e.message}", e)
             Result.failure(e)
         }
     }
-    
-    private fun parseSearchResults(jsonString: String): List<SearchResult> {
-        val results = mutableListOf<SearchResult>()
-        
-        try {
-            // Simple JSON parsing
-            val items = jsonString.trim()
-                .removeSurrounding("[", "]")
-                .split("},{")
-            
-            for (item in items) {
+
+    /**
+     * Parser robusto usando kotlinx.serialization.
+     * Reemplaza el parser manual con regex que fallaba en JSON anidado.
+     */
+    private fun parseWithKotlinxSerialization(jsonString: String): List<SearchResult> {
+        return try {
+            val array = json.parseToJsonElement(jsonString) as? JsonArray
+                ?: return emptyList()
+
+            array.mapNotNull { element ->
                 try {
-                    val cleanItem = item.trim().removeSurrounding("{", "}")
-                    
-                    // Extract display_name
-                    val displayNameMatch = """display_name"\s*:\s*"([^"]+)"""".toRegex().find(cleanItem)
-                    val displayName = displayNameMatch?.groupValues?.get(1) ?: continue
-                    
-                    // Extract lat
-                    val latMatch = """lat"\s*:\s*"([^"]+)"""".toRegex().find(cleanItem)
-                    val lat = latMatch?.groupValues?.get(1)?.toDoubleOrNull() ?: continue
-                    
-                    // Extract lon
-                    val lonMatch = """lon"\s*:\s*"([^"]+)"""".toRegex().find(cleanItem)
-                    val lon = lonMatch?.groupValues?.get(1)?.toDoubleOrNull() ?: continue
-                    
-                    // Extract name (short name)
-                    val nameMatch = """"name"\s*:\s*"([^"]+)"""".toRegex().find(cleanItem)
-                    val name = nameMatch?.groupValues?.get(1) ?: displayName.split(",").firstOrNull()?.trim() ?: "Sin nombre"
-                    
-                    // Extract type
-                    val typeMatch = """type"\s*:\s*"([^"]+)"""".toRegex().find(cleanItem)
-                    val type = typeMatch?.groupValues?.get(1) ?: ""
-                    
-                    results.add(SearchResult(
-                        name = name,
+                    val obj = element.jsonObject
+                    val lat = obj["lat"]?.jsonPrimitive?.content?.toDoubleOrNull() ?: return@mapNotNull null
+                    val lon = obj["lon"]?.jsonPrimitive?.content?.toDoubleOrNull() ?: return@mapNotNull null
+                    val displayName = obj["display_name"]?.jsonPrimitive?.content ?: return@mapNotNull null
+                    val type = obj["type"]?.jsonPrimitive?.content ?: ""
+
+                    // Intentar obtener el nombre corto del campo address
+                    val addressObj = obj["address"]?.jsonObject
+                    val shortName = addressObj?.let {
+                        it["suburb"]?.jsonPrimitive?.content
+                            ?: it["neighbourhood"]?.jsonPrimitive?.content
+                            ?: it["road"]?.jsonPrimitive?.content
+                            ?: it["amenity"]?.jsonPrimitive?.content
+                            ?: it["leisure"]?.jsonPrimitive?.content
+                    } ?: obj["name"]?.jsonPrimitive?.content
+                        ?: displayName.split(",").firstOrNull()?.trim()
+                        ?: "Sin nombre"
+
+                    SearchResult(
+                        name        = shortName,
                         displayName = displayName,
-                        lat = lat,
-                        lon = lon,
-                        type = type
-                    ))
+                        lat         = lat,
+                        lon         = lon,
+                        type        = type
+                    )
                 } catch (e: Exception) {
-                    // Skip this item
+                    Log.w(TAG, "Error parseando resultado: ${e.message}")
+                    null
                 }
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e(TAG, "Error parseando JSON: ${e.message}")
+            emptyList()
         }
-        
-        return results
     }
 }

@@ -11,6 +11,7 @@ import com.oficial.viasit.ui.admin.AdminDashboardScreen
 import com.oficial.viasit.ui.admin.RegisterAdminScreen
 import com.oficial.viasit.ui.auth.AuthScreen
 import com.oficial.viasit.ui.map.MainMapScreen
+import com.oficial.viasit.ui.passenger.PassengerDashboardScreen
 import com.oficial.viasit.ui.routes.RouteMapPickerScreen
 import com.oficial.viasit.ui.vehicle.DriverDashboardHandler
 import com.oficial.viasit.ui.vehicle.DriverVehicleRegistrationScreen
@@ -19,12 +20,13 @@ import com.oficial.viasit.viewmodels.AuthViewModel
 
 // ── Destinos de navegación ─────────────────────────────────────────────────
 sealed class Screen {
-    data object Auth                    : Screen()
-    data object Map                     : Screen()
-    data object DriverDashboard         : Screen()
+    data object Auth                     : Screen()
+    data object Map                      : Screen()
+    data object PassengerDashboard       : Screen()   // ← nuevo: pasajeros / invitados
+    data object DriverDashboard          : Screen()
     data object DriverVehicleRegistration: Screen()
-    data object AdminDashboard          : Screen()
-    data object RegisterAdmin           : Screen()
+    data object AdminDashboard           : Screen()
+    data object RegisterAdmin            : Screen()
     data class  RouteMapPicker(val lineaId: String, val lineaName: String) : Screen()
 }
 
@@ -42,9 +44,10 @@ fun VIASITApp() {
         when (val state = authState) {
             is AuthState.Authenticated -> {
                 currentScreen = when (state.user.userRole) {
-                    UserRole.conductor                       -> Screen.DriverDashboard
+                    UserRole.conductor                           -> Screen.DriverDashboard
                     UserRole.ADMIN_PRINCIPAL, UserRole.ADMIN_LINEA -> Screen.AdminDashboard
-                    else                                    -> Screen.Map
+                    // usuario e invitado van al dashboard de pasajeros
+                    UserRole.usuario, UserRole.invitado          -> Screen.PassengerDashboard
                 }
             }
             is AuthState.Unauthenticated -> currentScreen = Screen.Auth
@@ -69,6 +72,19 @@ fun VIASITApp() {
                     { currentScreen = Screen.DriverDashboard }
                 } else null
             )
+        }
+
+        Screen.PassengerDashboard -> {
+            val currentUser = (authState as? AuthState.Authenticated)?.user
+            if (currentUser != null) {
+                PassengerDashboardScreen(
+                    authViewModel = authViewModel,
+                    currentUser   = currentUser,
+                    onLogout      = { authViewModel.logout(); currentScreen = Screen.Auth }
+                )
+            } else {
+                currentScreen = Screen.Auth
+            }
         }
 
         Screen.DriverDashboard -> {
@@ -122,14 +138,15 @@ fun VIASITApp() {
                 lineaName = screen.lineaName,
                 onSaveRoute = { routeData ->
                     adminViewModel.createRutaWithCoords(
-                        n      = routeData.name,
-                        d      = routeData.description,
-                        sLat   = routeData.startPoint?.lat ?: 0.0,
-                        sLng   = routeData.startPoint?.lng ?: 0.0,
-                        eLat   = routeData.endPoint?.lat  ?: 0.0,
-                        eLng   = routeData.endPoint?.lng  ?: 0.0,
-                        lineaId = screen.lineaId,
-                        uid    = currentUser?.id ?: ""
+                        n         = routeData.name,
+                        d         = routeData.description,
+                        sLat      = routeData.startPoint?.lat ?: 0.0,
+                        sLng      = routeData.startPoint?.lng ?: 0.0,
+                        eLat      = routeData.endPoint?.lat  ?: 0.0,
+                        eLng      = routeData.endPoint?.lng  ?: 0.0,
+                        lineaId   = screen.lineaId,
+                        email     = currentUser?.email ?: "",
+                        waypoints = routeData.waypoints.map { Pair(it.lat, it.lng) }
                     )
                     currentScreen = Screen.AdminDashboard
                 },

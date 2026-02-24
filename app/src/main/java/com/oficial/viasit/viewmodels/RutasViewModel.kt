@@ -21,40 +21,108 @@ class RutasViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun createRuta(
-        name: String, description: String, startPoint: String = "", endPoint: String = "",
-        lineaId: String = "", currentUserId: String = "",
+    // ── Crear ruta desde el mapa (con OSRM waypoints) ───────────────────────
+    // ✅ Tras crear, auto-asigna el rutaId a la línea y recarga el estado
+    fun createRutaWithCoords(
+        name: String, description: String,
+        startLat: Double, startLng: Double, endLat: Double, endLng: Double,
+        lineaId: String, currentUserEmail: String = "",
+        waypoints: List<Pair<Double, Double>> = emptyList(),
         state: MutableStateFlow<AdminUiState>, onLog: (String, String) -> Unit
     ) {
         viewModelScope.launch {
             state.value = state.value.copy(isLoading = true, error = null)
-            adminRepository.createRuta(name, description, startPoint, endPoint, lineaId).fold(
-                onSuccess = {
-                    state.value = state.value.copy(isLoading = false, successMessage = "Ruta creada: $name")
-                    if (currentUserId.isNotEmpty()) onLog(currentUserId, "Creó ruta: $name")
+            val startPoint   = if (startLat != 0.0 && startLng != 0.0) "$startLat,$startLng" else ""
+            val endPoint     = if (endLat != 0.0 && endLng != 0.0)     "$endLat,$endLng"     else ""
+            val waypointsStr = waypoints.joinToString(";") { (lat, lng) -> "$lat,$lng" }
+
+            adminRepository.createRuta(name, description, startPoint, endPoint, lineaId, waypointsStr).fold(
+                onSuccess = { ruta ->
+                    // Auto-asignar la ruta a la línea
+                    if (lineaId.isNotEmpty() && ruta.id.isNotEmpty())
+                        adminRepository.updateLineaRuta(lineaId, ruta.id)
+                    // Recargar estado
+                    val updatedLineas = adminRepository.getLineas().getOrElse { state.value.lineas }
+                    val updatedRutas  = adminRepository.getRutas().getOrElse  { state.value.rutas  }
+                    val wptInfo = if (waypoints.isNotEmpty()) " con ${waypoints.size} puntos de recorrido" else ""
+                    state.value = state.value.copy(
+                        isLoading = false,
+                        successMessage = "Ruta \"$name\" creada y asignada",
+                        lineas = updatedLineas, rutas = updatedRutas
+                    )
+                    if (currentUserEmail.isNotEmpty())
+                        onLog(currentUserEmail, "Creó y asignó ruta: $name ($startPoint → $endPoint)$wptInfo")
                 },
                 onFailure = { state.value = state.value.copy(isLoading = false, error = it.message ?: "Error al crear ruta") }
             )
         }
     }
 
-    // Crea una ruta desde coordenadas del mapa — convierte Double a "lat,lng"
-    fun createRutaWithCoords(
+    // ── Crear ruta desde texto (fallback sin mapa) ──────────────────────────
+    fun createRuta(
         name: String, description: String,
-        startLat: Double, startLng: Double, endLat: Double, endLng: Double,
-        lineaId: String, currentUserId: String = "",
+        startPoint: String = "", endPoint: String = "",
+        lineaId: String = "", currentUserEmail: String = "",
         state: MutableStateFlow<AdminUiState>, onLog: (String, String) -> Unit
     ) {
         viewModelScope.launch {
             state.value = state.value.copy(isLoading = true, error = null)
-            val startPoint = if (startLat != 0.0 && startLng != 0.0) "$startLat,$startLng" else ""
-            val endPoint   = if (endLat != 0.0 && endLng != 0.0)     "$endLat,$endLng"     else ""
             adminRepository.createRuta(name, description, startPoint, endPoint, lineaId).fold(
-                onSuccess = {
-                    state.value = state.value.copy(isLoading = false, successMessage = "Ruta creada: $name")
-                    if (currentUserId.isNotEmpty()) onLog(currentUserId, "Creó ruta: $name ($startPoint → $endPoint)")
+                onSuccess = { ruta ->
+                    if (lineaId.isNotEmpty() && ruta.id.isNotEmpty())
+                        adminRepository.updateLineaRuta(lineaId, ruta.id)
+                    val updatedLineas = adminRepository.getLineas().getOrElse { state.value.lineas }
+                    val updatedRutas  = adminRepository.getRutas().getOrElse  { state.value.rutas  }
+                    state.value = state.value.copy(isLoading = false, successMessage = "Ruta creada: $name",
+                        lineas = updatedLineas, rutas = updatedRutas)
+                    if (currentUserEmail.isNotEmpty()) onLog(currentUserEmail, "Creó ruta: $name")
                 },
                 onFailure = { state.value = state.value.copy(isLoading = false, error = it.message ?: "Error al crear ruta") }
+            )
+        }
+    }
+
+    // ── Asignar ruta existente a una línea ──────────────────────────────────
+    fun assignRutaToLinea(
+        lineaId: String, rutaId: String, rutaName: String,
+        currentUserEmail: String, state: MutableStateFlow<AdminUiState>, onLog: (String, String) -> Unit
+    ) {
+        viewModelScope.launch {
+            state.value = state.value.copy(isLoading = true, error = null)
+            adminRepository.updateLineaRuta(lineaId, rutaId).fold(
+                onSuccess = {
+                    val updatedLineas = adminRepository.getLineas().getOrElse { state.value.lineas }
+                    val updatedRutas  = adminRepository.getRutas().getOrElse  { state.value.rutas  }
+                    state.value = state.value.copy(isLoading = false,
+                        successMessage = "Ruta \"$rutaName\" asignada",
+                        lineas = updatedLineas, rutas = updatedRutas)
+                    if (currentUserEmail.isNotEmpty())
+                        onLog(currentUserEmail, "Asignó ruta \"$rutaName\" a línea $lineaId")
+                },
+                onFailure = { state.value = state.value.copy(isLoading = false, error = it.message ?: "Error al asignar ruta") }
+            )
+        }
+    }
+
+    // ── Eliminar ruta (y limpiar asignación en línea) ───────────────────────
+    fun deleteRuta(
+        rutaId: String, rutaName: String, lineaId: String = "",
+        currentUserEmail: String, state: MutableStateFlow<AdminUiState>, onLog: (String, String) -> Unit
+    ) {
+        viewModelScope.launch {
+            state.value = state.value.copy(isLoading = true, error = null)
+            if (lineaId.isNotEmpty()) adminRepository.updateLineaRuta(lineaId, "")
+            adminRepository.deleteRuta(rutaId).fold(
+                onSuccess = {
+                    val updatedRutas  = adminRepository.getRutas().getOrElse  { state.value.rutas  }
+                    val updatedLineas = adminRepository.getLineas().getOrElse { state.value.lineas }
+                    state.value = state.value.copy(isLoading = false,
+                        successMessage = "Ruta \"$rutaName\" eliminada",
+                        rutas = updatedRutas, lineas = updatedLineas)
+                    if (currentUserEmail.isNotEmpty())
+                        onLog(currentUserEmail, "Eliminó ruta: $rutaName")
+                },
+                onFailure = { state.value = state.value.copy(isLoading = false, error = it.message ?: "Error al eliminar ruta") }
             )
         }
     }

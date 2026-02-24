@@ -31,9 +31,9 @@ class LogsViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun createLog(userId: String, description: String) {
+    fun createLog(userEmail: String, description: String) {
         viewModelScope.launch {
-            adminRepository.createLog(userId = userId, description = description)
+            adminRepository.createLog(userEmail = userEmail, description = description)
         }
     }
 }

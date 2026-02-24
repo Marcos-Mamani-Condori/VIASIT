@@ -93,10 +93,15 @@ class PocketBaseAutoClient(
         if (record == null) return
         val list = _autos.value.toMutableList()
         when (action) {
-            "create" -> list.add(record)
+            "create" -> {
+                // Evitar duplicados: si ya existe un auto con mismo id o mismo userId, actualizar
+                val existingIdx = list.indexOfFirst { it.id == record.id || it.userId == record.userId }
+                if (existingIdx != -1) list[existingIdx] = record
+                else list.add(record)
+            }
             "update" -> {
                 val i = list.indexOfFirst { it.id == record.id }
-                if (i != -1) list[i] = record
+                if (i != -1) list[i] = record else list.add(record)
             }
             "delete" -> list.removeIf { it.id == record.id }
         }
@@ -107,30 +112,44 @@ class PocketBaseAutoClient(
         return withContext(Dispatchers.IO) {
             try {
                 Log.d(TAG, "registerAuto: userId=$userId, placa=$placa, lineaCode=$lineaCode")
-                
-                // Si lineaCode parece un ID de PocketBase (15 caracteres alfanuméricos), usarlo directamente
-                // Si no, validarlo como código de invitación
+
                 val lineaId = if (lineaCode.length == 15 && lineaCode.all { it.isLetterOrDigit() }) {
-                    Log.d(TAG, "Usando lineaId directamente: $lineaCode")
-                    lineaCode // Es un ID de línea, usarlo directamente
+                    lineaCode
                 } else {
-                    Log.d(TAG, "Validando código de invitación: $lineaCode")
                     validateInvitationCode(lineaCode)
                         ?: return@withContext Result.failure(Exception("Codigo de invitacion invalido o expirado"))
                 }
 
+                // ✅ UPSERT: buscar si ya existe un auto para este conductor
+                val existingAuto = getAutoByUserId(userId).getOrNull()
+                if (existingAuto != null) {
+                    Log.d(TAG, "Auto existente encontrado (id=${existingAuto.id}), actualizando en lugar de crear")
+                    // Reactivar: solo actualizar lat/lng para marcar como activo
+                    val body = """{"lat":$lat,"lng":$lng,"angulo":0}"""
+                        .toRequestBody("application/json".toMediaType())
+                    val resp = okHttpClient.newCall(
+                        Request.Builder().url("$BASE_URL/api/collections/$COLLECTION/records/${existingAuto.id}").patch(body).build()
+                    ).execute()
+                    return@withContext if (resp.isSuccessful) {
+                        val updated = json.decodeFromString<Auto>(resp.body?.string() ?: "")
+                        updateUserLinea(userId, lineaId)
+                        Result.success(updated)
+                    } else {
+                        Result.failure(Exception("Error al reactivar auto: ${resp.code}"))
+                    }
+                }
+
+                // Crear nuevo registro solo si no existe
                 val body = """{"userid":"$userId","placa":"$placa","lat":$lat,"lng":$lng,"angulo":0}"""
                     .toRequestBody("application/json".toMediaType())
-                Log.d(TAG, "Enviando body: $body")
+                Log.d(TAG, "Creando nuevo auto...")
                 val resp = okHttpClient.newCall(
                     Request.Builder().url("$BASE_URL/api/collections/$COLLECTION/records").post(body).build()
                 ).execute()
 
                 if (resp.isSuccessful) {
                     val responseBody = resp.body?.string() ?: ""
-                    Log.d(TAG, "Auto registrado exitosamente: $responseBody")
                     val auto = json.decodeFromString<Auto>(responseBody)
-                    Log.d(TAG, "Auto parseado: id=${auto.id}, userId=${auto.userId}, placa=${auto.placa}")
                     updateUserLinea(userId, lineaId)
                     Result.success(auto)
                 } else {

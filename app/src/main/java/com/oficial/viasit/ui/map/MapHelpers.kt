@@ -14,10 +14,12 @@ import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.expressions.Expression
 import org.maplibre.android.style.layers.PropertyFactory
+import org.maplibre.android.style.layers.LineLayer
 import org.maplibre.android.style.layers.SymbolLayer
 import org.maplibre.android.style.sources.GeoJsonSource
 import org.maplibre.geojson.Feature
 import org.maplibre.geojson.FeatureCollection
+import org.maplibre.geojson.LineString
 import org.maplibre.geojson.Point
 import com.google.gson.JsonObject
 
@@ -107,3 +109,99 @@ fun enableLocationComponent(style: Style, map: MapLibreMap, context: android.con
         e.printStackTrace()
     }
 }
+
+// ─── Rutas / Polylines ────────────────────────────────────────────────────────
+
+/**
+ * Modelo ligero para pasar una ruta al mapa.
+ * startPoint y endPoint son "lat,lng"
+ */
+data class RoutePolyline(
+    val id: String,
+    val lineaName: String,
+    val startPoint: String,    // "lat,lng"
+    val endPoint: String,      // "lat,lng"
+    val waypoints: String = "", // "lat,lng;lat,lng;..." — vacío = línea recta
+    val color: String = "#3D5AFE"
+)
+
+/** Registra el source GeoJSON y la LineLayer para rutas. Llamar una vez al cargar el estilo. */
+fun addRoutesLayer(style: Style) {
+    if (style.getSource("routes-source") == null) {
+        style.addSource(GeoJsonSource("routes-source"))
+    }
+    if (style.getLayer("routes-layer") == null) {
+        // Agregar la capa DEBAJO de la capa de autos para que los autos queden encima
+        val lineLayer = LineLayer("routes-layer", "routes-source").withProperties(
+            PropertyFactory.lineColor(Expression.get("color")),
+            PropertyFactory.lineWidth(4f),
+            PropertyFactory.lineOpacity(0.85f),
+            PropertyFactory.lineCap(org.maplibre.android.style.layers.Property.LINE_CAP_ROUND),
+            PropertyFactory.lineJoin(org.maplibre.android.style.layers.Property.LINE_JOIN_ROUND)
+        )
+        // Insertar la capa de rutas por debajo de la de autos
+        if (style.getLayer("cars-layer") != null) {
+            style.addLayerBelow(lineLayer, "cars-layer")
+        } else {
+            style.addLayer(lineLayer)
+        }
+    }
+}
+
+/**
+ * Dibuja las rutas de las líneas en el mapa como polylines.
+ * Parsea el formato "lat,lng" de los campos start_point y end_point de la colección 'rutas'.
+ */
+fun updateRoutesSource(style: Style, routes: List<RoutePolyline>) {
+    val source = style.getSource("routes-source") as? GeoJsonSource ?: return
+
+    val linePalette = listOf(
+        "#3D5AFE", "#06B6D4", "#10B981", "#FFB300", "#F43F5E",
+        "#8B5CF6", "#EC4899", "#14B8A6", "#F97316", "#84CC16"
+    )
+
+    val features = routes.mapIndexedNotNull { index, route ->
+        try {
+            val startParts = route.startPoint.split(",").map { it.trim().toDouble() }
+            val endParts   = route.endPoint.split(",").map { it.trim().toDouble() }
+            if (startParts.size < 2 || endParts.size < 2) return@mapIndexedNotNull null
+
+            val startPt = Point.fromLngLat(startParts[1], startParts[0]) // lng, lat
+            val endPt   = Point.fromLngLat(endParts[1],   endParts[0])
+
+            // Si la ruta tiene waypoints intermedios los usa; si no, línea recta inicio→fin
+            val allPoints: List<Point> = if (route.waypoints.isNotBlank()) {
+                val midPoints = route.waypoints.split(";").mapNotNull { pair ->
+                    val parts = pair.trim().split(",")
+                    if (parts.size >= 2) {
+                        val lat = parts[0].trim().toDoubleOrNull() ?: return@mapNotNull null
+                        val lng = parts[1].trim().toDoubleOrNull() ?: return@mapNotNull null
+                        Point.fromLngLat(lng, lat)
+                    } else null
+                }
+                listOf(startPt) + midPoints + listOf(endPt)
+            } else {
+                listOf(startPt, endPt)
+            }
+
+            val lineString = LineString.fromLngLats(allPoints)
+            val color = linePalette[index % linePalette.size]
+
+            val props = com.google.gson.JsonObject().apply {
+                addProperty("color", color)
+                addProperty("linea", route.lineaName)
+            }
+            Feature.fromGeometry(lineString, props)
+        } catch (e: Exception) {
+            null  // Ignorar rutas con formato incorrecto
+        }
+    }
+    source.setGeoJson(FeatureCollection.fromFeatures(features))
+}
+
+/** Limpia todas las polylines de rutas del mapa */
+fun clearRoutesSource(style: Style) {
+    val source = style.getSource("routes-source") as? GeoJsonSource ?: return
+    source.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
+}
+

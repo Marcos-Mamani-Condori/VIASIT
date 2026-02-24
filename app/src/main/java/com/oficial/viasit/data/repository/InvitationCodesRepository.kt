@@ -1,0 +1,57 @@
+package com.oficial.viasit.data.repository
+
+import com.oficial.viasit.domain.model.InvitationCode
+import com.oficial.viasit.data.remote.PocketBaseRealtimeClient
+import com.oficial.viasit.data.repository.AdminJsonParsers.parseInvitationCodesFromJson
+
+/**
+ * Repositorio de códigos de invitación para admins (ADMIN_LINEA / ADMIN_PRINCIPAL).
+ */
+internal class InvitationCodesRepository(
+    private val client: PocketBaseRealtimeClient,
+    private val shared: AdminRepositoryShared
+) {
+    suspend fun generate(role: String, lineaId: String, expiresInHours: Int): Result<InvitationCode> {
+        return try {
+            val code = shared.generateSecureCode()
+            val data = mutableMapOf<String, Any>(
+                "code" to code, "role" to role,
+                "expiresAt" to shared.formatNowPlus(expiresInHours), "isUsed" to false
+            )
+            if (lineaId.isNotEmpty()) data["linea_id"] = lineaId
+            client.createRecord("invitation_codes", data, shared.authToken()).fold(
+                onSuccess = { json ->
+                    Result.success(InvitationCode(
+                        id = AdminJsonParsers.extractStringField(json, "id"),
+                        code = code, role = role, lineaId = lineaId,
+                        isUsed = false, expiresAt = shared.formatNowPlus(expiresInHours)
+                    ))
+                },
+                onFailure = { Result.failure(it) }
+            )
+        } catch (e: Exception) { Result.failure(e) }
+    }
+
+    suspend fun getAll(): Result<List<InvitationCode>> = try {
+        client.getList("invitation_codes", perPage = 50, sort = "-created", authToken = shared.authToken())
+            .map { parseInvitationCodesFromJson(it) }
+    } catch (e: Exception) { Result.failure(e) }
+
+    suspend fun validate(code: String): Result<InvitationCode> = try {
+        client.getList("invitation_codes", filter = "code='$code'&&isUsed=false", authToken = shared.authToken()).fold(
+            onSuccess = { json ->
+                val codes = parseInvitationCodesFromJson(json)
+                if (codes.isNotEmpty()) Result.success(codes.first())
+                else Result.failure(Exception("Código no válido o ya usado"))
+            },
+            onFailure = { Result.failure(it) }
+        )
+    } catch (e: Exception) { Result.failure(e) }
+
+    suspend fun delete(codeId: String): Result<Unit> =
+        client.deleteRecord("invitation_codes", codeId, shared.authToken()).map { }
+
+    suspend fun markUsed(codeId: String, userEmail: String): Result<Unit> =
+        client.updateRecord("invitation_codes", codeId,
+            mapOf("isUsed" to true, "usedBy" to userEmail), shared.authToken()).map { }
+}

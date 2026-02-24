@@ -19,7 +19,9 @@ data class RouteData(
     val name: String,
     val description: String,
     val startPoint: RouteLocation?,
-    val endPoint: RouteLocation?
+    val endPoint: RouteLocation?,
+    /** Puntos intermedios opcionales trazados por el admin */
+    val waypoints: List<RouteLocation> = emptyList()
 )
 
 /** Estado del mapa: cuál punto se está seleccionando ahora */

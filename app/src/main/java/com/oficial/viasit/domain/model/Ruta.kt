@@ -28,6 +28,11 @@ data class Ruta(
     @SerialName("end_point")
     val endPoint: String = "",
 
+    // Waypoints intermedios OPCIONALES (formato: "lat,lng;lat,lng;...")
+    // Si está vacío, el mapa dibuja una línea recta inicio → fin
+    @SerialName("waypoints")
+    val waypoints: String = "",
+
     @SerialName("created")
     val created: String = "",
 
