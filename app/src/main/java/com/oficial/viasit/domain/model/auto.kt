@@ -121,8 +121,11 @@ data class Auto(
     fun isActive(maxAgeMinutes: Int = 2): Boolean {
         return try {
             if (updated.isEmpty()) return false
-            val updateTime = java.time.OffsetDateTime.parse(updated)
-            val now = java.time.OffsetDateTime.now()
+            // PocketBase devuelve "2024-01-01 15:30:00.000Z" (espacio en vez de 'T')
+            // OffsetDateTime.parse requiere el formato ISO 8601 con 'T'
+            val normalized = updated.replace(" ", "T")
+            val updateTime = java.time.OffsetDateTime.parse(normalized)
+            val now = java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC)
             val minutesSinceUpdate = java.time.Duration.between(updateTime, now).toMinutes()
             minutesSinceUpdate < maxAgeMinutes
         } catch (e: Exception) {
@@ -136,8 +139,9 @@ data class Auto(
     fun getLastUpdateText(): String {
         return try {
             if (updated.isEmpty()) return "Sin datos"
-            val updateTime = java.time.OffsetDateTime.parse(updated)
-            val now = java.time.OffsetDateTime.now()
+            val normalized = updated.replace(" ", "T")
+            val updateTime = java.time.OffsetDateTime.parse(normalized)
+            val now = java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC)
             val minutesSinceUpdate = java.time.Duration.between(updateTime, now).toMinutes()
             when {
                 minutesSinceUpdate < 1 -> "Hace un momento"

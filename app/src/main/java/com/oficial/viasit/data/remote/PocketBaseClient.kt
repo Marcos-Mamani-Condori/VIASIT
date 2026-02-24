@@ -20,13 +20,16 @@ class PocketBaseRealtimeClient(private val autoDao: AutoData? = null) {
         private const val TAG = "PocketBaseClient"
         private const val COLLECTION = "autos"
         private val BASE_URL: String get() = BuildConfig.POCKETBASE_URL
+
+        /** Intervalo de polling de respaldo (garantiza que el script Python siempre se vea) */
+        private const val POLL_INTERVAL_MS = 3_000L
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val okHttpclient = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(0, TimeUnit.SECONDS)
+        .readTimeout(0, TimeUnit.SECONDS)   // Sin timeout para SSE
         .writeTimeout(30, TimeUnit.SECONDS)
         .build()
 
@@ -37,10 +40,11 @@ class PocketBaseRealtimeClient(private val autoDao: AutoData? = null) {
 
     private var eventSource: EventSource? = null
     private var clientId: String? = null
+    private var pollingJob: Job? = null
 
     // Delegados
     private val autoClient = PocketBaseAutoClient(okHttpclient, autoDao, _autos)
-    private val http = PocketBaseHttpClient(okHttpclient)
+    private val http = PocketBaseHttpClient.create()
 
     var authToken: String? = null
 
@@ -51,37 +55,65 @@ class PocketBaseRealtimeClient(private val autoDao: AutoData? = null) {
         if (eventSource != null) return
         scope.launch {
             try {
+                // 1. Carga inicial de datos
                 autoClient.fetchAutos()
+                // 2. Intentar SSE en segundo plano
                 connectSSE()
+                // 3. Polling de respaldo: re-fetch cada 3s.
+                //    Garantiza que los PATCH del script Python siempre aparezcan
+                //    incluso si SSE tiene problemas de conexión o suscripción.
+                startPolling()
             } catch (e: Exception) {
-                Log.e(TAG, "Error iniciando SSE", e)
-                delay(5000)
-                startRealtimeSubscription()
+                Log.e(TAG, "Error iniciando realtime, usando solo polling", e)
+                startPolling()
+            }
+        }
+    }
+
+    /** Polling periódico como respaldo y garantía de actualizaciones */
+    private fun startPolling() {
+        if (pollingJob?.isActive == true) return
+        pollingJob = scope.launch {
+            while (isActive) {
+                delay(POLL_INTERVAL_MS)
+                try {
+                    autoClient.fetchAutos()
+                } catch (e: Exception) {
+                    Log.w(TAG, "Error en polling: ${e.message}")
+                }
             }
         }
     }
 
     private fun connectSSE() {
+        // URL correcta de PocketBase: sin clientId en query params.
+        // PocketBase asigna el clientId y lo envía en el primer evento PB_CONNECT.
         val request = Request.Builder()
-            .url("$BASE_URL/api/realtime?clientId=${System.currentTimeMillis()}")
+            .url("$BASE_URL/api/realtime")
             .header("Accept", "text/event-stream")
             .build()
 
         val listener = object : EventSourceListener() {
             override fun onOpen(eventSource: EventSource, response: Response) {
-                Log.d(TAG, "SSE conectado")
+                Log.d(TAG, "SSE conectado a $BASE_URL")
             }
+
             override fun onEvent(eventSource: EventSource, id: String?, type: String?, data: String) {
                 scope.launch { handleSSEEvent(type, data) }
             }
+
             override fun onClosed(eventSource: EventSource) {
-                Log.d(TAG, "SSE cerrado")
+                Log.d(TAG, "SSE cerrado — polling sigue activo como respaldo")
+                this@PocketBaseRealtimeClient.eventSource = null
             }
+
             override fun onFailure(eventSource: EventSource, t: Throwable?, response: Response?) {
-                Log.e(TAG, "SSE error: ${t?.message}")
+                Log.w(TAG, "SSE no disponible (${t?.message}) — polling activo como respaldo")
+                this@PocketBaseRealtimeClient.eventSource = null
+                // Reintentar SSE en 10s sin detener el polling
                 scope.launch {
-                    delay(5000)
-                    if (this@PocketBaseRealtimeClient.eventSource != null) connectSSE()
+                    delay(10_000)
+                    if (pollingJob?.isActive == true) connectSSE()
                 }
             }
         }
@@ -93,17 +125,26 @@ class PocketBaseRealtimeClient(private val autoDao: AutoData? = null) {
         try {
             when (type) {
                 "PB_CONNECT" -> {
+                    // PocketBase envía el clientId al conectar
                     val connectData = json.decodeFromString<Map<String, String>>(data)
                     clientId = connectData["clientId"]
+                    Log.d(TAG, "SSE clientId recibido: $clientId")
                     clientId?.let { subscribeToCollection(it) }
                 }
-                null -> {
+                // PocketBase envía eventos de autos sin 'event:' line → OkHttp reporta type=null
+                // Algunos entornos o proxies añaden type="message"
+                null, "message" -> {
+                    if (data.isBlank() || data == "{}") return
                     val event = json.decodeFromString<RealtimeEvent>(data)
                     autoClient.applyRealtimeUpdate(event.action, event.record)
+                    Log.d(TAG, "SSE update: action=${event.action}, id=${event.record?.id}")
+                }
+                else -> {
+                    Log.d(TAG, "SSE evento desconocido type='$type': $data")
                 }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error procesando SSE: $data", e)
+            Log.w(TAG, "Error procesando SSE (type=$type): ${e.message}")
         }
     }
 
@@ -116,16 +157,24 @@ class PocketBaseRealtimeClient(private val autoDao: AutoData? = null) {
             val request = Request.Builder().url("$BASE_URL/api/realtime").post(body).build()
             withContext(Dispatchers.IO) {
                 okHttpclient.newCall(request).execute().use { resp ->
-                    if (!resp.isSuccessful) Log.e(TAG, "Error suscribiéndose: ${resp.code}")
+                    if (resp.isSuccessful) {
+                        Log.d(TAG, "Suscrito a $COLLECTION/*")
+                        // Fetch inmediato tras suscribirse para capturar
+                        // cualquier cambio que ocurrió durante la conexión
+                        autoClient.fetchAutos()
+                    } else {
+                        Log.e(TAG, "Error suscribiéndose: ${resp.code}")
+                    }
                 }
             }
-            autoClient.fetchAutos()
         } catch (e: Exception) {
             Log.e(TAG, "Error suscribiéndose", e)
         }
     }
 
     fun stopRealtimeSubscription() {
+        pollingJob?.cancel()
+        pollingJob = null
         eventSource?.cancel()
         eventSource = null
         clientId = null

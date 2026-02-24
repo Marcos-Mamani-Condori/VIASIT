@@ -51,8 +51,8 @@ fun addCarsLayer(style: Style) {
         val symbolLayer = SymbolLayer("cars-layer", "cars-source").withProperties(
             PropertyFactory.iconImage("car-icon"),
             PropertyFactory.iconSize(0.5f),
-            PropertyFactory.iconAllowOverlap(false),
-            PropertyFactory.iconIgnorePlacement(false),
+            PropertyFactory.iconAllowOverlap(true),
+            PropertyFactory.iconIgnorePlacement(true),
             PropertyFactory.iconAnchor("center"),
             PropertyFactory.iconRotate(Expression.get("angulo"))
         )
@@ -63,13 +63,16 @@ fun addCarsLayer(style: Style) {
 /** Actualiza las posiciones de todos los autos en el source GeoJSON */
 fun updateCarsSource(style: Style, autos: List<Auto>) {
     val source = style.getSource("cars-source") as? GeoJsonSource ?: return
-    val features = autos.map { auto ->
-        val properties = JsonObject().apply {
-            addProperty("placa", auto.placa)
-            addProperty("angulo", auto.angulo)
+    // Filtrar coordenadas inválidas (0,0) que corresponden al océano Atlántico
+    val features = autos
+        .filter { it.lat != 0.0 || it.lng != 0.0 }
+        .map { auto ->
+            val properties = JsonObject().apply {
+                addProperty("placa", auto.placa)
+                addProperty("angulo", auto.angulo)
+            }
+            Feature.fromGeometry(Point.fromLngLat(auto.lng, auto.lat), properties)
         }
-        Feature.fromGeometry(Point.fromLngLat(auto.lng, auto.lat), properties)
-    }
     source.setGeoJson(FeatureCollection.fromFeatures(features))
 }
 

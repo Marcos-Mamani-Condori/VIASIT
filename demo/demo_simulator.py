@@ -32,8 +32,8 @@ CONDUCTOR_PASSWORD = "password123"          # Contraseña del conductor
 
 # IDs de los autos en tu colección 'autos' de PocketBase
 # Los encuentras en: PocketBase → Collections → autos → (click en el registro) → copia el ID
-AUTO_1_ID = "REEMPLAZA_CON_ID_AUTO_1"
-AUTO_2_ID = "REEMPLAZA_CON_ID_AUTO_2"
+AUTO_1_ID = "iaaef1fgrk9earz"
+AUTO_2_ID = "wd43t93pa36qwpl"
 
 # Segundos entre cada movimiento (2 = tiempo real, 1 = más rápido para demo)
 INTERVALO_SEGUNDOS = 2
@@ -141,7 +141,20 @@ def mover_auto(auto_id, lat, lng, angulo):
     data = {"lat": lat, "lng": lng, "angulo": angulo}
     try:
         resp = requests.patch(url, json=data, timeout=5)
-        return resp.status_code == 200
+        if resp.status_code == 200:
+            return True
+        else:
+            print(f"  ⚠️  PATCH falló [{resp.status_code}] para auto {auto_id}")
+            print(f"       Respuesta: {resp.text[:200]}")
+            if resp.status_code == 403:
+                print(f"       → Ve a PocketBase → Collections → autos → 🔒 API Rules → 'Update rule' → déjalo VACÍO")
+            elif resp.status_code == 404:
+                print(f"       → El ID '{auto_id}' no existe en la colección 'autos'")
+            return False
+    except requests.exceptions.ConnectionError:
+        print(f"  ⚠️  No se puede conectar a {POCKETBASE_URL}")
+        print(f"       → Verifica que PocketBase esté corriendo")
+        return False
     except requests.exceptions.RequestException as e:
         print(f"  ⚠️  Error al mover auto {auto_id}: {e}")
         return False
@@ -156,6 +169,41 @@ def main():
     if ids_invalidos:
         print("\n❌ ERROR: Reemplaza los IDs de los autos (AUTO_1_ID, AUTO_2_ID) al inicio del archivo\n")
         sys.exit(1)
+
+    # ── Verificar conectividad con PocketBase ──────────────────────────────
+    print(f"\n🔍 Verificando conexión a {POCKETBASE_URL}...")
+    try:
+        resp = requests.get(f"{POCKETBASE_URL}/api/health", timeout=5)
+        if resp.status_code == 200:
+            print("   ✅ PocketBase está corriendo")
+        else:
+            print(f"   ⚠️  PocketBase respondió con código {resp.status_code}")
+    except requests.exceptions.ConnectionError:
+        print(f"   ❌ No se puede conectar a {POCKETBASE_URL}")
+        print(f"      → Asegúrate de que PocketBase esté corriendo")
+        print(f"      → Si usas WiFi, cambia POCKETBASE_URL a la IP de tu laptop (ej: http://192.168.1.X:8090)")
+        sys.exit(1)
+    except requests.exceptions.RequestException as e:
+        print(f"   ⚠️  Error al verificar: {e}")
+
+    # ── Verificar que los IDs de autos existen ─────────────────────────────
+    print(f"\n🔍 Verificando IDs de autos...")
+    for v in VEHICULOS:
+        try:
+            r = requests.get(f"{POCKETBASE_URL}/api/collections/autos/records/{v['id']}", timeout=5)
+            if r.status_code == 200:
+                data = r.json()
+                print(f"   ✅ {v['nombre']}: placa={data.get('placa', '?')}, id={v['id']}")
+            elif r.status_code == 404:
+                print(f"   ❌ {v['nombre']}: ID '{v['id']}' NO EXISTE en PocketBase")
+                print(f"      → Ve a PocketBase → Collections → autos → copia el ID correcto")
+            elif r.status_code == 403:
+                print(f"   ⚠️  {v['nombre']}: Acceso denegado (ID puede existir pero List rule bloquea)")
+                print(f"      → Ve a PocketBase → Collections → autos → 🔒 API Rules → déjalas VACÍAS")
+            else:
+                print(f"   ⚠️  {v['nombre']}: Respuesta inesperada {r.status_code}")
+        except Exception:
+            pass
 
     posiciones = [v["offset"] % len(v["ruta"]) for v in VEHICULOS]
 
