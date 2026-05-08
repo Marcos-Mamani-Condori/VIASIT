@@ -6,22 +6,14 @@ import com.oficial.viasit.domain.model.LogEntry
 import com.oficial.viasit.domain.model.Ruta
 import com.oficial.viasit.domain.model.VehicleInvitationCode
 
-/**
- * Utilidades de parseo JSON para los repositorios de administración.
- *
- * Todas las funciones son internas (internal) para que solo los repositorios
- * del mismo paquete puedan usarlas. No deben ser llamadas desde la UI o ViewModels.
- */
+
 internal object AdminJsonParsers {
 
-    /** Extrae un campo String del JSON de PocketBase por nombre de campo */
+
     fun extractStringField(json: String, field: String): String =
         Regex(""""$field"\s*:\s*"([^"]*)"""").find(json)?.groupValues?.get(1) ?: ""
 
-    /**
-     * Extrae los bloques JSON {} individuales del array "items" de PocketBase.
-     * Usa conteo de llaves para soportar cualquier orden de campos.
-     */
+
     fun extractItemBlocks(json: String): List<String> {
         val arrayStart = json.indexOf('[', json.indexOf("\"items\":"))
         if (arrayStart == -1) return emptyList()
@@ -40,7 +32,7 @@ internal object AdminJsonParsers {
         return blocks
     }
 
-    // ── Parsers por entidad ──────────────────────────────────────────────────
+
 
     fun parseInvitationCodesFromJson(json: String): List<InvitationCode> =
         extractItemBlocks(json).map { block ->

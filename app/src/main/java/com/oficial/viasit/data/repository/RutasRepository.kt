@@ -4,14 +4,12 @@ import com.oficial.viasit.domain.model.Ruta
 import com.oficial.viasit.data.remote.PocketBaseRealtimeClient
 import com.oficial.viasit.data.repository.AdminJsonParsers.extractItemBlocks
 import com.oficial.viasit.data.repository.AdminJsonParsers.parseRutaFromJson
+import com.oficial.viasit.domain.repository.IRutasRepository
 
-/**
- * Repositorio de rutas (creación, consulta, eliminación).
- */
 internal class RutasRepository(
     private val client: PocketBaseRealtimeClient,
     private val shared: AdminRepositoryShared
-) {
+) : IRutasRepository {
     suspend fun create(
         name: String, description: String,
         startPoint: String = "", endPoint: String = "",

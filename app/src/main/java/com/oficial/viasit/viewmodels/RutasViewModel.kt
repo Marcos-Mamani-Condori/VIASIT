@@ -21,8 +21,7 @@ class RutasViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // ── Crear ruta desde el mapa (con OSRM waypoints) ───────────────────────
-    // ✅ Tras crear, auto-asigna el rutaId a la línea y recarga el estado
+
     fun createRutaWithCoords(
         name: String, description: String,
         startLat: Double, startLng: Double, endLat: Double, endLng: Double,
@@ -38,10 +37,8 @@ class RutasViewModel(application: Application) : AndroidViewModel(application) {
 
             adminRepository.createRuta(name, description, startPoint, endPoint, lineaId, waypointsStr).fold(
                 onSuccess = { ruta ->
-                    // Auto-asignar la ruta a la línea
                     if (lineaId.isNotEmpty() && ruta.id.isNotEmpty())
                         adminRepository.updateLineaRuta(lineaId, ruta.id)
-                    // Recargar estado
                     val updatedLineas = adminRepository.getLineas().getOrElse { state.value.lineas }
                     val updatedRutas  = adminRepository.getRutas().getOrElse  { state.value.rutas  }
                     val wptInfo = if (waypoints.isNotEmpty()) " con ${waypoints.size} puntos de recorrido" else ""
@@ -58,7 +55,7 @@ class RutasViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // ── Crear ruta desde texto (fallback sin mapa) ──────────────────────────
+
     fun createRuta(
         name: String, description: String,
         startPoint: String = "", endPoint: String = "",
@@ -82,7 +79,7 @@ class RutasViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // ── Asignar ruta existente a una línea ──────────────────────────────────
+
     fun assignRutaToLinea(
         lineaId: String, rutaId: String, rutaName: String,
         currentUserEmail: String, state: MutableStateFlow<AdminUiState>, onLog: (String, String) -> Unit
@@ -104,7 +101,7 @@ class RutasViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // ── Eliminar ruta (y limpiar asignación en línea) ───────────────────────
+
     fun deleteRuta(
         rutaId: String, rutaName: String, lineaId: String = "",
         currentUserEmail: String, state: MutableStateFlow<AdminUiState>, onLog: (String, String) -> Unit

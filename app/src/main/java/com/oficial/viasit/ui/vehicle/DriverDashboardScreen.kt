@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.oficial.viasit.domain.model.Auto
-import com.oficial.viasit.ui.map.AutosViewModel
+import com.oficial.viasit.viewmodels.AutosViewModel
 import com.oficial.viasit.ui.theme.*
 import com.oficial.viasit.viewmodels.AuthViewModel
 
@@ -43,11 +43,15 @@ fun DriverDashboardScreen(
     onNavigateToRegisterVehicle: () -> Unit,
     onNavigateToMap: () -> Unit,
     onNavigateToManageVehicle: () -> Unit,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    autosViewModel: AutosViewModel = viewModel(factory = AutosViewModel.Factory)
 ) {
     val authState by authViewModel.authState.collectAsState()
     val currentUser = (authState as? com.oficial.viasit.domain.model.AuthState.Authenticated)?.user
     var showVehicleSelector by remember { mutableStateOf(false) }
+    var showReportesDialog by remember { mutableStateOf(false) }
+    var reportesList by remember { mutableStateOf<List<com.oficial.viasit.data.repository.AutoRepository.Reporte>>(emptyList()) }
+    var reportesLoading by remember { mutableStateOf(false) }
     val selectedVehicle = vehicles.find { it.id == selectedVehicleId }
 
     Scaffold(
@@ -158,6 +162,24 @@ fun DriverDashboardScreen(
                 onClick = onNavigateToMap
             )
 
+            if (selectedVehicle != null) {
+                DashboardMenuItem(
+                    icon = Icons.Default.ChatBubbleOutline,
+                    title = "Mis reportes",
+                    subtitle = "Opiniones de los pasajeros",
+                    iconColor = Cyan400,
+                    onClick = {
+                        reportesList = emptyList()
+                        reportesLoading = true
+                        showReportesDialog = true
+                        autosViewModel.fetchReportes(selectedVehicle.placa.ifBlank { selectedVehicle.id }) { lista ->
+                            reportesList = lista
+                            reportesLoading = false
+                        }
+                    }
+                )
+            }
+
             // ── Info tip ──────────────────────────────────────────────────────
             Row(
                 modifier = Modifier
@@ -194,6 +216,86 @@ fun DriverDashboardScreen(
                     showVehicleSelector = false
                 },
                 onDismiss = { showVehicleSelector = false }
+            )
+        }
+
+        // Diálogo de reportes
+        if (showReportesDialog) {
+            AlertDialog(
+                onDismissRequest = { showReportesDialog = false },
+                containerColor = Slate900,
+                title = { Text("Mis reportes", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White) },
+                text = {
+                    Column(modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        when {
+                            reportesLoading -> Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                                CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Brand500, strokeWidth = 2.dp)
+                            }
+                            reportesList.isEmpty() -> Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Slate800).padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Icon(Icons.Default.CheckCircle, null, tint = Emerald400, modifier = Modifier.size(16.dp))
+                                Text("No tienes reportes. ¡Buen trabajo!", style = MaterialTheme.typography.bodySmall, color = Slate400)
+                            }
+                            else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                items(reportesList) { rep ->
+                                    val texto = rep.descripcion.replace(Regex("""^\[Bus: [^\]]+\]\s*"""), "")
+                                    Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Slate800).padding(12.dp)) {
+                                        Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            Icon(Icons.Default.ChatBubbleOutline, null, tint = Slate500, modifier = Modifier.size(14.dp).padding(top = 2.dp))
+                                            Text(texto, style = MaterialTheme.typography.bodySmall, color = Slate300)
+                                        }
+                                        if (rep.respuesta.isNotBlank()) {
+                                            Spacer(modifier = Modifier.height(6.dp))
+                                            Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(start = 16.dp)) {
+                                                Icon(Icons.Default.SubdirectoryArrowRight, null, tint = Brand500, modifier = Modifier.size(14.dp).padding(top = 2.dp))
+                                                Text(rep.respuesta, style = MaterialTheme.typography.bodySmall, color = Brand400)
+                                            }
+                                        } else {
+                                            var replyText by remember { mutableStateOf("") }
+                                            var isReplying by remember { mutableStateOf(false) }
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                OutlinedTextField(
+                                                    value = replyText,
+                                                    onValueChange = { replyText = it },
+                                                    modifier = Modifier.weight(1f).height(46.dp),
+                                                    placeholder = { Text("Responder...", color = Slate600, fontSize = 12.sp) },
+                                                    colors = OutlinedTextFieldDefaults.colors(
+                                                        focusedBorderColor = Brand500, unfocusedBorderColor = Slate700,
+                                                        focusedTextColor = Color.White, unfocusedTextColor = Color.White
+                                                    ),
+                                                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp),
+                                                    shape = RoundedCornerShape(8.dp)
+                                                )
+                                                IconButton(
+                                                    onClick = {
+                                                        if (replyText.isNotBlank()) {
+                                                            isReplying = true
+                                                            autosViewModel.responderReporte(rep.id, replyText, (authState as? com.oficial.viasit.domain.model.AuthState.Authenticated)?.token) { ok ->
+                                                                isReplying = false
+                                                                if (ok) {
+                                                                    autosViewModel.fetchReportes(selectedVehicle?.placa ?: "") { lista -> reportesList = lista }
+                                                                }
+                                                            }
+                                                        }
+                                                    },
+                                                    enabled = replyText.isNotBlank() && !isReplying,
+                                                    modifier = Modifier.size(36.dp).background(Brand500, CircleShape)
+                                                ) {
+                                                    if (isReplying) CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
+                                                    else Icon(Icons.Default.Send, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showReportesDialog = false }) { Text("Cerrar", color = Brand400) }
+                }
             )
         }
     }

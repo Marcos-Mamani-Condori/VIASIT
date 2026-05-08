@@ -13,14 +13,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
 
-/**
- * ViewModel para el dashboard de pasajeros.
- * Carga las líneas y rutas de PocketBase en modo solo-lectura.
- */
 class PassengerViewModel(application: Application) : AndroidViewModel(application) {
 
     companion object {
@@ -33,8 +26,7 @@ class PassengerViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    private val pocketBase = AutosAplicacion.instance.pocketBaseClient
-    private val json = Json { ignoreUnknownKeys = true; isLenient = true }
+    private val adminRepository = AutosAplicacion.instance.adminRepository
 
     private val _lineas = MutableStateFlow<List<Linea>>(emptyList())
     val lineas: StateFlow<List<Linea>> = _lineas.asStateFlow()
@@ -48,13 +40,20 @@ class PassengerViewModel(application: Application) : AndroidViewModel(applicatio
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
-    /** ID de la línea que el pasajero seleccionó para ver en el mapa */
     private val _selectedLineaId = MutableStateFlow<String?>(null)
     val selectedLineaId: StateFlow<String?> = _selectedLineaId.asStateFlow()
 
-    /** Bus seleccionado desde la lista para centrar el mapa en él */
     private val _selectedAuto = MutableStateFlow<Auto?>(null)
     val selectedAuto: StateFlow<Auto?> = _selectedAuto.asStateFlow()
+
+    private val _destinoLineas = MutableStateFlow<List<Linea>>(emptyList())
+    val destinoLineas: StateFlow<List<Linea>> = _destinoLineas.asStateFlow()
+
+    private val _destinoNombre = MutableStateFlow<String?>(null)
+    val destinoNombre: StateFlow<String?> = _destinoNombre.asStateFlow()
+
+    private val _destinoQuery = MutableStateFlow("")
+    val destinoQuery: StateFlow<String> = _destinoQuery.asStateFlow()
 
     init {
         loadLineas()
@@ -69,56 +68,77 @@ class PassengerViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             _isLoading.value = true
             _error.value = null
-            try {
-                val result = pocketBase.getList(
-                    collection = "lineas",
-                    perPage    = 100,
-                    sort       = "name"
-                )
-                result.fold(
-                    onSuccess = { body ->
-                        val root  = json.parseToJsonElement(body).jsonObject
-                        val items = root["items"]?.jsonArray ?: return@fold
-                        val parsed = items.map { json.decodeFromJsonElement(Linea.serializer(), it) }
-                        // 🔍 DEBUG: mostrar qué ruta_id recibe cada línea
-                        parsed.forEach { linea ->
-                            Log.d(TAG, "Linea: ${linea.name} | rutaId='${linea.rutaId}'")
-                        }
-                        _lineas.value = parsed
-                        loadRutas()
-                    },
-                    onFailure = { e ->
-                        Log.e(TAG, "Error cargando líneas: ${e.message}")
-                        _error.value = "No se pudieron cargar las líneas"
+            adminRepository.getLineas().fold(
+                onSuccess = { lineas ->
+                    lineas.forEach { linea ->
+                        Log.d(TAG, "Linea: ${linea.name} | rutaId='${linea.rutaId}'")
                     }
-                )
-            } catch (e: Exception) {
-                Log.e(TAG, "Exception en loadLineas: ${e.message}")
-                _error.value = "Error de conexión"
-            } finally {
-                _isLoading.value = false
-            }
+                    _lineas.value = lineas
+                    loadRutas()
+                },
+                onFailure = { e ->
+                    Log.e(TAG, "Error cargando líneas: ${e.message}")
+                    _error.value = "No se pudieron cargar las líneas"
+                    _isLoading.value = false
+                }
+            )
         }
     }
 
     private suspend fun loadRutas() {
-        try {
-            val result = pocketBase.getList(collection = "rutas", perPage = 100)
-            result.fold(
-                onSuccess = { body ->
-                    val root  = json.parseToJsonElement(body).jsonObject
-                    val items = root["items"]?.jsonArray ?: return
-                    val parsed = items.map { json.decodeFromJsonElement(Ruta.serializer(), it) }
-                    // 🔍 DEBUG: mostrar rutas cargadas
-                    parsed.forEach { ruta ->
-                        Log.d(TAG, "Ruta: ${ruta.name} | id='${ruta.id}'")
-                    }
-                    _rutas.value = parsed.associateBy { it.id }
-                },
-                onFailure = { Log.w(TAG, "No se pudieron cargar rutas") }
-            )
-        } catch (e: Exception) {
-            Log.w(TAG, "Error cargando rutas: ${e.message}")
+        adminRepository.getRutas().fold(
+            onSuccess = { rutas ->
+                rutas.forEach { ruta ->
+                    Log.d(TAG, "Ruta: ${ruta.name} | id='${ruta.id}'")
+                }
+                _rutas.value = rutas.associateBy { it.id }
+            },
+            onFailure = { Log.w(TAG, "No se pudieron cargar rutas") }
+        )
+        _isLoading.value = false
+    }
+
+    fun buscarLineasPorDestino(lat: Double, lng: Double, nombre: String) {
+        val coincidentes = _lineas.value.filter { linea ->
+            val ruta = _rutas.value[linea.rutaId] ?: return@filter false
+            rutaPasaCercaDe(ruta, lat, lng, radioMetros = 800.0)
         }
+        _destinoLineas.value = coincidentes
+        _destinoNombre.value = nombre
+    }
+
+    fun limpiarDestino() {
+        _destinoLineas.value = emptyList()
+        _destinoNombre.value = null
+        _destinoQuery.value = ""
+    }
+
+    fun setDestinoQuery(q: String) {
+        _destinoQuery.value = q
+    }
+
+    private fun rutaPasaCercaDe(ruta: Ruta, lat: Double, lng: Double, radioMetros: Double): Boolean {
+        val puntos = buildList {
+            parsePunto(ruta.startPoint)?.let { add(it) }
+            parsePunto(ruta.endPoint)?.let { add(it) }
+            if (ruta.waypoints.isNotBlank()) {
+                ruta.waypoints.split(";").forEach { seg ->
+                    parsePunto(seg)?.let { add(it) }
+                }
+            }
+        }
+        return puntos.any { (pLat, pLng) ->
+            val result = FloatArray(1)
+            android.location.Location.distanceBetween(lat, lng, pLat, pLng, result)
+            result[0] <= radioMetros
+        }
+    }
+
+    private fun parsePunto(s: String): Pair<Double, Double>? {
+        val parts = s.trim().split(",")
+        if (parts.size < 2) return null
+        val pLat = parts[0].trim().toDoubleOrNull() ?: return null
+        val pLng = parts[1].trim().toDoubleOrNull() ?: return null
+        return pLat to pLng
     }
 }

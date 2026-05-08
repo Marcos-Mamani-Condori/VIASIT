@@ -16,7 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.oficial.viasit.domain.model.User
-import com.oficial.viasit.ui.map.AutosViewModel
+import com.oficial.viasit.viewmodels.AutosViewModel
 import com.oficial.viasit.ui.theme.Brand500
 import com.oficial.viasit.ui.theme.Slate500
 import com.oficial.viasit.ui.theme.Slate950
@@ -30,11 +30,7 @@ private enum class PassengerTab(val label: String, val icon: ImageVector) {
     PERFIL("Perfil", Icons.Default.Person)
 }
 
-/**
- * Dashboard principal para usuarios de rol 'usuario' e 'invitado'.
- * El tab state está levantado aquí para que RoutesTab pueda cambiar
- * al tab Mapa cuando el pasajero toca "Ver en mapa".
- */
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PassengerDashboardScreen(
@@ -47,7 +43,7 @@ fun PassengerDashboardScreen(
     var selectedTab by remember { mutableStateOf(PassengerTab.MAPA) }
 
     Scaffold(
-        // ✅ Respeta barra de estado del sistema en todos los dispositivos
+
         contentWindowInsets = WindowInsets.safeDrawing,
         containerColor = Slate950,
         bottomBar = {
@@ -76,7 +72,7 @@ fun PassengerDashboardScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)  // ✅ usa todo el padding (top + bottom)
+                .padding(paddingValues)
         ) {
             when (selectedTab) {
                 PassengerTab.MAPA   -> PassengerMapScreen(
@@ -85,6 +81,7 @@ fun PassengerDashboardScreen(
                 PassengerTab.AUTOS  -> ActiveAutosTab(
                     autosViewModel     = autosViewModel,
                     passengerViewModel = passengerViewModel,
+                    currentUser        = currentUser,
                     onNavigateToMap    = { selectedTab = PassengerTab.MAPA }
                 )
                 PassengerTab.RUTAS  -> RoutesTab(

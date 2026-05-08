@@ -25,17 +25,7 @@ import com.oficial.viasit.ui.admin.EmptyState
 import com.oficial.viasit.ui.admin.GeneratedCodeBanner
 import com.oficial.viasit.ui.theme.*
 
-/**
- * Tab "Códigos Vehículo" — solo para ADMIN_LINEA.
- *
- * Permite generar códigos que los conductores usan
- * para registrar su vehículo en la línea.
- *
- * Funciones:
- *  - Generar un nuevo código (72 horas de validez)
- *  - Copiar el código al portapapeles
- *  - Ver y eliminar códigos existentes
- */
+
 @Composable
 fun VehicleCodesTabContent(
     lineaId: String,
@@ -63,7 +53,7 @@ fun VehicleCodesTabContent(
         contentPadding = PaddingValues(20.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        // ── Panel generador ────────────────────────────────────────────────
+
         item {
             Column(
                 modifier = Modifier
@@ -92,7 +82,7 @@ fun VehicleCodesTabContent(
             Spacer(modifier = Modifier.height(4.dp))
         }
 
-        // ── Código recién generado ─────────────────────────────────────────
+
         generatedCode?.let { code ->
             item {
                 GeneratedCodeBanner(
@@ -131,7 +121,7 @@ fun VehicleCodesTabContent(
     }
 }
 
-// ── Item de código de vehículo ────────────────────────────────────────────────
+
 @Composable
 fun VehicleCodeItem(code: VehicleInvitationCode, onCopy: () -> Unit, onDelete: () -> Unit) {
     Row(

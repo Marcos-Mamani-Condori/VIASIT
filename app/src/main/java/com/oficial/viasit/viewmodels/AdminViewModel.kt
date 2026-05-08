@@ -30,23 +30,19 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
 
     private val logAction: (String, String) -> Unit = { email, desc -> logsVM.createLog(email, desc) }
 
-    // ── Líneas ───────────────────────────────────────────────────────────────
     fun loadLineas()                                                           = lineasVM.loadLineas(_uiState)
     fun createLinea(n: String, c: String, r: String, email: String)           = lineasVM.createLinea(n, c, r, email, _uiState, logAction)
     fun updateLinea(id: String, n: String, c: String, r: String, email: String) = lineasVM.updateLinea(id, n, c, r, email, _uiState, logAction)
     fun deleteLinea(id: String, email: String)                                = lineasVM.deleteLinea(id, email, _uiState, logAction)
 
-    // ── Invitaciones ─────────────────────────────────────────────────────────
     fun loadInvitationCodes()                                                  = invitacionesVM.loadInvitationCodes(_uiState)
     fun generateInvitationCode(role: String, lineaId: String, hours: Int = 24, email: String = "") =
         invitacionesVM.generateInvitationCode(role, lineaId, hours, email, _uiState, logAction)
     fun deleteInvitationCode(id: String, email: String)                       = invitacionesVM.deleteInvitationCode(id, email, _uiState, logAction)
 
-    // ── Logs ─────────────────────────────────────────────────────────────────
     fun loadLogs()                                                             = logsVM.loadLogs(_uiState)
     fun createLog(email: String, description: String)                         = logsVM.createLog(email, description)
 
-    // ── Rutas ────────────────────────────────────────────────────────────────
     fun loadRutas() = viewModelScope.launch {
         _uiState.value = _uiState.value.copy(isLoading = true)
         getApplication<AutosAplicacion>().adminRepository.getRutas().fold(
@@ -64,7 +60,6 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     fun deleteRuta(rutaId: String, rutaName: String, lineaId: String = "", email: String) =
         rutasVM.deleteRuta(rutaId, rutaName, lineaId, email, _uiState, logAction)
 
-    // ── Códigos de vehículo ──────────────────────────────────────────────────
     fun loadVehicleInvitationCodes(lineaId: String)                           = vehicleCodesVM.loadVehicleInvitationCodes(lineaId, _uiState)
     fun generateVehicleInvitationCode(lineaId: String, creadoPor: String, hours: Int = 72, email: String = "") =
         vehicleCodesVM.generateVehicleInvitationCode(lineaId, creadoPor, hours, email, _uiState, logAction)
@@ -72,6 +67,5 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         vehicleCodesVM.deleteVehicleInvitationCode(id, lineaId, email, _uiState, logAction)
     fun clearVehicleCode() { _uiState.value = _uiState.value.copy(generatedVehicleCode = null) }
 
-    // ── UI ───────────────────────────────────────────────────────────────────
     fun clearMessages() { _uiState.value = _uiState.value.copy(error = null, successMessage = null, generatedCode = null) }
 }

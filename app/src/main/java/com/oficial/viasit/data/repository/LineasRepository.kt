@@ -4,14 +4,12 @@ import android.util.Log
 import com.oficial.viasit.domain.model.Linea
 import com.oficial.viasit.data.remote.PocketBaseRealtimeClient
 import com.oficial.viasit.data.repository.AdminJsonParsers.parseLineasFromJson
+import com.oficial.viasit.domain.repository.ILineasRepository
 
-/**
- * Repositorio de líneas de transporte.
- */
 internal class LineasRepository(
     private val client: PocketBaseRealtimeClient,
     private val shared: AdminRepositoryShared
-) {
+) : ILineasRepository {
     suspend fun create(name: String, code: String, rutaId: String = ""): Result<Linea> = try {
         val data = mutableMapOf<String, Any>("name" to name, "code" to code)
         if (rutaId.isNotEmpty()) data["ruta_id"] = rutaId

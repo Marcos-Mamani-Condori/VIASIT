@@ -7,6 +7,8 @@ import com.oficial.viasit.data.remote.PocketBaseRealtimeClient
 import com.oficial.viasit.data.repository.AdminRepository
 import com.oficial.viasit.data.repository.AutoRepository
 import com.oficial.viasit.data.repository.AuthRepository
+import com.oficial.viasit.domain.usecases.LoginUseCase
+import com.oficial.viasit.domain.usecases.RegisterUseCase
 
 class AutosAplicacion : Application() {
 
@@ -27,6 +29,9 @@ class AutosAplicacion : Application() {
     val authRepository: AuthRepository by lazy {
         AuthRepository(applicationContext)
     }
+
+    val loginUseCase by lazy { LoginUseCase(authRepository) }
+    val registerUseCase by lazy { RegisterUseCase(authRepository) }
 
     // AdminRepository comparte el mismo cliente y usa el token de la sesión activa
     val adminRepository: AdminRepository by lazy {

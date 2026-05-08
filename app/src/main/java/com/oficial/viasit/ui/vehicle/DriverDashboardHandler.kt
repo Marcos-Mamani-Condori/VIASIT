@@ -10,7 +10,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.oficial.viasit.domain.model.AuthState
 import com.oficial.viasit.domain.model.Auto
 import com.oficial.viasit.domain.model.UserRole
-import com.oficial.viasit.ui.map.AutosViewModel
+import com.oficial.viasit.viewmodels.AutosViewModel
 import com.oficial.viasit.viewmodels.AuthViewModel
 
 /**

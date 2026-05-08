@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.oficial.viasit.data.repository.AuthRepository
+import com.oficial.viasit.domain.usecases.LoginUseCase
+import com.oficial.viasit.domain.usecases.RegisterUseCase
 import com.oficial.viasit.domain.model.AuthState
 import com.oficial.viasit.domain.model.RegisterRequest
 import com.oficial.viasit.domain.model.UserRole
@@ -13,7 +15,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-class AuthViewModel(private val authRepository: AuthRepository) : ViewModel() {
+class AuthViewModel(
+    private val authRepository: AuthRepository,
+    private val loginUseCase: LoginUseCase,
+    private val registerUseCase: RegisterUseCase
+) : ViewModel() {
     val authState: StateFlow<AuthState> = authRepository.authState
 
     private val _loginForm = MutableStateFlow(LoginFormState())
@@ -39,7 +45,7 @@ class AuthViewModel(private val authRepository: AuthRepository) : ViewModel() {
         if (!validateLogin(form)) return
         _loginForm.update { it.copy(isLoading = true, error = null) }
         viewModelScope.launch {
-            val result = authRepository.login(form.email, form.password)
+            val result = loginUseCase(form.email, form.password)
             result.fold(
                 onSuccess = { user ->
                     _loginForm.update { it.copy(isLoading = false, isSuccess = true) }
@@ -56,7 +62,7 @@ class AuthViewModel(private val authRepository: AuthRepository) : ViewModel() {
         if (!validateRegister(form)) return
         _registerForm.update { it.copy(isLoading = true, error = null) }
         viewModelScope.launch {
-            val result = authRepository.register(RegisterRequest(
+            val result = registerUseCase(RegisterRequest(
                 email = form.email,
                 password = form.password,
                 passwordConfirm = form.confirmPassword,
@@ -123,7 +129,12 @@ class AuthViewModel(private val authRepository: AuthRepository) : ViewModel() {
         val Factory: ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                return AuthViewModel(com.oficial.viasit.AutosAplicacion.instance.authRepository) as T
+                val app = com.oficial.viasit.AutosAplicacion.instance
+                return AuthViewModel(
+                    authRepository = app.authRepository,
+                    loginUseCase = app.loginUseCase,
+                    registerUseCase = app.registerUseCase
+                ) as T
             }
         }
     }

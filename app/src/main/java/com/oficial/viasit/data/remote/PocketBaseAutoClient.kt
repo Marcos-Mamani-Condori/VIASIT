@@ -125,7 +125,7 @@ class PocketBaseAutoClient(
                 if (existingAuto != null) {
                     Log.d(TAG, "Auto existente encontrado (id=${existingAuto.id}), actualizando en lugar de crear")
                     // Reactivar: solo actualizar lat/lng para marcar como activo
-                    val body = """{"lat":$lat,"lng":$lng,"angulo":0}"""
+                    val body = "{\"lat\":$lat,\"lng\":$lng,\"angulo\":0}"
                         .toRequestBody("application/json".toMediaType())
                     val resp = okHttpClient.newCall(
                         Request.Builder().url("$BASE_URL/api/collections/$COLLECTION/records/${existingAuto.id}").patch(body).build()
@@ -140,7 +140,7 @@ class PocketBaseAutoClient(
                 }
 
                 // Crear nuevo registro solo si no existe
-                val body = """{"userid":"$userId","placa":"$placa","lat":$lat,"lng":$lng,"angulo":0}"""
+                val body = "{\"userid\":\"$userId\",\"placa\":\"$placa\",\"lat\":$lat,\"lng\":$lng,\"angulo\":0}"
                     .toRequestBody("application/json".toMediaType())
                 Log.d(TAG, "Creando nuevo auto...")
                 val resp = okHttpClient.newCall(

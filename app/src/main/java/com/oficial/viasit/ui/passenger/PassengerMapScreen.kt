@@ -24,7 +24,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.oficial.viasit.ui.map.AutosViewModel
+import com.oficial.viasit.viewmodels.AutosViewModel
 import com.oficial.viasit.ui.map.RoutePolyline
 import com.oficial.viasit.ui.map.addCarsLayer
 import com.oficial.viasit.ui.map.addCarIconToStyle

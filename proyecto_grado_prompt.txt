@@ -1,0 +1,60 @@
+# Contexto del Proyecto VIASIT para Perfil de Proyecto de Grado
+
+A continuación se detalla la estructura, tecnologías, arquitectura y funcionalidades actuales del proyecto Android "VIASIT", desarrollado de manera nativa. Toda esta información representa el estado real del código base y debe ser utilizada estructurar el documento de Perfil de Proyecto de Grado.
+
+## 1. Información General del Proyecto
+- **Nombre de la Aplicación**: VIASIT
+- **Plataforma**: Android Nativo
+- **Lenguaje de Programación**: Kotlin (Compatibilidad con Java 17)
+- **SDKs Android**: Min SDK 26 (Android 8.0), Target SDK 35 (Android 15)
+- **Entornos (Flavors)**: "dev" (Desarrollo local) y "prod" (Producción)
+
+## 2. Tecnologías y Librerías Principales
+- **Interfaz de Usuario (UI)**: Jetpack Compose (Material Design 3, animaciones, componentes modernos).
+- **Arquitectura Base**: MVVM (Model-View-ViewModel) con principios de Clean Architecture.
+- **Backend / Base de Datos Remota**: PocketBase (BaaS - Backend as a Service).
+- **Tiempo Real**: Server-Sent Events (SSE) a través de OkHttp para actualizaciones eficientes y de bajo consumo en tiempo real.
+- **Base de Datos Local**: Room Database (ORM nativo de Android).
+- **Servicios en Segundo Plano**: Foreground Services para el rastreo de ubicación.
+
+## 3. Mapas, Geolocalización y Recursos de Software
+- **Motor de Renderizado**: MapLibre Android, utilizado para renderizar mapas vectoriales nativos con alto rendimiento.
+- **Servidor de Teselas (Tiles)**: Se consume el servicio gratuito **OpenFreeMap** (basado en datos de OpenStreetMap), lo cual exime al proyecto de costos operativos por licencias de mapas (como ocurriría con Google Maps API) y permite personalizaciones de estilo (`https://tiles.openfreemap.org/styles/bright`).
+- **Geolocalización**: Google Play Services Location (FusedLocationProviderClient) para la obtención precisa de coordenadas GPS.
+
+## 4. Arquitectura del Software
+El proyecto está dividido en capas claras siguiendo Clean Architecture:
+- **Capa Data (`data`)**:
+  - `remote`: Interacción directa con la API de PocketBase y flujos SSE.
+  - `local`: Interacción con Room Database para cacheo o persistencia local. ***Específicamente, se guardan de forma local los datos de los vehículos (`AutoEntity`, incluyendo su placa, código y su última posición `lat`/`lng` conocida) para que el mapa pueda renderizar rápidamente los minibuses al abrir la app de forma estática antes de establecer la conexión en tiempo real o ante caídas breves de datos.***
+  - `repository`: Repositorios que centralizan la fuente de verdad (ej. `AuthRepository`, `AutoRepository`, `RutasRepository`, `AdminRepository`).
+- **Capa Domain (`domain`)**:
+  - `model`: Entidades de negocio centrales: `User`, `Ruta`, `Linea`, `auto` (Vehículo), `Log`, `InvitationCode`.
+- **Capa UI (`ui`)**:
+  - Módulos divididos por contexto funcional: `admin` (pantallas de administración), `passenger` (pantallas del usuario pasajero), `map` (componentes del mapa), `auth` (inicio de sesión y registro), `routes` (visualización de rutas), `theme`.
+- **Capa ViewModels (`viewmodels`)**:
+  - Intermediarios que manejan el estado de la UI (UiState).
+- **Capa Service (`service`)**:
+  - Contiene `LocationTrackingService`, encargado de enviar reportes de ubicación en tiempo real.
+
+## 5. Seguridad de la Información y Roles
+- **Manejo de Roles**: El sistema diferencia estrictamente entre `usuario` (pasajero), `conductor` y `admin`.
+- **Autenticación y Sesiones**: PocketBase actúa como el proveedor de identidad. Tras un inicio de sesión exitoso, se genera un Token JWT (gestionado internamente por el SDK de PocketBase Auth Client) que se incluye como *Bearer Token* en la cabecera (Header) de las peticiones HTTP subsiguientes (vía OkHttp) para garantizar que solo usuarios autenticados realicen modificaciones (ej. actualizar posición o gestionar líneas).
+- Los conductores además requieren un "Código de Invitación de Vehículo" válido y no expirado para poder registrarse y vincularse a una línea específica.
+
+## 6. Flujo de Datos y Geolocalización (Data Flow)
+- **Emisión de Ubicación (Conductor)**: El sistema utiliza la misma aplicación móvil compartida. Sin embargo, existe un rol específico de **"Conductor"**. Cuando un usuario con este rol inicia su servicio, la aplicación lanza el `LocationTrackingService` en primer plano (Foreground Service) que está atado a una notificación persistente.
+- **Frecuencia de Actualización Adaptativa**: Para optimizar la red y evitar desgastar la batería del conductor, el envío de coordenadas a PocketBase (mediante el socket SSE en tiempo real) se realiza evaluando la distancia (mínimo 10 metros de cambio) y la velocidad del vehículo de manera dinámica:
+  - **En Movimiento (> 5 km/h):** Reporta su ubicación cada 5 segundos.
+  - **Lentamente (1 a 5 km/h):** Reporta su ubicación cada 10 segundos.
+  - **Detenido (< 1 km/h):** Reporta cada 30 segundos.
+*(Esto es un detalle clave para justificar técnicamente el por qué usar SSE y una estrategia custom en lugar de Polling básico).*
+
+## 7. Alcance Geográfico (Contexto de Aplicación)
+- **Delimitación Geográfica**: Aunque la lógica de los mapas permite un uso global, el alcance específico del proyecto y el diseño de la base de datos están contextualizados para el servicio del transporte público urbano (típicamente minibuses) en la ciudad de **La Paz, Bolivia**. Cualquier justificación del planteamiento del problema se debe basar en el tráfico automotor y la organización sindical de esta región.
+
+## 8. Diseño Metodológico
+- **Metodología de Desarrollo Ágil**: El proyecto se desarrolla bajo la metodología **Scrum** (soportada por el ciclo de desarrollo iterativo e incremental de **Mobile-D**, ideal para proyectos móviles). Esto implica la división de tareas en *Sprints* enfocados en funcionalidades clave (Auth, Mapas, Realtime SSE, Panel Admin), revisiones continuas del código (refactorizaciones arquitectónicas) y entregables parciales totalmente funcionales.
+
+---
+Instrucción para el modelo de lenguaje de destino: Utiliza esta descripción técnica exacta, sin inventar módulos adicionales, para estructurar los apartados técnicos (como Marco Práctico, Diseño Metodológico, Arquitectura de Software y Herramientas a utilizar) del Perfil del Proyecto de Grado.
