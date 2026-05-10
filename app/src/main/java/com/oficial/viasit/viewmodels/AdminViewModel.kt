@@ -5,9 +5,9 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.oficial.viasit.AutosAplicacion
+import com.oficial.viasit.domain.repository.IAdminRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.launch
 
 class AdminViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -19,7 +19,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private val adminRepository = (application as AutosAplicacion).adminRepository
+    private val adminRepository: IAdminRepository = (application as AutosAplicacion).adminRepository
 
     private val _uiState = MutableStateFlow(AdminUiState())
     val uiState: StateFlow<AdminUiState> = _uiState
@@ -45,13 +45,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     fun loadLogs()                                                                 = logsHandler.loadLogs(_uiState)
     fun createLog(userId: String, description: String)                            = logsHandler.createLog(userId, description)
 
-    fun loadRutas() = viewModelScope.launch {
-        _uiState.value = _uiState.value.copy(isLoading = true)
-        adminRepository.getRutas().fold(
-            onSuccess = { rutas -> _uiState.value = _uiState.value.copy(rutas = rutas, isLoading = false) },
-            onFailure = { _uiState.value = _uiState.value.copy(isLoading = false, error = it.message) }
-        )
-    }
+    fun loadRutas() = rutasHandler.loadRutas(_uiState)
     fun createRuta(n: String, d: String, s: String, e: String, lineaId: String, userId: String) =
         rutasHandler.createRuta(n, d, s, e, lineaId, userId, _uiState, logAction)
     fun createRutaWithCoords(n: String, d: String, sLat: Double, sLng: Double, eLat: Double, eLng: Double,

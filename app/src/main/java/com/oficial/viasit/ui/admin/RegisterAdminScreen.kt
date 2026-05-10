@@ -20,147 +20,60 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
-import com.oficial.viasit.AutosAplicacion
-import com.oficial.viasit.data.remote.PocketBaseAuthClient
-import com.oficial.viasit.data.repository.AdminRepository
-import com.oficial.viasit.data.repository.AuthRepository
-import com.oficial.viasit.domain.model.AdminRegisterRequest
-import com.oficial.viasit.domain.model.AuthState
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.oficial.viasit.domain.model.RegisterRequest
 import com.oficial.viasit.ui.theme.*
-import kotlinx.coroutines.launch
-
-private val Slate500 = Color(0xFF64748B)
+import com.oficial.viasit.viewmodels.RegisterAdminViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RegisterAdminScreen(
-    onRegisterSuccess: () -> Unit,
     onNavigateBack: () -> Unit,
-    authState: AuthState
+    onRegisterSuccess: () -> Unit,
+    viewModel: RegisterAdminViewModel = viewModel(factory = RegisterAdminViewModel.Factory)
 ) {
+    val isLoading by viewModel.isLoading.collectAsState()
+    val errorMessage by viewModel.errorMessage.collectAsState()
+    val successMessage by viewModel.successMessage.collectAsState()
+
+    var name by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
+    var phone by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
-    var name by remember { mutableStateOf("") }
-    var phone by remember { mutableStateOf("") }
     var invitationCode by remember { mutableStateOf("") }
-    var selectedRole by remember { mutableStateOf("ADMIN_LINEA") }
-
+    
     var passwordVisible by remember { mutableStateOf(false) }
     var confirmPasswordVisible by remember { mutableStateOf(false) }
-    var isLoading by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    var successMessage by remember { mutableStateOf<String?>(null) }
-    var codeValidated by remember { mutableStateOf(false) }
-    var validatedCodeRole by remember { mutableStateOf("") }
-    var validatedCodeLineaId by remember { mutableStateOf("") }
 
-    val scope = rememberCoroutineScope()
-    val authClient = remember { PocketBaseAuthClient() }
-    val adminRepository = remember { AutosAplicacion.instance.adminRepository }
-    val authRepository = remember { AutosAplicacion.instance.authRepository }
+    val codeValidated by viewModel.codeValidated.collectAsState()
+    val validatedCodeRole by viewModel.validatedCodeRole.collectAsState()
+    val validatedCodeLineaId by viewModel.validatedCodeLineaId.collectAsState()
 
     LaunchedEffect(invitationCode) {
         if (invitationCode.length >= 8) {
-            val result = adminRepository.validateInvitationCode(invitationCode)
-            result.fold(
-                onSuccess = { code ->
-                    if (code != null) {
-                        codeValidated = true
-                        validatedCodeRole = code.role
-                        validatedCodeLineaId = code.lineaId
-                        selectedRole = code.role
-                    } else {
-                        codeValidated = false
-                    }
-                },
-                onFailure = { codeValidated = false }
-            )
-        } else {
-            codeValidated = false
-        }
-    }
-
-    fun validateCode() {
-        scope.launch {
-            isLoading = true
-            errorMessage = null
-            val result = adminRepository.validateInvitationCode(invitationCode)
-            result.fold(
-                onSuccess = { code ->
-                    if (code != null) {
-                        codeValidated = true
-                        validatedCodeRole = code.role
-                        validatedCodeLineaId = code.lineaId
-                        selectedRole = code.role
-                        successMessage = "Código válido: ${code.role}"
-                    } else {
-                        codeValidated = false
-                        errorMessage = "Código no válido o ya utilizado"
-                    }
-                },
-                onFailure = { error ->
-                    codeValidated = false
-                    errorMessage = error.message ?: "Error al validar código"
-                }
-            )
-            isLoading = false
+            viewModel.validateCode(invitationCode)
         }
     }
 
     fun register() {
-        if (!codeValidated) { errorMessage = "Valida primero el código de invitación"; return }
-        if (password != confirmPassword) { errorMessage = "Las contraseñas no coinciden"; return }
-        if (password.length < 8) { errorMessage = "La contraseña debe tener al menos 8 caracteres"; return }
+        if (!codeValidated) { viewModel.clearMessages(); return }
+        if (password != confirmPassword) { viewModel.clearMessages(); return }
+        if (password.length < 8) { viewModel.clearMessages(); return }
 
-        scope.launch {
-            isLoading = true
-            errorMessage = null
-
-            val request = AdminRegisterRequest(
+        viewModel.registerAdmin(
+            request = RegisterRequest(
                 email = email,
                 password = password,
                 passwordConfirm = confirmPassword,
                 name = name,
                 phone = phone,
                 role = validatedCodeRole,
-                invitationCode = invitationCode
-            )
-
-            val result = authClient.registerAdmin(
-                email = request.email,
-                password = request.password,
-                passwordConfirm = request.passwordConfirm,
-                name = request.name,
-                phone = request.phone,
-                role = request.role,
-                invitationCode = request.invitationCode,
                 lineaId = validatedCodeLineaId
-            )
-
-            result.fold(
-                onSuccess = { user ->
-                    val codeValidation = adminRepository.validateInvitationCode(invitationCode)
-                    codeValidation.fold(
-                        onSuccess = { code ->
-                            if (code != null) adminRepository.useInvitationCode(code.id, user.id)
-                        },
-                        onFailure = { }
-                    )
-
-                    authRepository.login(email, password).fold(
-                        onSuccess = { successMessage = "Registro exitoso"; onRegisterSuccess() },
-                        onFailure = { onRegisterSuccess() }
-                    )
-                },
-                onFailure = { error ->
-                    errorMessage = error.message ?: "Error al registrar"
-                }
-            )
-            isLoading = false
-        }
+            ),
+            invitationCode = invitationCode,
+            onSuccess = onRegisterSuccess
+        )
     }
 
     Scaffold(
@@ -267,7 +180,7 @@ fun RegisterAdminScreen(
                         when {
                             codeValidated -> Icon(Icons.Default.CheckCircle, null,
                                 tint = Emerald400)
-                            invitationCode.isNotEmpty() -> TextButton(onClick = { validateCode() }) {
+                            invitationCode.isNotEmpty() -> TextButton(onClick = { viewModel.validateCode(invitationCode) }) {
                                 Text("Validar", color = Brand400,
                                     style = MaterialTheme.typography.labelMedium)
                             }

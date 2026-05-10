@@ -1,14 +1,14 @@
 package com.oficial.viasit.viewmodels
 
-import com.oficial.viasit.data.repository.AdminRepository
 import com.oficial.viasit.domain.model.Linea
+import com.oficial.viasit.domain.repository.IAdminRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 
 internal class LineasHandler(
     private val scope: CoroutineScope,
-    private val repository: AdminRepository
+    private val repository: IAdminRepository
 ) {
     fun loadLineas(state: MutableStateFlow<AdminUiState>) {
         scope.launch {

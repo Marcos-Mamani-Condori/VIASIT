@@ -6,9 +6,12 @@ import androidx.lifecycle.viewModelScope
 import com.oficial.viasit.data.repository.AuthRepository
 import com.oficial.viasit.domain.usecases.LoginUseCase
 import com.oficial.viasit.domain.usecases.RegisterUseCase
+import com.oficial.viasit.domain.usecases.AuthValidators
 import com.oficial.viasit.domain.model.AuthState
 import com.oficial.viasit.domain.model.RegisterRequest
 import com.oficial.viasit.domain.model.UserRole
+import com.oficial.viasit.domain.model.LoginFormState
+import com.oficial.viasit.domain.model.RegisterFormState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -41,8 +44,10 @@ class AuthViewModel(
     fun updateRegisterInvitationCode(code: String) { _registerForm.update { it.copy(invitationCode = code) } }
 
     fun login() {
-        val form = _loginForm.value
-        if (!validateLogin(form)) return
+        val form = AuthValidators.validateLogin(_loginForm.value)
+        _loginForm.value = form
+        if (form.emailError != null || form.passwordError != null) return
+
         _loginForm.update { it.copy(isLoading = true, error = null) }
         viewModelScope.launch {
             val result = loginUseCase(form.email, form.password)
@@ -58,8 +63,10 @@ class AuthViewModel(
     }
 
     fun register() {
-        val form = _registerForm.value
-        if (!validateRegister(form)) return
+        val form = AuthValidators.validateRegister(_registerForm.value)
+        _registerForm.value = form
+        if (form.emailError != null || form.passwordError != null || form.confirmPasswordError != null || form.nameError != null || form.error != null) return
+
         _registerForm.update { it.copy(isLoading = true, error = null) }
         viewModelScope.launch {
             val result = registerUseCase(RegisterRequest(
@@ -92,38 +99,6 @@ class AuthViewModel(
     fun getUserRole(): UserRole = authRepository.getUserRole()
     fun getUserId(): String? = authRepository.getUserId()
 
-    private fun validateLogin(form: LoginFormState): Boolean {
-        val emailRegex = Regex("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")
-        return when {
-            form.email.isBlank() -> { _loginForm.update { it.copy(emailError = "Email requerido") }; false }
-            !emailRegex.matches(form.email) -> { _loginForm.update { it.copy(emailError = "Email invalido") }; false }
-            form.password.isBlank() -> { _loginForm.update { it.copy(passwordError = "Contrasena requerida") }; false }
-            form.password.length < 6 -> { _loginForm.update { it.copy(passwordError = "Minimo 6 caracteres") }; false }
-            else -> { _loginForm.update { it.copy(emailError = null, passwordError = null) }; true }
-        }
-    }
-
-    private fun validateRegister(form: RegisterFormState): Boolean {
-        val emailRegex = Regex("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")
-        return when {
-            form.email.isBlank() -> { _registerForm.update { it.copy(emailError = "Email requerido") }; false }
-            !emailRegex.matches(form.email) -> { _registerForm.update { it.copy(emailError = "Email invalido") }; false }
-            form.password.isBlank() -> { _registerForm.update { it.copy(passwordError = "Contrasena requerida") }; false }
-            form.password.length < 8 -> { _registerForm.update { it.copy(passwordError = "Minimo 8 caracteres") }; false }
-            form.confirmPassword != form.password -> { _registerForm.update { it.copy(confirmPasswordError = "No coinciden") }; false }
-            form.name.isBlank() -> { _registerForm.update { it.copy(nameError = "Nombre requerido") }; false }
-            form.role == "conductor" && form.invitationCode.isBlank() -> {
-                _registerForm.update { it.copy(error = "Los conductores necesitan un código de invitación") }; false
-            }
-            else -> {
-                _registerForm.update {
-                    it.copy(emailError = null, passwordError = null, confirmPasswordError = null, nameError = null, error = null)
-                }
-                true
-            }
-        }
-    }
-
     companion object {
         val Factory: ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
@@ -138,30 +113,3 @@ class AuthViewModel(
         }
     }
 }
-
-data class LoginFormState(
-    val email: String = "",
-    val password: String = "",
-    val emailError: String? = null,
-    val passwordError: String? = null,
-    val isLoading: Boolean = false,
-    val isSuccess: Boolean = false,
-    val error: String? = null
-)
-
-data class RegisterFormState(
-    val email: String = "",
-    val password: String = "",
-    val confirmPassword: String = "",
-    val name: String = "",
-    val phone: String = "",
-    val role: String = "usuario",
-    val invitationCode: String = "",
-    val emailError: String? = null,
-    val passwordError: String? = null,
-    val confirmPasswordError: String? = null,
-    val nameError: String? = null,
-    val isLoading: Boolean = false,
-    val isSuccess: Boolean = false,
-    val error: String? = null
-)

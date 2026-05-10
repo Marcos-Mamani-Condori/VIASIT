@@ -1,14 +1,24 @@
 package com.oficial.viasit.viewmodels
 
-import com.oficial.viasit.data.repository.AdminRepository
+import com.oficial.viasit.domain.repository.IAdminRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 
 internal class RutasHandler(
     private val scope: CoroutineScope,
-    private val repository: AdminRepository
+    private val repository: IAdminRepository
 ) {
+    fun loadRutas(state: MutableStateFlow<AdminUiState>) {
+        scope.launch {
+            state.value = state.value.copy(isLoading = true, error = null)
+            repository.getRutas().fold(
+                onSuccess = { rutas -> state.value = state.value.copy(isLoading = false, rutas = rutas) },
+                onFailure = { state.value = state.value.copy(isLoading = false, error = it.message) }
+            )
+        }
+    }
+
     fun createRutaWithCoords(
         name: String, description: String,
         startLat: Double, startLng: Double, endLat: Double, endLng: Double,

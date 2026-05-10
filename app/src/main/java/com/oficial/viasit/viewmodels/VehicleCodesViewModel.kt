@@ -1,6 +1,6 @@
 package com.oficial.viasit.viewmodels
 
-import com.oficial.viasit.data.repository.AdminRepository
+import com.oficial.viasit.domain.repository.IAdminRepository
 import com.oficial.viasit.domain.model.VehicleInvitationCode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -8,7 +8,7 @@ import kotlinx.coroutines.launch
 
 internal class VehicleCodesHandler(
     private val scope: CoroutineScope,
-    private val repository: AdminRepository
+    private val repository: IAdminRepository
 ) {
     fun generateVehicleInvitationCode(
         lineaId: String, creadoPor: String, expiresInHours: Int = 72,
