@@ -3,6 +3,7 @@ package com.oficial.viasit.domain.model
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
+
 @Serializable
 data class Log(
     @SerialName("id")
@@ -27,5 +28,8 @@ data class Log(
     val collectionName: String = "logs"
 )
 
+/**
+ * Alias para compatibilidad con código existente
+ */
 typealias LogEntry = Log
 

@@ -33,7 +33,6 @@ class PocketBaseAuthClient {
 
     private var authToken: String? = null
 
-    // ============ Clases de request serializables ============
 
     @Serializable
     private data class LoginRequest(
@@ -53,7 +52,6 @@ class PocketBaseAuthClient {
         val lineaId: String? = null
     )
 
-    // ============ Auth methods ============
 
     suspend fun login(email: String, password: String): Result<User> {
         return withContext(Dispatchers.IO) {
@@ -177,7 +175,6 @@ class PocketBaseAuthClient {
     fun getAuthToken(): String? = authToken
 }
 
-// ============ Modelos de respuesta ============
 
 @Serializable
 data class AuthResponse(
