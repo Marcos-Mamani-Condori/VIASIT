@@ -67,7 +67,6 @@ class RoutingService {
             .joinToString(";") { (lat, lng) -> "$lat,$lng" }
     }
 
-    // ── Parser JSON ───────────────────────────────────────────────────────────
 
     private fun parseOsrmResponse(jsonStr: String): List<Pair<Double, Double>> {
         return try {
@@ -79,7 +78,6 @@ class RoutingService {
             val coords    = geometry["coordinates"]?.jsonArray
                 ?: return emptyList()
 
-            // GeoJSON retorna [lng, lat] — invertimos a (lat, lng)
             coords.mapNotNull { coord ->
                 val arr = coord.jsonArray
                 if (arr.size < 2) return@mapNotNull null

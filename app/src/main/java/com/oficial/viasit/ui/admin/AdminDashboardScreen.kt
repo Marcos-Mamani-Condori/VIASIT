@@ -37,7 +37,6 @@ fun AdminDashboardScreen(
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
 
-    // Tabs según rol
     val tabs: List<Pair<String, ImageVector>> = if (currentUser.isAdminPrincipal) {
         listOf("Líneas" to Icons.Default.DirectionsBus, "Rutas" to Icons.Default.Route,
             "Invitaciones" to Icons.Default.Key, "Logs" to Icons.Default.History)
@@ -46,7 +45,6 @@ fun AdminDashboardScreen(
             "Logs" to Icons.Default.History)
     }
 
-    // Carga inicial de datos según rol
     LaunchedEffect(Unit) {
         if (currentUser.isAdminPrincipal) {
             viewModel.loadLineas()
@@ -71,7 +69,6 @@ fun AdminDashboardScreen(
 
             AdminUserBanner(currentUser = currentUser)
 
-            // ── Tabs ──────────────────────────────────────────────────────
             TabRow(
                 selectedTabIndex = selectedTab,
                 containerColor   = Slate900, contentColor = Brand400,
@@ -95,7 +92,6 @@ fun AdminDashboardScreen(
                 }
             }
 
-            // ── Contenido ─────────────────────────────────────────────────
             if (currentUser.isAdminPrincipal) {
                 when (selectedTab) {
                     0 -> LineasTabContent(
@@ -149,7 +145,6 @@ fun AdminDashboardScreen(
                 }
             }
 
-            // ── Mensajes error / éxito ────────────────────────────────────
             uiState.error?.let { error ->
                 Snackbar(modifier = Modifier.padding(16.dp),
                     containerColor = Color(0xFF2D0A12), contentColor = Color(0xFFFFB3B3),
@@ -166,7 +161,6 @@ fun AdminDashboardScreen(
     }
 }
 
-// ── TopBar ────────────────────────────────────────────────────────────────────
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AdminTopBar(currentUser: User, onLogout: () -> Unit) {
@@ -196,7 +190,6 @@ private fun AdminTopBar(currentUser: User, onLogout: () -> Unit) {
     )
 }
 
-// ── Banner de usuario ─────────────────────────────────────────────────────────
 @Composable
 private fun AdminUserBanner(currentUser: User) {
     Box(modifier = Modifier.fillMaxWidth().background(Slate900)

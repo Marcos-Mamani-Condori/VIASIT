@@ -69,14 +69,12 @@ fun LoginForm(
 
         ViasitPrimaryButton(text = "Iniciar sesión", onClick = onLoginClick, isLoading = isLoading)
 
-        // Divisor "o"
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             HorizontalDivider(modifier = Modifier.weight(1f), color = Slate700)
             Text("o", style = MaterialTheme.typography.bodySmall, color = Slate600)
             HorizontalDivider(modifier = Modifier.weight(1f), color = Slate700)
         }
 
-        // Botón invitado
         OutlinedButton(
             onClick  = onGuestClick,
             modifier = Modifier.fillMaxWidth().height(50.dp),
@@ -89,13 +87,11 @@ fun LoginForm(
             Text("Ver mapa como invitado", style = MaterialTheme.typography.labelLarge)
         }
 
-        // Link a registro
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
             Text("¿No tienes cuenta? ", style = MaterialTheme.typography.bodySmall, color = Slate400)
             Text("Regístrate", style = MaterialTheme.typography.bodySmall, color = Brand400, fontWeight = FontWeight.SemiBold, modifier = Modifier.clickable { onShowRegister() })
         }
 
-        // Acceso admin
         Text(
             text = "Registrar administrador",
             style = MaterialTheme.typography.labelMedium, color = Brand400, fontWeight = FontWeight.Medium,

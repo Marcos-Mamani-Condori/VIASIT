@@ -43,7 +43,6 @@ fun RoutesTab(
             .fillMaxSize()
             .background(Slate950)
     ) {
-        // Header
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -172,14 +171,12 @@ private fun LineaCard(
         shape = RoundedCornerShape(16.dp)
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            // Cabecera de la línea
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Badge del código
                 Box(
                     modifier = Modifier
                         .size(44.dp)
@@ -215,7 +212,6 @@ private fun LineaCard(
                     }
                 }
 
-                // Badge "En mapa" o botón "Ver en mapa"
                 if (isSelected) {
                     Surface(
                         shape = RoundedCornerShape(20.dp),
@@ -258,7 +254,6 @@ private fun LineaCard(
                     }
                 }
 
-                // Indicador de expansión
                 Icon(
                     imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                     contentDescription = null,
@@ -267,7 +262,6 @@ private fun LineaCard(
                 )
             }
 
-            // Detalle de la ruta (expandible)
             AnimatedVisibility(
                 visible = expanded,
                 enter = expandVertically(),
@@ -297,7 +291,6 @@ private fun LineaCard(
                                 color = Slate400
                             )
                         }
-                        // Inicio → Fin
                         if (ruta.startPoint.isNotBlank() || ruta.endPoint.isNotBlank()) {
                             Row(
                                 modifier = Modifier
@@ -307,7 +300,6 @@ private fun LineaCard(
                                     .padding(12.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                // Inicio
                                 Column(horizontalAlignment = Alignment.Start) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Box(
@@ -333,7 +325,6 @@ private fun LineaCard(
                                     tint = Slate600, modifier = Modifier.size(18.dp)
                                         .align(Alignment.CenterVertically))
 
-                                // Fin
                                 Column(horizontalAlignment = Alignment.End) {
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,

@@ -38,7 +38,6 @@ fun GreetingCard(name: String, vehicleCount: Int) {
     }
 }
 
-// ── Tarjeta de selección de vehículo ─────────────────────────────────────────
 @Composable
 fun VehicleSelectorCard(
     vehicles: List<Auto>,
@@ -80,7 +79,6 @@ fun VehicleSelectorCard(
     }
 }
 
-// ── Tarjeta de toggle de servicio ─────────────────────────────────────────────
 @Composable
 fun ServiceToggleCard(isInService: Boolean, onToggle: (Boolean) -> Unit, vehiclePlaca: String = "") {
     Card(
@@ -130,7 +128,6 @@ fun ServiceToggleCard(isInService: Boolean, onToggle: (Boolean) -> Unit, vehicle
     }
 }
 
-// ── Tarjeta de estado informativo ─────────────────────────────────────────────
 @Composable
 fun StatusInfoCard(icon: ImageVector, title: String, message: String, accentColor: Color) {
     Row(
@@ -151,7 +148,6 @@ fun StatusInfoCard(icon: ImageVector, title: String, message: String, accentColo
     }
 }
 
-// ── Ítem del menú de acciones ─────────────────────────────────────────────────
 @Composable
 fun DashboardMenuItem(icon: ImageVector, title: String, subtitle: String, iconColor: Color, onClick: () -> Unit) {
     Card(
@@ -180,7 +176,6 @@ fun DashboardMenuItem(icon: ImageVector, title: String, subtitle: String, iconCo
     }
 }
 
-// ── Diálogo de selección de vehículo ─────────────────────────────────────────
 @Composable
 fun VehicleSelectorDialog(
     vehicles: List<Auto>,
@@ -229,5 +224,4 @@ fun VehicleSelectorDialog(
     )
 }
 
-// Nota: color auxiliar solo necesario en este archivo
 private val Slate500 = Color(0xFF64748B)

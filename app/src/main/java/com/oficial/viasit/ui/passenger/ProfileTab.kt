@@ -33,7 +33,6 @@ fun ProfileTab(user: User, onLogout: () -> Unit) {
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // ── Header con gradiente ─────────────────────────────────────────────
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -46,7 +45,6 @@ fun ProfileTab(user: User, onLogout: () -> Unit) {
             contentAlignment = Alignment.Center
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                // Avatar con inicial
                 Box(
                     modifier = Modifier
                         .size(80.dp)
@@ -75,7 +73,6 @@ fun ProfileTab(user: User, onLogout: () -> Unit) {
 
                 Spacer(modifier = Modifier.height(4.dp))
 
-                // Badge de rol
                 Surface(
                     shape = RoundedCornerShape(20.dp),
                     color = Brand500.copy(alpha = 0.2f)
@@ -94,7 +91,6 @@ fun ProfileTab(user: User, onLogout: () -> Unit) {
             }
         }
 
-        // ── Información de la cuenta ─────────────────────────────────────────
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -149,7 +145,6 @@ fun ProfileTab(user: User, onLogout: () -> Unit) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // ── Cerrar sesión ────────────────────────────────────────────────
             Button(
                 onClick    = onLogout,
                 modifier   = Modifier.fillMaxWidth().height(52.dp),

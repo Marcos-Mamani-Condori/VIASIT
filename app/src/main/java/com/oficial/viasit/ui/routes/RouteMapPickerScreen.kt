@@ -70,7 +70,6 @@ fun RouteMapPickerScreen(
     val geocodingService = remember { GeocodingService() }
     val routingService   = remember { RoutingService() }
 
-    // ── Estado ──────────────────────────────────────────────────────────────
     var mapInstance    by remember { mutableStateOf<MapLibreMap?>(null) }
     var startPoint     by remember { mutableStateOf<RouteLocation?>(null) }
     var endPoint       by remember { mutableStateOf<RouteLocation?>(null) }
@@ -79,7 +78,6 @@ fun RouteMapPickerScreen(
     var viaMode        by remember { mutableStateOf(false) }   // tap = agregar punto vía
     var isRouting      by remember { mutableStateOf(false) }   // cargando OSRM
     var routingError   by remember { mutableStateOf<String?>(null) }
-    // Puntos calculados por OSRM (incluye inicio + intermedios por calles + fin)
     var calculatedRoute by remember { mutableStateOf<List<Pair<Double, Double>>>(emptyList()) }
 
     var routeName        by remember { mutableStateOf("") }
@@ -93,7 +91,6 @@ fun RouteMapPickerScreen(
     var searchJob         by remember { mutableStateOf<Job?>(null) }
     var routingJob        by remember { mutableStateOf<Job?>(null) }
 
-    // ── Funciones de mapa ────────────────────────────────────────────────────
 
     fun drawPreviewLine(style: Style, points: List<Pair<Double, Double>>) {
         val src = style.getSource("preview-line-source") as? GeoJsonSource ?: return
@@ -114,7 +111,6 @@ fun RouteMapPickerScreen(
         routingJob = scope.launch {
             isRouting = true
             routingError = null
-            // Puntos: inicio → vías intermedias → fin
             val allPts = listOf(Pair(start.lat, start.lng)) +
                     viaPoints.map { Pair(it.lat, it.lng) } +
                     listOf(Pair(end.lat, end.lng))
@@ -125,7 +121,6 @@ fun RouteMapPickerScreen(
                     mapInstance?.getStyle { style -> drawPreviewLine(style, route) }
                 },
                 onFailure = { err ->
-                    // Fallback: línea recta entre los puntos
                     calculatedRoute = allPts
                     mapInstance?.getStyle { style -> drawPreviewLine(style, allPts) }
                     routingError = "Sin conexión, usando línea recta"
@@ -135,7 +130,6 @@ fun RouteMapPickerScreen(
         }
     }
 
-    // ── MapView ─────────────────────────────────────────────────────────────
     val mapView = remember {
         MapView(context).apply {
             getMapAsync { map ->
@@ -145,7 +139,6 @@ fun RouteMapPickerScreen(
                     addMarkerLayer(style, "start-marker-source", "start-marker-layer", "start-marker-icon")
                     addMarkerLayer(style, "end-marker-source",   "end-marker-layer",   "end-marker-icon")
 
-                    // Source + LineLayer para la ruta calculada
                     if (style.getSource("preview-line-source") == null)
                         style.addSource(GeoJsonSource("preview-line-source"))
                     if (style.getLayer("preview-line-layer") == null) {
@@ -189,7 +182,6 @@ fun RouteMapPickerScreen(
         }
     }
 
-    // Ciclo de vida del MapView
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
@@ -208,12 +200,10 @@ fun RouteMapPickerScreen(
 
     BackHandler(onBack = onBack)
 
-    // ── Layout ───────────────────────────────────────────────────────────────
     Box(modifier = Modifier.fillMaxSize()) {
 
         AndroidView({ mapView }, modifier = Modifier.fillMaxSize())
 
-        // ── Top bar + buscador ─────────────────────────────────────────────
         Column(modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth()) {
             TopAppBar(
                 title = {
@@ -241,7 +231,6 @@ fun RouteMapPickerScreen(
                 )
             )
 
-            // Banner de error de routing (desaparece solo)
             AnimatedVisibility(visible = routingError != null) {
                 Card(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
@@ -263,7 +252,6 @@ fun RouteMapPickerScreen(
                 }
             }
 
-            // Barra de búsqueda
             Card(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
                 colors = CardDefaults.cardColors(containerColor = Slate800),
@@ -309,7 +297,6 @@ fun RouteMapPickerScreen(
                 }
             }
 
-            // Resultados de búsqueda
             if (showSearchResults && searchResults.isNotEmpty()) {
                 Card(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).heightIn(max = 240.dp),
@@ -366,13 +353,11 @@ fun RouteMapPickerScreen(
             }
         }
 
-        // ── Panel inferior ─────────────────────────────────────────────────
         Column(
             modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // Indicador de modo actual
             Card(
                 colors = CardDefaults.cardColors(
                     containerColor = when {
@@ -408,7 +393,6 @@ fun RouteMapPickerScreen(
                 }
             }
 
-            // Resumen puntos seleccionados
             if (startPoint != null || endPoint != null || viaPoints.isNotEmpty()) {
                 Card(
                     colors = CardDefaults.cardColors(containerColor = Slate800.copy(alpha = 0.95f)),
@@ -478,9 +462,7 @@ fun RouteMapPickerScreen(
                 }
             }
 
-            // Botones de acción
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                // Cambiar modo Inicio/Fin
                 OutlinedButton(
                     onClick = { viaMode = false
                         selectionMode = if (selectionMode == PointSelectionMode.START)
@@ -497,7 +479,6 @@ fun RouteMapPickerScreen(
                         fontSize = 12.sp, fontWeight = FontWeight.Medium)
                 }
 
-                // Modo pasos intermedios
                 OutlinedButton(
                     onClick  = { viaMode = !viaMode },
                     modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp),
@@ -513,7 +494,6 @@ fun RouteMapPickerScreen(
                     Text(if (viaMode) "Paso ON" else "+ Paso", fontSize = 12.sp, fontWeight = FontWeight.Medium)
                 }
 
-                // Continuar
                 Button(
                     onClick  = { showSaveDialog = true },
                     modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp),
@@ -527,7 +507,6 @@ fun RouteMapPickerScreen(
             }
         }
 
-        // FAB de ubicación
         LargeFloatingActionButton(
             onClick = { mapInstance?.let { centerOnUserRoute(it, context) } },
             modifier = Modifier.align(Alignment.TopEnd).padding(top = 180.dp, end = 16.dp),
@@ -535,7 +514,6 @@ fun RouteMapPickerScreen(
         ) { Icon(Icons.Default.MyLocation, "Mi ubicación") }
     }
 
-    // ── Diálogo guardar ──────────────────────────────────────────────────────
     if (showSaveDialog) {
         AlertDialog(
             onDismissRequest = { showSaveDialog = false },
@@ -598,7 +576,6 @@ fun RouteMapPickerScreen(
                 Button(
                     onClick = {
                         if (routeName.isNotBlank() && startPoint != null && endPoint != null) {
-                            // Los waypoints = ruta calculada por OSRM (sin incluir inicio y fin)
                             val waypointList = if (calculatedRoute.size > 2) {
                                 calculatedRoute.drop(1).dropLast(1)
                                     .map { (lat, lng) -> RouteLocation(lat, lng) }

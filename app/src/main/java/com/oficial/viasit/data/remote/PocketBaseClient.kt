@@ -41,7 +41,6 @@ class PocketBaseRealtimeClient(private val autoDao: AutoData? = null) {
     private var clientId: String? = null
     private var pollingJob: Job? = null
 
-    // Delegados
     private val autoClient = PocketBaseAutoClient(okHttpclient, autoDao, _autos)
     private val http = PocketBaseHttpClient.create()
 
@@ -54,13 +53,8 @@ class PocketBaseRealtimeClient(private val autoDao: AutoData? = null) {
         if (eventSource != null) return
         scope.launch {
             try {
-                // 1. Carga inicial de datos
                 autoClient.fetchAutos()
-                // 2. Intentar SSE en segundo plano
                 connectSSE()
-                // 3. Polling de respaldo: re-fetch cada 3s.
-                //    Garantiza que los PATCH del script Python siempre aparezcan
-                //    incluso si SSE tiene problemas de conexión o suscripción.
                 startPolling()
             } catch (e: Exception) {
                 Log.e(TAG, "Error iniciando realtime, usando solo polling", e)
@@ -84,8 +78,6 @@ class PocketBaseRealtimeClient(private val autoDao: AutoData? = null) {
     }
 
     private fun connectSSE() {
-        // URL correcta de PocketBase: sin clientId en query params.
-        // PocketBase asigna el clientId y lo envía en el primer evento PB_CONNECT.
         val request = Request.Builder()
             .url("$BASE_URL/api/realtime")
             .header("Accept", "text/event-stream")
@@ -108,7 +100,6 @@ class PocketBaseRealtimeClient(private val autoDao: AutoData? = null) {
             override fun onFailure(eventSource: EventSource, t: Throwable?, response: Response?) {
                 Log.w(TAG, "SSE no disponible (${t?.message}) — polling activo como respaldo")
                 this@PocketBaseRealtimeClient.eventSource = null
-                // Reintentar SSE en 10s sin detener el polling
                 scope.launch {
                     delay(10_000)
                     if (pollingJob?.isActive == true) connectSSE()
@@ -123,14 +114,11 @@ class PocketBaseRealtimeClient(private val autoDao: AutoData? = null) {
         try {
             when (type) {
                 "PB_CONNECT" -> {
-                    // PocketBase envía el clientId al conectar
                     val connectData = json.decodeFromString<Map<String, String>>(data)
                     clientId = connectData["clientId"]
                     Log.d(TAG, "SSE clientId recibido: $clientId")
                     clientId?.let { subscribeToCollection(it) }
                 }
-                // PocketBase envía eventos de autos sin 'event:' line → OkHttp reporta type=null
-                // Algunos entornos o proxies añaden type="message"
                 null, "message" -> {
                     if (data.isBlank() || data == "{}") return
                     val event = json.decodeFromString<RealtimeEvent>(data)
@@ -157,8 +145,6 @@ class PocketBaseRealtimeClient(private val autoDao: AutoData? = null) {
                 okHttpclient.newCall(request).execute().use { resp ->
                     if (resp.isSuccessful) {
                         Log.d(TAG, "Suscrito a $COLLECTION/*")
-                        // Fetch inmediato tras suscribirse para capturar
-                        // cualquier cambio que ocurrió durante la conexión
                         autoClient.fetchAutos()
                     } else {
                         Log.e(TAG, "Error suscribiéndose: ${resp.code}")
@@ -185,7 +171,6 @@ class PocketBaseRealtimeClient(private val autoDao: AutoData? = null) {
 
     fun isConnected(): Boolean = eventSource != null
 
-    // Delegación a PocketBaseAutoClient
     suspend fun fetchAutos() = autoClient.fetchAutos()
     suspend fun registerAuto(userId: String, placa: String, lineaCode: String, lat: Double, lng: Double) =
         autoClient.registerAuto(userId, placa, lineaCode, lat, lng)
@@ -195,7 +180,6 @@ class PocketBaseRealtimeClient(private val autoDao: AutoData? = null) {
     suspend fun updateAutoLocation(userId: String, lat: Double, lng: Double, angulo: Float) =
         autoClient.updateAutoLocation(userId, lat, lng, angulo)
 
-    // Delegación a PocketBaseHttpClient
     suspend fun createRecord(collection: String, data: Map<String, Any>, authToken: String? = null) =
         http.createRecord(collection, data, authToken)
     suspend fun updateRecord(collection: String, recordId: String, data: Map<String, Any>, authToken: String? = null) =

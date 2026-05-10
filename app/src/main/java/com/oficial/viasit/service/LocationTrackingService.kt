@@ -41,16 +41,14 @@ class LocationTrackingService : Service() {
         private const val CHANNEL_ID = "location_channel"
         private const val TAG = "LocationTrackingService"
 
-        // Configuration
         private const val MIN_DISTANCE_METERS = 10f
-        private const val INTERVAL_MOVING  = 5000L      // 5 seconds - moving fast
-        private const val INTERVAL_SLOW    = 10000L     // 10 seconds - moving slow
-        private const val INTERVAL_STOPPED = 30000L     // 30 seconds - stopped
+        private const val INTERVAL_MOVING  = 5000L      
+        private const val INTERVAL_SLOW    = 10000L     
+        private const val INTERVAL_STOPPED = 30000L     
     }
 
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var locationCallback: LocationCallback
-    // Usa el cliente compartido en vez de crear una instancia nueva (evita 3er OkHttpClient)
     private lateinit var pocketBaseClient: PocketBaseRealtimeClient
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -62,11 +60,9 @@ class LocationTrackingService : Service() {
     private var isInService: Boolean = false
     private var isTracking: Boolean = false
 
-    // Tracking state
     private var lastLocation: Location? = null
     private var lastLocationTime: Long = 0
     private var currentInterval: Long = INTERVAL_MOVING
-    // Fix 9: solo llama updateLocationRequest cuando el intervalo realmente cambia
     private var lastRequestedInterval: Long = -1L
 
     private var previousLocationForBearing: Location? = null
@@ -74,7 +70,6 @@ class LocationTrackingService : Service() {
     override fun onCreate() {
         super.onCreate()
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
-        // Reutiliza el cliente compartido; no crea OkHttpClient extra
         pocketBaseClient = AutosAplicacion.instance.pocketBaseClient
         createNotificationChannel()
         setupLocationCallback()
@@ -182,7 +177,6 @@ class LocationTrackingService : Service() {
                 speedKmH > 1 -> INTERVAL_SLOW
                 else         -> INTERVAL_STOPPED
             }
-            // Fix 9: solo actualiza si el intervalo realmente cambió (evita remove+add innecesario)
             if (newInterval != lastRequestedInterval) {
                 currentInterval = newInterval
                 updateLocationRequest(newInterval)
@@ -210,13 +204,11 @@ class LocationTrackingService : Service() {
     }
 
     private fun calculateBearing(location: Location): Double {
-        // Primero usar el bearing del GPS si es válido
         if (location.hasBearing() && location.bearing > 0f) {
             previousLocationForBearing = location
             return location.bearing.toDouble()
         }
 
-        // Fallback: calcular desde la última posición conocida
         previousLocationForBearing?.let { prev ->
             val result = FloatArray(2) // [0]=distancia, [1]=bearing inicial
             Location.distanceBetween(

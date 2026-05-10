@@ -25,7 +25,6 @@ class AuthRepository(context: Context) {
     val authState: StateFlow<AuthState> = _authState
     private val context: Context = context.applicationContext
 
-    // Estado "en servicio" expuesto como StateFlow para evitar lectura de disco en cada recomposición
     private val _isInService = MutableStateFlow(prefs.getBoolean("isInService", false))
     val isInService: StateFlow<Boolean> = _isInService
 

@@ -62,7 +62,6 @@ fun RegisterAdminScreen(
     val adminRepository = remember { AutosAplicacion.instance.adminRepository }
     val authRepository = remember { AutosAplicacion.instance.authRepository }
 
-    // Auto-validate cuando el código tiene longitud suficiente (8 caracteres)
     LaunchedEffect(invitationCode) {
         if (invitationCode.length >= 8) {
             val result = adminRepository.validateInvitationCode(invitationCode)
@@ -149,7 +148,6 @@ fun RegisterAdminScreen(
 
             result.fold(
                 onSuccess = { user ->
-                    // Marcar el código como usado
                     val codeValidation = adminRepository.validateInvitationCode(invitationCode)
                     codeValidation.fold(
                         onSuccess = { code ->
@@ -158,7 +156,6 @@ fun RegisterAdminScreen(
                         onFailure = { }
                     )
                     
-                    // Hacer login automáticamente a través de AuthRepository para actualizar el estado
                     val loginResult = authRepository.login(email, password)
                     loginResult.fold(
                         onSuccess = { loggedInUser ->
@@ -209,7 +206,6 @@ fun RegisterAdminScreen(
         ) {
             Spacer(modifier = Modifier.height(8.dp))
 
-            // ── Header ────────────────────────────────────────────────────────
             Row(verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                 Box(
@@ -231,7 +227,6 @@ fun RegisterAdminScreen(
                 }
             }
 
-            // ── Error / Success ───────────────────────────────────────────────
             AnimatedVisibility(visible = errorMessage != null) {
                 errorMessage?.let { error ->
                     Row(
@@ -251,7 +246,6 @@ fun RegisterAdminScreen(
                 }
             }
 
-            // ── Código de invitación ──────────────────────────────────────────
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -310,7 +304,6 @@ fun RegisterAdminScreen(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                // Badge de rol
                 AnimatedVisibility(visible = codeValidated) {
                     Row(
                         modifier = Modifier
@@ -332,7 +325,6 @@ fun RegisterAdminScreen(
                 }
             }
 
-            // ── Información personal ──────────────────────────────────────────
             Text("Información personal",
                 style = MaterialTheme.typography.labelMedium, color = Slate600)
 
@@ -359,7 +351,6 @@ fun RegisterAdminScreen(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone)
             )
 
-            // ── Contraseña ────────────────────────────────────────────────────
             Text("Contraseña",
                 style = MaterialTheme.typography.labelMedium, color = Slate600)
 
@@ -405,7 +396,6 @@ fun RegisterAdminScreen(
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            // ── Botón registrar ───────────────────────────────────────────────
             Button(
                 onClick = { register() },
                 enabled = !isLoading && codeValidated && name.isNotBlank()
@@ -444,7 +434,6 @@ fun RegisterAdminScreen(
     }
 }
 
-// ─── Campo de texto para RegisterAdmin ───────────────────────────────────────
 @Composable
 private fun AdminRegTextField(
     value: String,

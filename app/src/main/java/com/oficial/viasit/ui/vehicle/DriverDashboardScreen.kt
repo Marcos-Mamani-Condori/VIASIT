@@ -30,7 +30,6 @@ import com.oficial.viasit.viewmodels.AutosViewModel
 import com.oficial.viasit.ui.theme.*
 import com.oficial.viasit.viewmodels.AuthViewModel
 
-// ─── Driver Dashboard ─────────────────────────────────────────────────────────
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DriverDashboardScreen(
@@ -106,13 +105,11 @@ fun DriverDashboardScreen(
         ) {
             Spacer(modifier = Modifier.height(4.dp))
 
-            // ── Saludo ────────────────────────────────────────────────────────
             GreetingCard(
                 name = currentUser?.name ?: "Conductor",
                 vehicleCount = vehicles.size
             )
 
-            // ── Selector de vehículo ──────────────────────────────────────────
             if (vehicles.isNotEmpty()) {
                 VehicleSelectorCard(
                     vehicles = vehicles,
@@ -122,7 +119,6 @@ fun DriverDashboardScreen(
                 )
             }
 
-            // ── Estado / Toggle en servicio ───────────────────────────────────
             if (selectedVehicle != null) {
                 ServiceToggleCard(
                     isInService = isInService,
@@ -138,7 +134,6 @@ fun DriverDashboardScreen(
                 )
             }
 
-            // ── Acciones ──────────────────────────────────────────────────────
             Text(
                 "Acciones",
                 style = MaterialTheme.typography.labelMedium,
@@ -180,7 +175,6 @@ fun DriverDashboardScreen(
                 )
             }
 
-            // ── Info tip ──────────────────────────────────────────────────────
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -205,7 +199,6 @@ fun DriverDashboardScreen(
             Spacer(modifier = Modifier.height(8.dp))
         }
 
-        // Diálogo selector de vehículo
         if (showVehicleSelector) {
             VehicleSelectorDialog(
                 vehicles = vehicles,
@@ -219,7 +212,6 @@ fun DriverDashboardScreen(
             )
         }
 
-        // Diálogo de reportes
         if (showReportesDialog) {
             AlertDialog(
                 onDismissRequest = { showReportesDialog = false },
@@ -300,6 +292,3 @@ fun DriverDashboardScreen(
         }
     }
 }
-// Sub-componentes privados eliminados — ahora viven en DriverComponents.kt
-// Ver: GreetingCard, VehicleSelectorCard, ServiceToggleCard,
-//      StatusInfoCard, DashboardMenuItem, VehicleSelectorDialog

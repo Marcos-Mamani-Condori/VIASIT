@@ -15,6 +15,6 @@ data class RouteData(
 )
 
 enum class PointSelectionMode {
-    START,  // El usuario está eligiendo el punto de inicio
-    END     // El usuario está eligiendo el punto final
+    START,
+    END 
 }

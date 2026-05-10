@@ -107,7 +107,6 @@ fun ActiveAutosTab(
             }
         }
 
-        // ── Buscador de destino ──
         Column(modifier = Modifier.fillMaxWidth().background(Slate900).padding(horizontal = 16.dp).padding(bottom = 12.dp)) {
             OutlinedTextField(
                 value         = destinoQuery,

@@ -58,7 +58,6 @@ fun MainMapScreen(
     var mapInstance  by remember { mutableStateOf<MapLibreMap?>(null) }
     var selectedCar  by remember { mutableStateOf<Auto?>(null) }
 
-    // Search state
     val geocodingService                         = remember { GeocodingService() }
     var searchQuery  by remember { mutableStateOf("") }
     var searchResults by remember { mutableStateOf<List<SearchResult>>(emptyList()) }
@@ -70,7 +69,6 @@ fun MainMapScreen(
     val isDriver    = currentUser?.userRole == UserRole.conductor
     val isInService by authViewModel.isInService.collectAsState()
 
-    // Tu vehículo propio (si eres conductor y estás en servicio)
     val myVehicle: Auto? = if (isDriver && isInService) {
         autos.find { it.userId.contains(currentUser?.id ?: "") }
     } else null
@@ -82,7 +80,6 @@ fun MainMapScreen(
                 map.setStyle(Style.Builder().fromUri("https://tiles.openfreemap.org/styles/bright")) { style ->
                     addCarIconToStyle(style, context)
                     addCarsLayer(style)
-                    // Solo mostrar vehículos activos (actualizados en los últimos 2 minutos)
                     val activeAutos = autos.filter { it.isActive() }
                     updateCarsSource(style, activeAutos)
                     enableLocationComponent(style, map, context)
@@ -99,7 +96,6 @@ fun MainMapScreen(
         }
     }
 
-    // Ciclo de vida del MapView
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
@@ -116,8 +112,6 @@ fun MainMapScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    // Actualizar marcadores cuando cambian los autos (SSE → recomposición automática)
-    // Solo mostrar vehículos activos (actualizados en los últimos 2 minutos)
     LaunchedEffect(autos, mapInstance) {
         val activeAutos = autos.filter { it.isActive() }
         mapInstance?.getStyle { style -> updateCarsSource(style, activeAutos) }
@@ -126,7 +120,6 @@ fun MainMapScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         AndroidView({ mapView }, modifier = Modifier.fillMaxSize())
 
-        // ── Top bar + buscador ────────────────────────────────────────────
         Column(
             modifier = Modifier
                 .align(Alignment.TopCenter)
@@ -174,7 +167,6 @@ fun MainMapScreen(
                 )
             )
 
-            // Barra de búsqueda
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -256,7 +248,6 @@ fun MainMapScreen(
                 }
             }
 
-            // Resultados de búsqueda
             if (showSearchResults && searchResults.isNotEmpty()) {
                 Card(
                     modifier = Modifier
@@ -306,7 +297,6 @@ fun MainMapScreen(
             }
         }
 
-        // ── Botón de ubicación ────────────────────────────────────────────
         LargeFloatingActionButton(
             onClick  = { mapInstance?.let { centerOnUser(it, context) } },
             modifier = Modifier
@@ -319,7 +309,6 @@ fun MainMapScreen(
             Icon(Icons.Default.LocationOn, contentDescription = "Mi posición")
         }
 
-        // ── Panel inferior: info del auto seleccionado o lista ────────────
         Box(
             modifier = Modifier
                 .align(Alignment.BottomStart)
@@ -362,7 +351,6 @@ fun MainMapScreen(
                         }
                     }
 
-                    // Lista de otros vehículos activos
                     val vehiclesToShow = if (isDriver && isInService) {
                         autos.filter { it.id != myVehicle?.id && it.isActive() }
                     } else {

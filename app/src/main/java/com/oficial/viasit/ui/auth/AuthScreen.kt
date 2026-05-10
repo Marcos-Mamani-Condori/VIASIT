@@ -46,7 +46,6 @@ fun AuthScreen(
             .fillMaxSize()
             .background(Brush.verticalGradient(listOf(Slate950, Slate900)))
     ) {
-        // Decoración de fondo: círculo de acento sutil
         Box(
             modifier = Modifier
                 .size(320.dp)
@@ -67,7 +66,6 @@ fun AuthScreen(
         ) {
             Spacer(modifier = Modifier.height(60.dp))
 
-            // Logo
             Box(
                 modifier = Modifier.size(72.dp).clip(RoundedCornerShape(20.dp))
                     .background(Brush.linearGradient(listOf(Brand500, Brand400))),
@@ -86,7 +84,6 @@ fun AuthScreen(
 
             Spacer(modifier = Modifier.height(48.dp))
 
-            // Formulario animado (slide horizontal)
             AnimatedContent(
                 targetState = showRegister,
                 transitionSpec = {

@@ -18,7 +18,6 @@ import com.oficial.viasit.ui.vehicle.DriverVehicleRegistrationScreen
 import com.oficial.viasit.viewmodels.AdminViewModel
 import com.oficial.viasit.viewmodels.AuthViewModel
 
-// ── Destinos de navegación ─────────────────────────────────────────────────
 sealed class Screen {
     data object Auth                     : Screen()
     data object Map                      : Screen()
@@ -30,7 +29,6 @@ sealed class Screen {
     data class  RouteMapPicker(val lineaId: String, val lineaName: String) : Screen()
 }
 
-// ── Composable raíz ───────────────────────────────────────────────────────
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VIASITApp() {
@@ -39,7 +37,6 @@ fun VIASITApp() {
 
     var currentScreen by remember { mutableStateOf<Screen>(Screen.Auth) }
 
-    // Un solo LaunchedEffect: authState ya cambia al restaurar sesión
     LaunchedEffect(authState) {
         when (val state = authState) {
             is AuthState.Authenticated -> {

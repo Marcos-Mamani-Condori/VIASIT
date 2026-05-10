@@ -57,7 +57,6 @@ fun addCarsLayer(style: Style) {
 
 fun updateCarsSource(style: Style, autos: List<Auto>) {
     val source = style.getSource("cars-source") as? GeoJsonSource ?: return
-    // Filtrar coordenadas inválidas (0,0) que corresponden al océano Atlántico
     val features = autos
         .filter { it.lat != 0.0 || it.lng != 0.0 }
         .map { auto ->
@@ -100,14 +99,13 @@ fun enableLocationComponent(style: Style, map: MapLibreMap, context: android.con
     }
 }
 
-// ─── Rutas / Polylines ────────────────────────────────────────────────────────
 
 data class RoutePolyline(
     val id: String,
     val lineaName: String,
-    val startPoint: String,    // "lat,lng"
-    val endPoint: String,      // "lat,lng"
-    val waypoints: String = "", // "lat,lng;lat,lng;..." — vacío = línea recta
+    val startPoint: String,
+    val endPoint: String,
+    val waypoints: String = "",
     val color: String = "#3D5AFE"
 )
 
@@ -116,7 +114,6 @@ fun addRoutesLayer(style: Style) {
         style.addSource(GeoJsonSource("routes-source"))
     }
     if (style.getLayer("routes-layer") == null) {
-        // Agregar la capa DEBAJO de la capa de autos para que los autos queden encima
         val lineLayer = LineLayer("routes-layer", "routes-source").withProperties(
             PropertyFactory.lineColor(Expression.get("color")),
             PropertyFactory.lineWidth(4f),
@@ -124,7 +121,6 @@ fun addRoutesLayer(style: Style) {
             PropertyFactory.lineCap(org.maplibre.android.style.layers.Property.LINE_CAP_ROUND),
             PropertyFactory.lineJoin(org.maplibre.android.style.layers.Property.LINE_JOIN_ROUND)
         )
-        // Insertar la capa de rutas por debajo de la de autos
         if (style.getLayer("cars-layer") != null) {
             style.addLayerBelow(lineLayer, "cars-layer")
         } else {
@@ -150,7 +146,6 @@ fun updateRoutesSource(style: Style, routes: List<RoutePolyline>) {
             val startPt = Point.fromLngLat(startParts[1], startParts[0]) // lng, lat
             val endPt   = Point.fromLngLat(endParts[1],   endParts[0])
 
-            // Si la ruta tiene waypoints intermedios los usa; si no, línea recta inicio→fin
             val allPoints: List<Point> = if (route.waypoints.isNotBlank()) {
                 val midPoints = route.waypoints.split(";").mapNotNull { pair ->
                     val parts = pair.trim().split(",")
@@ -174,7 +169,7 @@ fun updateRoutesSource(style: Style, routes: List<RoutePolyline>) {
             }
             Feature.fromGeometry(lineString, props)
         } catch (e: Exception) {
-            null  // Ignorar rutas con formato incorrecto
+            null 
         }
     }
     source.setGeoJson(FeatureCollection.fromFeatures(features))

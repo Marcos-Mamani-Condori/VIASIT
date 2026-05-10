@@ -60,7 +60,6 @@ fun PassengerMapScreen(passengerViewModel: PassengerViewModel) {
     var mapInstance  by remember { mutableStateOf<MapLibreMap?>(null) }
     var mapStyle      by remember { mutableStateOf<Style?>(null) }  // se asigna cuando el estilo termina de cargar
 
-    // Search
     val geocodingService   = remember { GeocodingService() }
     var searchQuery        by remember { mutableStateOf("") }
     var searchResults      by remember { mutableStateOf<List<SearchResult>>(emptyList()) }
@@ -70,7 +69,6 @@ fun PassengerMapScreen(passengerViewModel: PassengerViewModel) {
 
     val selectedLineaId by passengerViewModel.selectedLineaId.collectAsState()
 
-    // Solo mostrar la ruta de la línea seleccionada
     val routePolylines: List<RoutePolyline> = remember(rutas, lineas, selectedLineaId) {
         if (selectedLineaId == null) return@remember emptyList()
         val linea = lineas.find { it.id == selectedLineaId } ?: return@remember emptyList()
@@ -82,7 +80,7 @@ fun PassengerMapScreen(passengerViewModel: PassengerViewModel) {
                 lineaName  = linea.name,
                 startPoint = ruta.startPoint,
                 endPoint   = ruta.endPoint,
-                waypoints  = ruta.waypoints  // ← multi-punto si el admin los trazó
+                waypoints  = ruta.waypoints
             )
         )
     }
@@ -104,7 +102,6 @@ fun PassengerMapScreen(passengerViewModel: PassengerViewModel) {
         }
     }
 
-    // Ciclo de vida
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
@@ -121,13 +118,11 @@ fun PassengerMapScreen(passengerViewModel: PassengerViewModel) {
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    // Actualizar autos en tiempo real
     LaunchedEffect(autos, mapStyle) {
         val activeAutos = autos.filter { it.isActive() }
         mapStyle?.let { style -> updateCarsSource(style, activeAutos) }
     }
 
-    // Dibujar polyline cuando cambie la ruta seleccionada O cuando el estilo esté listo
     LaunchedEffect(routePolylines, mapStyle) {
         val style = mapStyle ?: return@LaunchedEffect
         if (routePolylines.isNotEmpty()) {
@@ -148,7 +143,6 @@ fun PassengerMapScreen(passengerViewModel: PassengerViewModel) {
         }
     }
 
-    // ── Centrar mapa en bus seleccionado desde la lista ────────────────────
     val selectedAuto by passengerViewModel.selectedAuto.collectAsState()
     LaunchedEffect(selectedAuto, mapStyle) {
         val auto = selectedAuto ?: return@LaunchedEffect
@@ -158,20 +152,17 @@ fun PassengerMapScreen(passengerViewModel: PassengerViewModel) {
                 CameraUpdateFactory.newLatLngZoom(LatLng(auto.lat, auto.lng), 16.0)
             )
         }
-        // Limpiar selección para que no vuelva a centrar si el style se recarga
         passengerViewModel.clearSelectedAuto()
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
         AndroidView({ mapView }, modifier = Modifier.fillMaxSize())
 
-        // ── Top bar y buscador ─────────────────────────────────────────────
         Column(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .fillMaxWidth()
         ) {
-            // Header compacto
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -207,7 +198,6 @@ fun PassengerMapScreen(passengerViewModel: PassengerViewModel) {
                         )
                     }
                 }
-                // Botón refresh autos
                 IconButton(onClick = {
                     scope.launch { autosViewModel.refresh() }
                 }) {
@@ -217,7 +207,6 @@ fun PassengerMapScreen(passengerViewModel: PassengerViewModel) {
                         modifier = Modifier.size(18.dp)
                     )
                 }
-                // Botón para quitar la ruta seleccionada
                 if (selectedLineaId != null) {
                     IconButton(onClick = { passengerViewModel.clearSelectedLinea() }) {
                         Icon(
@@ -229,7 +218,6 @@ fun PassengerMapScreen(passengerViewModel: PassengerViewModel) {
                 }
             }
 
-            // Buscador
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -311,7 +299,6 @@ fun PassengerMapScreen(passengerViewModel: PassengerViewModel) {
                 }
             }
 
-            // Resultados de búsqueda
             if (showSearchResults && searchResults.isNotEmpty()) {
                 Card(
                     modifier = Modifier
@@ -375,7 +362,6 @@ fun PassengerMapScreen(passengerViewModel: PassengerViewModel) {
             }
         }
 
-        // Botón flotante: centrar en usuario
         FloatingActionButton(
             onClick = { mapInstance?.let { centerOnUser(it, context) } },
             modifier = Modifier
@@ -388,7 +374,6 @@ fun PassengerMapScreen(passengerViewModel: PassengerViewModel) {
             Icon(Icons.Default.MyLocation, "Mi ubicación", modifier = Modifier.size(22.dp))
         }
 
-        // Leyenda de rutas (esquina inferior izquierda)
         if (routePolylines.isNotEmpty()) {
             RoutePolylineLegend(
                 routes = routePolylines,

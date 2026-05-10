@@ -28,7 +28,6 @@ class GeocodingService {
 
     companion object {
         private const val TAG = "GeocodingService"
-        // Bounding box de La Paz: sur-oeste, nor-este
         private const val VIEWBOX = "-68.25,-16.60,-67.95,-16.40"
     }
 
@@ -44,7 +43,6 @@ class GeocodingService {
         limit: Int = 5
     ): Result<List<SearchResult>> = withContext(Dispatchers.IO) {
         try {
-            // Si la búsqueda ya tiene "la paz" o "bolivia" no agregar, si no, añadirlo
             val enrichedQuery = if (
                 query.contains("la paz", ignoreCase = true) ||
                 query.contains("bolivia", ignoreCase = true)
@@ -103,7 +101,6 @@ class GeocodingService {
                     val displayName = obj["display_name"]?.jsonPrimitive?.content ?: return@mapNotNull null
                     val type = obj["type"]?.jsonPrimitive?.content ?: ""
 
-                    // Intentar obtener el nombre corto del campo address
                     val addressObj = obj["address"]?.jsonObject
                     val shortName = addressObj?.let {
                         it["suburb"]?.jsonPrimitive?.content

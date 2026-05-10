@@ -14,7 +14,6 @@ class AutosAplicacion : Application() {
 
     private val database by lazy { AppDatabase.getDatabase(this) }
 
-    // Cliente compartido: una sola instancia de OkHttpClient + SSE para toda la app
     val pocketBaseClient by lazy {
         PocketBaseRealtimeClient(database.autoData())
     }
@@ -33,7 +32,6 @@ class AutosAplicacion : Application() {
     val loginUseCase by lazy { LoginUseCase(authRepository) }
     val registerUseCase by lazy { RegisterUseCase(authRepository) }
 
-    // AdminRepository comparte el mismo cliente y usa el token de la sesión activa
     val adminRepository: AdminRepository by lazy {
         AdminRepository(pocketBaseClient, authRepository)
     }

@@ -18,7 +18,6 @@ import org.maplibre.geojson.FeatureCollection
 import org.maplibre.geojson.Point
 
 fun addMarkerIconsToStyle(mapStyle: Style, context: android.content.Context) {
-    // Marcador INICIO — círculo azul con punto blanco en el centro
     run {
         val bitmap = android.graphics.Bitmap.createBitmap(48, 48, android.graphics.Bitmap.Config.ARGB_8888)
         val canvas = android.graphics.Canvas(bitmap)
@@ -32,7 +31,6 @@ fun addMarkerIconsToStyle(mapStyle: Style, context: android.content.Context) {
         mapStyle.addImage("start-marker-icon", bitmap)
     }
 
-    // Marcador FIN — círculo verde con punto blanco en el centro
     run {
         val bitmap = android.graphics.Bitmap.createBitmap(48, 48, android.graphics.Bitmap.Config.ARGB_8888)
         val canvas = android.graphics.Canvas(bitmap)

@@ -19,7 +19,6 @@ class AdminRepository(
         val items: List<T> = emptyList()
     )
 
-    // ── Utilidades compartidas ────────────────────────────────────────────────
     fun getAuthToken() = authRepository?.getCurrentUser()?.let { client.authToken } ?: client.authToken
 
     private val shared = AdminRepositoryShared(authRepository) { getAuthToken() }
@@ -30,14 +29,12 @@ class AdminRepository(
     fun extractStringField(json: String, field: String) = AdminJsonParsers.extractStringField(json, field)
     fun extractItemBlocks(json: String)                 = AdminJsonParsers.extractItemBlocks(json)
 
-    // ── Sub-repositorios ─────────────────────────────────────────────────────
     private val invitaciones   = InvitationCodesRepository(client, shared)
     private val lineas         = LineasRepository(client, shared)
     private val rutas          = RutasRepository(client, shared)
     private val logs           = LogsRepository(client, shared)
     private val vehicleCodes   = VehicleCodesRepository(client, shared)
 
-    // ── Códigos de invitación ─────────────────────────────────────────────────
     suspend fun generateInvitationCode(role: String = "ADMIN_LINEA", lineaId: String = "", expiresInHours: Int = 24): Result<InvitationCode> =
         invitaciones.generate(role, lineaId, expiresInHours)
     suspend fun getInvitationCodes(): Result<List<InvitationCode>>                     = invitaciones.getAll()
@@ -45,7 +42,6 @@ class AdminRepository(
     suspend fun deleteInvitationCode(codeId: String): Result<Unit>                     = invitaciones.delete(codeId)
     suspend fun useInvitationCode(codeId: String, userEmail: String): Result<Unit>     = invitaciones.markUsed(codeId, userEmail)
 
-    // ── Líneas ────────────────────────────────────────────────────────────────
     suspend fun createLinea(name: String, code: String, rutaId: String = ""): Result<Linea>                          = lineas.create(name, code, rutaId)
     suspend fun getLineas(): Result<List<Linea>>                                                                      = lineas.getAll()
     suspend fun getLineasByRuta(rutaId: String): Result<List<Linea>>                                                 = lineas.getByRuta(rutaId)
@@ -53,7 +49,6 @@ class AdminRepository(
     suspend fun deleteLinea(lineaId: String): Result<Unit>                                                           = lineas.delete(lineaId)
     suspend fun updateLineaRuta(lineaId: String, rutaId: String): Result<Unit>                                       = lineas.updateRuta(lineaId, rutaId)
 
-    // ── Rutas ─────────────────────────────────────────────────────────────────
     suspend fun createRuta(name: String, description: String, startPoint: String = "", endPoint: String = "",
                            lineaId: String = "", waypoints: String = ""): Result<Ruta>                               = rutas.create(name, description, startPoint, endPoint, lineaId, waypoints)
     suspend fun getRuta(rutaId: String): Result<Ruta>                                                                = rutas.getById(rutaId)
@@ -62,12 +57,10 @@ class AdminRepository(
         if (linea.rutaId.isBlank()) Result.success(null) else rutas.getById(linea.rutaId).map { it }
     suspend fun deleteRuta(rutaId: String): Result<Unit>                                                             = rutas.delete(rutaId)
 
-    // ── Logs ─────────────────────────────────────────────────────────────────
     suspend fun createLog(userEmail: String, description: String): Result<Unit>                                      = logs.create(userEmail, description)
     suspend fun getLogs(limit: Int = 50): Result<List<LogEntry>>                                                     = logs.getAll(limit)
     suspend fun getLogsByUser(userId: String): Result<List<LogEntry>>                                                = logs.getByUser(userId)
 
-    // ── Códigos de vehículo ───────────────────────────────────────────────────
     suspend fun generateVehicleInvitationCode(lineaId: String, creadoPor: String, expiresInHours: Int = 72): Result<VehicleInvitationCode> =
         vehicleCodes.generate(lineaId, creadoPor, expiresInHours)
     suspend fun getVehicleInvitationCodesByLinea(lineaId: String): Result<List<VehicleInvitationCode>>              = vehicleCodes.getByLinea(lineaId)

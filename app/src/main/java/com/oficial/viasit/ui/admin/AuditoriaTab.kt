@@ -44,10 +44,8 @@ fun AuditoriaTabContent(
     }
 }
 
-// ── Entrada de log ────────────────────────────────────────────────────────────
 @Composable
 fun LogEntryItem(log: LogEntry) {
-    // SimpleDateFormat solo para formatear la fecha al mostrar; no necesita ser thread-safe aquí
     val displayFormat = remember { SimpleDateFormat("dd/MM/yy HH:mm", Locale.getDefault()) }
 
     Row(
@@ -59,7 +57,6 @@ fun LogEntryItem(log: LogEntry) {
         verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Punto indicador
         Box(
             modifier = Modifier
                 .size(8.dp)
@@ -79,7 +76,6 @@ fun LogEntryItem(log: LogEntry) {
                 Text("ID: ${log.userId.take(8)}…",
                     style = MaterialTheme.typography.labelSmall, color = Slate600)
                 Text(
-                    // Intentar parsear la fecha de PocketBase (yyyy-MM-dd HH:mm:ss.SSSZ)
                     try {
                         val parseFmt = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS'Z'", Locale.getDefault())
                         val d = parseFmt.parse(log.created)

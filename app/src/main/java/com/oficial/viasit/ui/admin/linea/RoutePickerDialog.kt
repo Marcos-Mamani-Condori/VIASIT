@@ -30,7 +30,6 @@ fun RoutePickerDialog(
         shape            = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
-            // Título
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.Route, null, tint = Brand400, modifier = Modifier.size(22.dp))

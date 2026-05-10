@@ -12,16 +12,12 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.concurrent.TimeUnit
 
-// Cliente HTTP genérico para operaciones CRUD sobre cualquier colección de PocketBase.
-// Extraído de PocketBaseClient.kt para separar la lógica de red del protocolo SSE.
-// Usado por AdminRepository (y cualquier futuro repo que necesite acceso directo a PocketBase).
 class PocketBaseHttpClient(private val okHttpClient: OkHttpClient) {
 
     companion object {
         private const val TAG = "PocketBaseHttp"
         private val BASE_URL: String get() = BuildConfig.POCKETBASE_URL
 
-        // Instancia standalone (útil si se necesita fuera de PocketBaseRealtimeClient)
         fun create(): PocketBaseHttpClient = PocketBaseHttpClient(
             OkHttpClient.Builder()
                 .connectTimeout(30, TimeUnit.SECONDS)
@@ -116,7 +112,6 @@ class PocketBaseHttpClient(private val okHttpClient: OkHttpClient) {
         }
     }
 
-    // Serializa un Map<String, Any> a JSON de forma segura (evita concatenación manual)
     fun buildJsonString(data: Map<String, Any>): String {
         val sb = StringBuilder("{")
         data.entries.forEachIndexed { i, (key, value) ->

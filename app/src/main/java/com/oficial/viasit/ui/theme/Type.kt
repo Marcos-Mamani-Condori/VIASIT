@@ -7,12 +7,9 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
-// Usamos las fuentes del sistema con pesos bien definidos
-// (Inter / Roboto según el dispositivo — ambas son excelentes)
 val AppFontFamily = FontFamily.Default
 
 val Typography = Typography(
-    // Títulos grandes — pantallas de bienvenida, headers
     displayLarge = TextStyle(
         fontFamily = AppFontFamily,
         fontWeight = FontWeight.Black,
@@ -35,7 +32,6 @@ val Typography = Typography(
         letterSpacing = 0.sp
     ),
 
-    // Títulos de sección
     headlineLarge = TextStyle(
         fontFamily = AppFontFamily,
         fontWeight = FontWeight.Bold,
@@ -58,7 +54,6 @@ val Typography = Typography(
         letterSpacing = 0.sp
     ),
 
-    // Títulos de cards / items
     titleLarge = TextStyle(
         fontFamily = AppFontFamily,
         fontWeight = FontWeight.SemiBold,
@@ -81,7 +76,6 @@ val Typography = Typography(
         letterSpacing = 0.1.sp
     ),
 
-    // Cuerpo de texto
     bodyLarge = TextStyle(
         fontFamily = AppFontFamily,
         fontWeight = FontWeight.Normal,
@@ -104,7 +98,6 @@ val Typography = Typography(
         letterSpacing = 0.4.sp
     ),
 
-    // Labels — botones, chips, tabs
     labelLarge = TextStyle(
         fontFamily = AppFontFamily,
         fontWeight = FontWeight.SemiBold,

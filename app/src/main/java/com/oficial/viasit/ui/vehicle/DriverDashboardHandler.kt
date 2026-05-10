@@ -27,7 +27,6 @@ fun DriverDashboardHandler(
     var isAuthRestored    by remember { mutableStateOf(false) }
     val currentUser = (authState as? AuthState.Authenticated)?.user
 
-    // Esperar a que authState esté disponible
     LaunchedEffect(authState) {
         if (authState is AuthState.Authenticated) isAuthRestored = true
     }
@@ -36,15 +35,11 @@ fun DriverDashboardHandler(
     var selectedVehicleId by remember { mutableStateOf<String?>(null) }
     var isLoading      by remember { mutableStateOf(true) }
     
-    // Flag para evitar redirección infinita después de registrar vehículo
-    // Usar rememberSaveable para que sobreviva a recomposiciones
     var hasCheckedVehicle by rememberSaveable { mutableStateOf(false) }
     var hasNavigatedToRegister by rememberSaveable { mutableStateOf(false) }
 
-    // StateFlow reactivo — no lee SharedPreferences en cada recomposición
     val isInService by authViewModel.isInService.collectAsState()
 
-    // Cargar vehículo del conductor desde PocketBase
     LaunchedEffect(currentUser) {
         if (currentUser != null && currentUser.userRole == UserRole.conductor) {
             android.util.Log.d("DriverDashboardHandler", "Buscando vehículo para usuario: ${currentUser.id}")
@@ -66,7 +61,6 @@ fun DriverDashboardHandler(
         }
     }
 
-    // Observar cambios via SSE para detectar vehículos del conductor
     val autos by autosViewModel.autosUiState.collectAsState()
     LaunchedEffect(autos) {
         if (currentUser != null) {
@@ -79,8 +73,6 @@ fun DriverDashboardHandler(
         }
     }
 
-    // FIX: verificar vehículo vacío solo cuando carga terminó (no en el callback async)
-    // Solo redirigir una vez para evitar bucles infinitos
     LaunchedEffect(isLoading, vehicles.size, hasCheckedVehicle, hasNavigatedToRegister) {
         android.util.Log.d("DriverDashboardHandler", "isLoading=$isLoading, vehicles=${vehicles.size}, hasCheckedVehicle=$hasCheckedVehicle, hasNavigatedToRegister=$hasNavigatedToRegister")
         if (!isLoading && vehicles.isEmpty() && currentUser?.userRole == UserRole.conductor && hasCheckedVehicle && !hasNavigatedToRegister) {

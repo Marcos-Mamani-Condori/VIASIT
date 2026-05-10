@@ -117,7 +117,6 @@ fun RegisterVehicleScreen(
                     Spacer(modifier = Modifier.height(16.dp))
                 }
 
-                // Campo placa
                 OutlinedTextField(
                     value = vehicleFormState.placa,
                     onValueChange = autosViewModel::updatePlaca,
@@ -133,7 +132,6 @@ fun RegisterVehicleScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Mostrar información de la línea asignada
                 currentUser?.lineaId?.let { lineaId ->
                     if (lineaId.isNotEmpty()) {
                         Card(
@@ -163,7 +161,6 @@ fun RegisterVehicleScreen(
 
                 Spacer(modifier = Modifier.height(32.dp))
 
-                // Botón registrar
                 Button(
                     onClick = {
                         currentUser?.let { user ->
@@ -204,7 +201,6 @@ fun RegisterVehicleScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Botón ir al dashboard sin registrar
                 TextButton(
                     onClick = {
                         android.util.Log.d("RegisterVehicleScreen", "Botón 'Ir al dashboard' presionado")

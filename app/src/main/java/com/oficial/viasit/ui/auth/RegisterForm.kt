@@ -78,7 +78,6 @@ fun RegisterForm(
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone)
         )
 
-        // ── Selector de rol (chips) ────────────────────────────────────────
         Column {
             Text("Tipo de usuario", style = MaterialTheme.typography.labelMedium, color = Slate400,
                 modifier = Modifier.padding(bottom = 8.dp))
@@ -108,7 +107,6 @@ fun RegisterForm(
             }
         }
 
-        // ── Código de invitación (solo conductores) ────────────────────────
         AnimatedVisibility(
             visible = role == "conductor",
             enter = expandVertically() + fadeIn(),

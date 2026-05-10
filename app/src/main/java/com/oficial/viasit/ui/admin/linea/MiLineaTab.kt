@@ -52,7 +52,6 @@ fun MiLineaTabContent(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
 
-        // ── Card: Línea asignada ─────────────────────────────────────────────
         item {
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceElevated),
                 shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
@@ -85,7 +84,6 @@ fun MiLineaTabContent(
             }
         }
 
-        // ── Card: Ruta actual ────────────────────────────────────────────────
         item {
             Card(colors = CardDefaults.cardColors(
                 containerColor = if (tieneRuta) Slate800 else Slate900.copy(alpha = 0.7f)),
@@ -141,7 +139,6 @@ fun MiLineaTabContent(
             }
         }
 
-        // ── Botón Asignar / Modificar ruta ────────────────────────────────────
         item {
             if (miLinea != null) {
                 Button(
@@ -163,7 +160,6 @@ fun MiLineaTabContent(
         }
     }
 
-    // ── Modal: elegir acción (crear nueva o seleccionar existente) ─────────
     if (showAssignOptions && miLinea != null) {
         ModalBottomSheet(
             onDismissRequest = { showAssignOptions = false },
@@ -178,7 +174,6 @@ fun MiLineaTabContent(
                 Text("¿Cómo deseas asignar la ruta?",
                     style = MaterialTheme.typography.bodySmall, color = Slate400)
                 HorizontalDivider(color = Slate700)
-                // Opción A: crear en mapa
                 if (onNavigateToRoutePicker != null) {
                     Button(
                         onClick  = { showAssignOptions = false; onNavigateToRoutePicker(lineaId, miLinea.name) },
@@ -190,7 +185,6 @@ fun MiLineaTabContent(
                         Text("Crear nueva ruta en mapa", fontWeight = FontWeight.Bold)
                     }
                 }
-                // Opción B: seleccionar existente
                 OutlinedButton(
                     onClick  = { showAssignOptions = false; showRoutePicker = true },
                     modifier = Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(14.dp),
@@ -202,7 +196,6 @@ fun MiLineaTabContent(
                     Text("Seleccionar ruta existente")
                 }
                 if (onNavigateToRoutePicker == null) {
-                    // Fallback texto
                     OutlinedButton(
                         onClick  = { showAssignOptions = false; showCreateDialog = true },
                         modifier = Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(14.dp),
@@ -214,7 +207,6 @@ fun MiLineaTabContent(
         }
     }
 
-    // ── RoutePickerDialog: lista de rutas existentes ───────────────────────
     if (showRoutePicker) {
         RoutePickerDialog(
             rutas         = rutas,
@@ -227,7 +219,6 @@ fun MiLineaTabContent(
         )
     }
 
-    // ── Diálogo fallback: crear ruta con texto ─────────────────────────────
     if (showCreateDialog && miLinea != null) {
         var name        by remember { mutableStateOf("") }
         var description by remember { mutableStateOf("") }
