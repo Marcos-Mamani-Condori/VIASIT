@@ -32,6 +32,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.oficial.viasit.domain.model.PointSelectionMode
+import com.oficial.viasit.domain.model.RouteData
+import com.oficial.viasit.domain.model.RouteLocation
 import com.oficial.viasit.ui.theme.*
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay

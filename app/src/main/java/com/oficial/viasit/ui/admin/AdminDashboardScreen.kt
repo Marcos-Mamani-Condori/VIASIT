@@ -96,24 +96,24 @@ fun AdminDashboardScreen(
                 when (selectedTab) {
                     0 -> LineasTabContent(
                         lineas        = uiState.lineas, isLoading = uiState.isLoading,
-                        onCreateLinea = { n, c, r -> viewModel.createLinea(n, c, r, currentUser.email) },
-                        onDeleteLinea = { viewModel.deleteLinea(it, currentUser.email) }
+                        onCreateLinea = { n, c, r -> viewModel.createLinea(n, c, r, currentUser.id) },
+                        onDeleteLinea = { viewModel.deleteLinea(it, currentUser.id) }
                     )
                     1 -> RutasTabContent(
                         rutas     = uiState.rutas,
                         lineas    = uiState.lineas,
                         isLoading = uiState.isLoading,
                         onDeleteRuta = { rutaId, rutaName, lineaId ->
-                            viewModel.deleteRuta(rutaId, rutaName, lineaId, currentUser.email)
+                            viewModel.deleteRuta(rutaId, rutaName, lineaId, currentUser.id)
                         }
                     )
                     2 -> InvitacionesTabContent(
                         invitationCodes = uiState.invitationCodes, lineas = uiState.lineas,
                         isLoading       = uiState.isLoading, generatedCode = uiState.generatedCode,
                         onGenerateCode  = { role, lineaId ->
-                            viewModel.generateInvitationCode(role, lineaId, 24, currentUser.email)
+                            viewModel.generateInvitationCode(role, lineaId, 24, currentUser.id)
                         },
-                        onDeleteCode = { viewModel.deleteInvitationCode(it, currentUser.email) }
+                        onDeleteCode = { viewModel.deleteInvitationCode(it, currentUser.id) }
                     )
                     3 -> AuditoriaTabContent(logs = uiState.logs, isLoading = uiState.isLoading)
                 }
@@ -126,10 +126,10 @@ fun AdminDashboardScreen(
                         isLoading = uiState.isLoading,
                         userEmail = currentUser.email,
                         onCreateRuta = { name, desc, start, end, lineaId ->
-                            viewModel.createRuta(name, desc, start, end, lineaId, currentUser.email)
+                            viewModel.createRuta(name, desc, start, end, lineaId, currentUser.id)
                         },
                         onAssignRuta = { rutaId, rutaName ->
-                            viewModel.assignRutaToLinea(currentUser.lineaId, rutaId, rutaName, currentUser.email)
+                            viewModel.assignRutaToLinea(currentUser.lineaId, rutaId, rutaName, currentUser.id)
                         },
                         onNavigateToRoutePicker = onNavigateToRoutePicker
                     )
@@ -137,9 +137,9 @@ fun AdminDashboardScreen(
                         lineaId       = currentUser.lineaId, vehicleCodes = uiState.vehicleCodes,
                         isLoading     = uiState.isLoading, generatedCode = uiState.generatedVehicleCode,
                         onGenerateCode = {
-                            viewModel.generateVehicleInvitationCode(currentUser.lineaId, currentUser.email, 72, currentUser.email)
+                            viewModel.generateVehicleInvitationCode(currentUser.lineaId, currentUser.email, 72, currentUser.id)
                         },
-                        onDeleteCode = { viewModel.deleteVehicleInvitationCode(it, currentUser.lineaId, currentUser.email) }
+                        onDeleteCode = { viewModel.deleteVehicleInvitationCode(it, currentUser.lineaId, currentUser.id) }
                     )
                     2 -> AuditoriaTabContent(logs = uiState.logs, isLoading = uiState.isLoading)
                 }

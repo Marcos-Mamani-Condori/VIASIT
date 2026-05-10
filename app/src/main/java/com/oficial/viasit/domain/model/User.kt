@@ -115,7 +115,10 @@ data class RegisterRequest(
     val role: String = "usuario",
     
     @SerialName("invitationCode")
-    val invitationCode: String = ""
+    val invitationCode: String = "",
+
+    @SerialName("lineId")
+    val lineaId: String = ""
 )
 
 @Serializable

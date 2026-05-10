@@ -12,9 +12,9 @@ internal class LogsRepository(
     private val client: PocketBaseRealtimeClient,
     private val shared: AdminRepositoryShared
 ) : ILogsRepository {
-    override suspend fun create(userEmail: String, description: String): Result<Unit> = try {
+    override suspend fun create(userId: String, description: String): Result<Unit> = try {
         client.createRecord("logs",
-            mapOf("userid" to userEmail, "description" to description),
+            mapOf("userid" to userId, "description" to description),
             shared.authToken()).map { }
     } catch (e: Exception) { Result.failure(e) }
 
@@ -39,8 +39,8 @@ internal class VehicleCodesRepository(
             "expiresAt" to shared.formatNowPlus(expiresInHours), "usedBy" to "")
         client.createRecord("vehicle_invitation_codes", data, shared.authToken()).map { json ->
             VehicleInvitationCode(id = AdminJsonParsers.extractStringField(json, "id"),
-                code = code, lineaId = lineaId, creadoPor = creadoPor,
-                usadoPor = "", expiresAt = shared.formatNowPlus(expiresInHours))
+                code = code, lineaId = lineaId, createdBy = creadoPor,
+                usedBy = "", expiresAt = shared.formatNowPlus(expiresInHours))
         }
     } catch (e: Exception) { Result.failure(e) }
 

@@ -5,7 +5,7 @@ import kotlinx.serialization.Serializable
 
 
 @Serializable
-data class Log(
+data class LogEntry(
     @SerialName("id")
     val id: String = "",
 
@@ -27,9 +27,3 @@ data class Log(
     @SerialName("collectionName")
     val collectionName: String = "logs"
 )
-
-/**
- * Alias para compatibilidad con código existente
- */
-typealias LogEntry = Log
-

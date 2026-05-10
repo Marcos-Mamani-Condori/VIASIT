@@ -31,7 +31,7 @@ class AutosAplicacion : Application() {
     }
 
     val loginUseCase by lazy { LoginUseCase(authRepository) }
-    val registerUseCase by lazy { RegisterUseCase(authRepository) }
+    val registerUseCase by lazy { RegisterUseCase(authRepository, adminRepository) }
 
     val reportesRepository: ReportesRepository by lazy {
         ReportesRepository(pocketBaseClient)

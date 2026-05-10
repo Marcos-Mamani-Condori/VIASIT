@@ -57,7 +57,7 @@ class AdminRepository(
         if (linea.rutaId.isBlank()) Result.success(null) else rutas.getById(linea.rutaId).map { it }
     suspend fun deleteRuta(rutaId: String): Result<Unit>                                                             = rutas.delete(rutaId)
 
-    suspend fun createLog(userEmail: String, description: String): Result<Unit>                                      = logs.create(userEmail, description)
+    suspend fun createLog(userId: String, description: String): Result<Unit>                                       = logs.create(userId, description)
     suspend fun getLogs(limit: Int = 50): Result<List<LogEntry>>                                                     = logs.getAll(limit)
     suspend fun getLogsByUser(userId: String): Result<List<LogEntry>>                                                = logs.getByUser(userId)
 

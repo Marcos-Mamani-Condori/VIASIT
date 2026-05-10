@@ -79,8 +79,8 @@ internal object AdminJsonParsers {
                 id        = extractStringField(block, "id"),
                 code      = extractStringField(block, "code"),
                 lineaId   = extractStringField(block, "lineId"),
-                creadoPor = extractStringField(block, "createdBy"),
-                usadoPor  = extractStringField(block, "usedBy"),
+                createdBy = extractStringField(block, "createdBy"),
+                usedBy    = extractStringField(block, "usedBy"),
                 expiresAt = extractStringField(block, "expiresAt")
             )
         }.filter { it.id.isNotEmpty() }

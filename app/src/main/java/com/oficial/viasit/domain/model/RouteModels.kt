@@ -1,4 +1,4 @@
-package com.oficial.viasit.ui.routes
+package com.oficial.viasit.domain.model
 
 data class RouteLocation(
     val lat: Double,

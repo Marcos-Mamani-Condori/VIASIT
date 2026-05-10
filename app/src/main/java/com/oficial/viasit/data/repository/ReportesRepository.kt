@@ -17,7 +17,7 @@ class ReportesRepository(
     override suspend fun submitReporte(descripcion: String, userId: String): Result<Unit> =
         client.createRecord(
             "reports",
-            mapOf("description" to descripcion, "users" to userId),
+            mapOf("description" to descripcion, "users" to listOf(userId)),
             null
         ).map { }
 

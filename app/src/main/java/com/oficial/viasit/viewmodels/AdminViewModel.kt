@@ -19,52 +19,54 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private val adminRepository = (application as AutosAplicacion).adminRepository
+
     private val _uiState = MutableStateFlow(AdminUiState())
     val uiState: StateFlow<AdminUiState> = _uiState
 
-    private val lineasVM       = LineasViewModel(application)
-    private val invitacionesVM = InvitacionesViewModel(application)
-    private val logsVM         = LogsViewModel(application)
-    private val rutasVM        = RutasViewModel(application)
-    private val vehicleCodesVM = VehicleCodesViewModel(application)
+    private val lineasHandler       = LineasHandler(viewModelScope, adminRepository)
+    private val invitacionesHandler = InvitacionesHandler(viewModelScope, adminRepository)
+    private val logsHandler         = LogsHandler(viewModelScope, adminRepository)
+    private val rutasHandler        = RutasHandler(viewModelScope, adminRepository)
+    private val vehicleCodesHandler = VehicleCodesHandler(viewModelScope, adminRepository)
 
-    private val logAction: (String, String) -> Unit = { email, desc -> logsVM.createLog(email, desc) }
+    private val logAction: (String, String) -> Unit = { userId, desc -> logsHandler.createLog(userId, desc) }
 
-    fun loadLineas()                                                           = lineasVM.loadLineas(_uiState)
-    fun createLinea(n: String, c: String, r: String, email: String)           = lineasVM.createLinea(n, c, r, email, _uiState, logAction)
-    fun updateLinea(id: String, n: String, c: String, r: String, email: String) = lineasVM.updateLinea(id, n, c, r, email, _uiState, logAction)
-    fun deleteLinea(id: String, email: String)                                = lineasVM.deleteLinea(id, email, _uiState, logAction)
+    fun loadLineas()                                                               = lineasHandler.loadLineas(_uiState)
+    fun createLinea(n: String, c: String, r: String, userId: String)              = lineasHandler.createLinea(n, c, r, userId, _uiState, logAction)
+    fun updateLinea(id: String, n: String, c: String, r: String, userId: String)  = lineasHandler.updateLinea(id, n, c, r, userId, _uiState, logAction)
+    fun deleteLinea(id: String, userId: String)                                    = lineasHandler.deleteLinea(id, userId, _uiState, logAction)
 
-    fun loadInvitationCodes()                                                  = invitacionesVM.loadInvitationCodes(_uiState)
-    fun generateInvitationCode(role: String, lineaId: String, hours: Int = 24, email: String = "") =
-        invitacionesVM.generateInvitationCode(role, lineaId, hours, email, _uiState, logAction)
-    fun deleteInvitationCode(id: String, email: String)                       = invitacionesVM.deleteInvitationCode(id, email, _uiState, logAction)
+    fun loadInvitationCodes()                                                      = invitacionesHandler.loadInvitationCodes(_uiState)
+    fun generateInvitationCode(role: String, lineaId: String, hours: Int = 24, userId: String = "") =
+        invitacionesHandler.generateInvitationCode(role, lineaId, hours, userId, _uiState, logAction)
+    fun deleteInvitationCode(id: String, userId: String)                          = invitacionesHandler.deleteInvitationCode(id, userId, _uiState, logAction)
 
-    fun loadLogs()                                                             = logsVM.loadLogs(_uiState)
-    fun createLog(email: String, description: String)                         = logsVM.createLog(email, description)
+    fun loadLogs()                                                                 = logsHandler.loadLogs(_uiState)
+    fun createLog(userId: String, description: String)                            = logsHandler.createLog(userId, description)
 
     fun loadRutas() = viewModelScope.launch {
         _uiState.value = _uiState.value.copy(isLoading = true)
-        getApplication<AutosAplicacion>().adminRepository.getRutas().fold(
+        adminRepository.getRutas().fold(
             onSuccess = { rutas -> _uiState.value = _uiState.value.copy(rutas = rutas, isLoading = false) },
             onFailure = { _uiState.value = _uiState.value.copy(isLoading = false, error = it.message) }
         )
     }
-    fun createRuta(n: String, d: String, s: String, e: String, lineaId: String, email: String) =
-        rutasVM.createRuta(n, d, s, e, lineaId, email, _uiState, logAction)
+    fun createRuta(n: String, d: String, s: String, e: String, lineaId: String, userId: String) =
+        rutasHandler.createRuta(n, d, s, e, lineaId, userId, _uiState, logAction)
     fun createRutaWithCoords(n: String, d: String, sLat: Double, sLng: Double, eLat: Double, eLng: Double,
-                             lineaId: String, email: String, waypoints: List<Pair<Double,Double>> = emptyList()) =
-        rutasVM.createRutaWithCoords(n, d, sLat, sLng, eLat, eLng, lineaId, email, waypoints, _uiState, logAction)
-    fun assignRutaToLinea(lineaId: String, rutaId: String, rutaName: String, email: String) =
-        rutasVM.assignRutaToLinea(lineaId, rutaId, rutaName, email, _uiState, logAction)
-    fun deleteRuta(rutaId: String, rutaName: String, lineaId: String = "", email: String) =
-        rutasVM.deleteRuta(rutaId, rutaName, lineaId, email, _uiState, logAction)
+                             lineaId: String, userId: String, waypoints: List<Pair<Double,Double>> = emptyList()) =
+        rutasHandler.createRutaWithCoords(n, d, sLat, sLng, eLat, eLng, lineaId, userId, waypoints, _uiState, logAction)
+    fun assignRutaToLinea(lineaId: String, rutaId: String, rutaName: String, userId: String) =
+        rutasHandler.assignRutaToLinea(lineaId, rutaId, rutaName, userId, _uiState, logAction)
+    fun deleteRuta(rutaId: String, rutaName: String, lineaId: String = "", userId: String) =
+        rutasHandler.deleteRuta(rutaId, rutaName, lineaId, userId, _uiState, logAction)
 
-    fun loadVehicleInvitationCodes(lineaId: String)                           = vehicleCodesVM.loadVehicleInvitationCodes(lineaId, _uiState)
-    fun generateVehicleInvitationCode(lineaId: String, creadoPor: String, hours: Int = 72, email: String = "") =
-        vehicleCodesVM.generateVehicleInvitationCode(lineaId, creadoPor, hours, email, _uiState, logAction)
-    fun deleteVehicleInvitationCode(id: String, lineaId: String, email: String) =
-        vehicleCodesVM.deleteVehicleInvitationCode(id, lineaId, email, _uiState, logAction)
+    fun loadVehicleInvitationCodes(lineaId: String)                               = vehicleCodesHandler.loadVehicleInvitationCodes(lineaId, _uiState)
+    fun generateVehicleInvitationCode(lineaId: String, creadoPor: String, hours: Int = 72, userId: String = "") =
+        vehicleCodesHandler.generateVehicleInvitationCode(lineaId, creadoPor, hours, userId, _uiState, logAction)
+    fun deleteVehicleInvitationCode(id: String, lineaId: String, userId: String) =
+        vehicleCodesHandler.deleteVehicleInvitationCode(id, lineaId, userId, _uiState, logAction)
     fun clearVehicleCode() { _uiState.value = _uiState.value.copy(generatedVehicleCode = null) }
 
     fun clearMessages() { _uiState.value = _uiState.value.copy(error = null, successMessage = null, generatedCode = null) }
