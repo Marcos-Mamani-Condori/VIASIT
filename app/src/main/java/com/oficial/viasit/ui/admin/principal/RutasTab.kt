@@ -21,11 +21,6 @@ import com.oficial.viasit.ui.admin.DeleteConfirmDialog
 import com.oficial.viasit.ui.admin.EmptyState
 import com.oficial.viasit.ui.theme.*
 
-/**
- * Tab "Rutas" para ADMIN_PRINCIPAL.
- * Muestra todas las rutas del sistema con su linea asignada.
- * Permite borrar rutas (con confirmación) y ver detalles de cada una.
- */
 @Composable
 fun RutasTabContent(
     rutas: List<Ruta>,

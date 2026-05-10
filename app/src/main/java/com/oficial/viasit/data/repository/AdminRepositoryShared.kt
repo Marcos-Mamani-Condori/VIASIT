@@ -5,10 +5,6 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-/**
- * Utilidades compartidas entre todos los sub-repositorios de AdminRepository.
- * Encapsula: token de auth, fechas y generador de códigos seguros.
- */
 internal class AdminRepositoryShared(
     private val authRepository: AuthRepository? = null,
     private val getToken: () -> String?

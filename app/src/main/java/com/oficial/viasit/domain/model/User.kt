@@ -3,28 +3,14 @@ package com.oficial.viasit.domain.model
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-/**
- * User roles in the VIASIT application
- * IMPORTANTE: Los valores deben coincidir exactamente con PocketBase schema
- * Schema: maxSelect: 2, values: ["conductor", "usuario", "invitado", "ADMIN_PRINCIPAL", "ADMIN_LINEA"]
- */
 enum class UserRole {
-    invitado,       // Invitado - puede ver buses en el mapa
-    usuario,        // Usuario - puede enviar su ubicación
-    conductor,      // Conductor - puede activar "en servicio" y enviar ubicación
-    ADMIN_LINEA,    // Admin de Línea - gestiona una línea específica
-    ADMIN_PRINCIPAL // Admin Principal - gestiona todas las líneas
+    invitado,
+    usuario,
+    conductor,
+    ADMIN_LINEA,
+    ADMIN_PRINCIPAL
 }
 
-/**
- * Modelo de datos para Usuarios
- * Colección PocketBase: users (auth collection)
- * 
- * Schema:
- * - phone: text
- * - role: select (maxSelect: 2)
- * - lineaId: relation a lineas (maxSelect: 1)
- */
 @Serializable
 data class User(
     @SerialName("id")
@@ -36,17 +22,13 @@ data class User(
     @SerialName("name")
     val name: String = "",
     
-    // PocketBase devuelve role como array con maxSelect: 2
     @SerialName("role")
     val role: List<String> = listOf(UserRole.usuario.name),
     
-    // Teléfono del usuario
     @SerialName("phone")
     val phone: String = "",
     
-    // Línea asignada (relation a lineas) - para ADMIN_LINEA y conductores
-    // En PocketBase el campo se llama "lineaId"
-    @SerialName("lineaId")
+    @SerialName("lineId")
     val lineaId: String = "",
     
     @SerialName("created")
@@ -61,7 +43,6 @@ data class User(
     @SerialName("collectionName")
     val collectionName: String = "users"
 ) {
-    // Obtener el rol principal (primer elemento de la lista)
     val userRole: UserRole
         get() = try {
             if (role.isNotEmpty()) {
@@ -95,9 +76,6 @@ data class User(
         get() = userRole == UserRole.ADMIN_PRINCIPAL
 }
 
-/**
- * Authentication state
- */
 @Serializable
 sealed class AuthState {
     data object Unauthenticated : AuthState()
@@ -107,9 +85,6 @@ sealed class AuthState {
     data class Error(val message: String) : AuthState()
 }
 
-/**
- * Login request
- */
 @Serializable
 data class LoginRequest(
     @SerialName("email")
@@ -119,9 +94,6 @@ data class LoginRequest(
     val password: String
 )
 
-/**
- * Register request
- */
 @Serializable
 data class RegisterRequest(
     @SerialName("email")
@@ -146,9 +118,6 @@ data class RegisterRequest(
     val invitationCode: String = ""
 )
 
-/**
- * Auth response from PocketBase
- */
 @Serializable
 data class AuthResponse(
     @SerialName("token")
@@ -158,9 +127,6 @@ data class AuthResponse(
     val user: User = User()
 )
 
-/**
- * Admin registration request with invitation code
- */
 @Serializable
 data class AdminRegisterRequest(
     @SerialName("email")

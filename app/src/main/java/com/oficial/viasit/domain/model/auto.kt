@@ -11,12 +11,6 @@ import kotlinx.serialization.descriptors.serialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
-/**
- * Serializador personalizado para manejar userid que puede ser:
- * - String: "lvb2ka1s47ap07u"
- * - JsonObject: {"id": "lvb2ka1s47ap07u", ...} (relación expandida)
- * - JsonArray: ["lvb2ka1s47ap07u"] (relación múltiple con un elemento)
- */
 object UserIdSerializer : KSerializer<String> {
     override val descriptor: SerialDescriptor = serialDescriptor<String>()
     
@@ -34,7 +28,6 @@ object UserIdSerializer : KSerializer<String> {
                 (it as? JsonPrimitive)?.content ?: ""
             } ?: ""
             is kotlinx.serialization.json.JsonArray -> {
-                // Si es un array, tomar el primer elemento
                 if (element.isEmpty()) ""
                 else {
                     val first = element[0]
@@ -52,56 +45,29 @@ object UserIdSerializer : KSerializer<String> {
     }
 }
 
-/**
- * Modelo de datos para Vehículos (Autos)
- * Colección PocketBase: autos
- * 
- * Schema:
- * - placa: text
- * - lat: number
- * - lng: number
- * - angulo: number
- * - colectivoid: text
- * - userid: relation a users
- * - code: text
- * 
- * NOTA: La línea del vehículo se obtiene del conductor (userId -> lineaId en users)
- * No se almacena lineaId aquí para evitar redundancia.
- */
 @Serializable
 data class Auto(
     @SerialName("id")
     val id: String = "",
 
-    // Relación con el usuario conductor (relation a users)
-    // Puede ser un String (ID) o un JsonObject (relación expandida)
     @Serializable(UserIdSerializer::class)
     @SerialName("userid")
     val userId: String = "",
     
-    // Código del vehículo
     @SerialName("code")
     val code: String = "",
 
-    // Placa del vehículo
-    @SerialName("placa")
+    @SerialName("plate")
     val placa: String = "",
 
-    // Latitud actual
     @SerialName("lat")
     val lat: Double = 0.0,
 
-    // Longitud actual
     @SerialName("lng")
     val lng: Double = 0.0,
 
-    // Ángulo/Dirección del vehículo
-    @SerialName("angulo")
+    @SerialName("angle")
     val angulo: Double = 0.0,
-
-    // ID del colectivo (si aplica)
-    @SerialName("colectivoid")
-    val colectivoid: String = "",
 
     @SerialName("created")
     val created: String = "",
@@ -113,16 +79,11 @@ data class Auto(
     val collectionId: String = "",
 
     @SerialName("collectionName")
-    val collectionName: String = "autos"
+    val collectionName: String = "vehicles"
 ) {
-    /**
-     * Verifica si el vehículo está activo (actualizó en los últimos 2 minutos)
-     */
     fun isActive(maxAgeMinutes: Int = 2): Boolean {
         return try {
             if (updated.isEmpty()) return false
-            // PocketBase devuelve "2024-01-01 15:30:00.000Z" (espacio en vez de 'T')
-            // OffsetDateTime.parse requiere el formato ISO 8601 con 'T'
             val normalized = updated.replace(" ", "T")
             val updateTime = java.time.OffsetDateTime.parse(normalized)
             val now = java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC)
@@ -133,9 +94,6 @@ data class Auto(
         }
     }
 
-    /**
-     * Retorna hace cuánto se actualizó en formato legible
-     */
     fun getLastUpdateText(): String {
         return try {
             if (updated.isEmpty()) return "Sin datos"

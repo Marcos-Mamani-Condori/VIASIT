@@ -20,16 +20,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.oficial.viasit.ui.theme.*
 
-/**
- * Formulario de inicio de sesión.
- *
- * Campos: correo electrónico + contraseña con toggle de visibilidad.
- *
- * Acciones adicionales:
- *  - "Ver mapa como invitado" — acceso sin cuenta
- *  - "Regístrate" — navega al formulario de registro
- *  - "Registrar administrador" — acceso especial para admins
- */
 @Composable
 fun LoginForm(
     email: String,

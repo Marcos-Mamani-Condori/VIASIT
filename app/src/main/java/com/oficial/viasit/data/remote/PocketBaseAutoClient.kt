@@ -33,7 +33,7 @@ class PocketBaseAutoClient(
 
     companion object {
         private const val TAG = "PocketBaseAutoClient"
-        private const val COLLECTION = "autos"
+        private const val COLLECTION = "vehicles"
         private val BASE_URL: String get() = BuildConfig.POCKETBASE_URL
 
         fun create(autoDao: AutoData?, autos: MutableStateFlow<List<Auto>>): PocketBaseAutoClient =
@@ -94,7 +94,6 @@ class PocketBaseAutoClient(
         val list = _autos.value.toMutableList()
         when (action) {
             "create" -> {
-                // Evitar duplicados: si ya existe un auto con mismo id o mismo userId, actualizar
                 val existingIdx = list.indexOfFirst { it.id == record.id || it.userId == record.userId }
                 if (existingIdx != -1) list[existingIdx] = record
                 else list.add(record)
@@ -120,12 +119,10 @@ class PocketBaseAutoClient(
                         ?: return@withContext Result.failure(Exception("Codigo de invitacion invalido o expirado"))
                 }
 
-                // ✅ UPSERT: buscar si ya existe un auto para este conductor
                 val existingAuto = getAutoByUserId(userId).getOrNull()
                 if (existingAuto != null) {
                     Log.d(TAG, "Auto existente encontrado (id=${existingAuto.id}), actualizando en lugar de crear")
-                    // Reactivar: solo actualizar lat/lng para marcar como activo
-                    val body = "{\"lat\":$lat,\"lng\":$lng,\"angulo\":0}"
+                    val body = "{\"lat\":$lat,\"lng\":$lng,\"angle\":0}"
                         .toRequestBody("application/json".toMediaType())
                     val resp = okHttpClient.newCall(
                         Request.Builder().url("$BASE_URL/api/collections/$COLLECTION/records/${existingAuto.id}").patch(body).build()
@@ -139,8 +136,7 @@ class PocketBaseAutoClient(
                     }
                 }
 
-                // Crear nuevo registro solo si no existe
-                val body = "{\"userid\":\"$userId\",\"placa\":\"$placa\",\"lat\":$lat,\"lng\":$lng,\"angulo\":0}"
+                val body = "{\"userid\":\"$userId\",\"plate\":\"$placa\",\"lat\":$lat,\"lng\":$lng,\"angle\":0}"
                     .toRequestBody("application/json".toMediaType())
                 Log.d(TAG, "Creando nuevo auto...")
                 val resp = okHttpClient.newCall(
@@ -176,7 +172,6 @@ class PocketBaseAutoClient(
     private suspend fun validateInvitationCode(code: String): String? {
         return withContext(Dispatchers.IO) {
             try {
-                // Usar isUsed (camelCase) que es como está en PocketBase según el schema
                 val filter = java.net.URLEncoder.encode("code=\"$code\" && isUsed=false", "UTF-8")
                 val resp = okHttpClient.newCall(
                     Request.Builder()
@@ -196,7 +191,7 @@ class PocketBaseAutoClient(
                         if (exp.isBefore(Instant.now())) return@withContext null
                     } catch (_: Exception) {}
                 }
-                inv["linea_id"]?.jsonPrimitive?.content
+                inv["lineId"]?.jsonPrimitive?.content
             } catch (e: Exception) { Log.e(TAG, "validateInvitationCode", e); null }
         }
     }
@@ -204,8 +199,6 @@ class PocketBaseAutoClient(
     suspend fun getAutoByUserId(userId: String): Result<Auto?> {
         return withContext(Dispatchers.IO) {
             try {
-                // Para relaciones en PocketBase, usar userid.id para filtrar por ID
-                // Esto funciona tanto para relaciones simples como múltiples (arrays)
                 val filter = "userid.id=\"$userId\""
                 val encodedFilter = java.net.URLEncoder.encode(filter, "UTF-8")
                 val url = "$BASE_URL/api/collections/$COLLECTION/records?perPage=1&filter=$encodedFilter"
@@ -228,7 +221,7 @@ class PocketBaseAutoClient(
     suspend fun updateAutoLocation(autoId: String, lat: Double, lng: Double, angulo: Double): Result<Auto> {
         return withContext(Dispatchers.IO) {
             try {
-                val body = """{"lat":$lat,"lng":$lng,"angulo":$angulo}"""
+                val body = """{"lat":$lat,"lng":$lng,"angle":$angulo}"""
                     .toRequestBody("application/json".toMediaType())
                 val resp = okHttpClient.newCall(
                     Request.Builder().url("$BASE_URL/api/collections/$COLLECTION/records/$autoId").patch(body).build()
@@ -246,7 +239,7 @@ class PocketBaseAutoClient(
             try {
                 val autoId = getAutoByUserId(userId).getOrNull()?.id
                     ?: return@withContext Result.failure(Exception("Auto no encontrado"))
-                val body = """{"lat":$lat,"lng":$lng,"angulo":$angulo}"""
+                val body = """{"lat":$lat,"lng":$lng,"angle":$angulo}"""
                     .toRequestBody("application/json".toMediaType())
                 val resp = okHttpClient.newCall(
                     Request.Builder().url("$BASE_URL/api/collections/$COLLECTION/records/$autoId").patch(body).build()

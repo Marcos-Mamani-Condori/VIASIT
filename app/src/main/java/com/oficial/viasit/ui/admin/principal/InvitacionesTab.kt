@@ -26,16 +26,6 @@ import com.oficial.viasit.ui.admin.EmptyState
 import com.oficial.viasit.ui.admin.GeneratedCodeBanner
 import com.oficial.viasit.ui.theme.*
 
-/**
- * Tab "Invitaciones" — solo para ADMIN_PRINCIPAL.
- *
- * Permite generar códigos de invitación para:
- *  - Nuevos ADMIN_LINEA (asignándolos a una línea con el dropdown)
- *  - Nuevos ADMIN_PRINCIPAL
- *
- * También lista los códigos existentes con estado (disponible/usado)
- * y permite copiarlos o eliminarlos.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InvitacionesTabContent(

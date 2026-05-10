@@ -58,7 +58,6 @@ class AuthRepository(context: Context) {
         return withContext(Dispatchers.IO) {
             _authState.value = AuthState.Loading
 
-            // Si es conductor con código de invitación, validar y obtener lineaId
             var lineaId = ""
             if (request.role == "conductor" && request.invitationCode.isNotBlank()) {
                 val lineaResult = validateVehicleInvitationCode(request.invitationCode)
@@ -81,7 +80,6 @@ class AuthRepository(context: Context) {
 
             result.fold(
                 onSuccess = { user ->
-                    // Si se usó código, marcarlo como usado
                     if (lineaId.isNotEmpty()) {
                         markVehicleCodeAsUsed(request.invitationCode, request.email)
                     }
@@ -101,8 +99,6 @@ class AuthRepository(context: Context) {
 
     private suspend fun validateVehicleInvitationCode(code: String): String? {
         return try {
-            // NO codificar aquí - PocketBaseHttpClient ya codifica el filtro
-            // Usar isUsed (camelCase) según el schema oficial de PocketBase
             val filter = "code=\"$code\" && isUsed=false"
             android.util.Log.d("AuthRepository", "Validando código: $code con filtro: $filter")
             
@@ -128,9 +124,8 @@ class AuthRepository(context: Context) {
                     
                     val expiresAt = inv["expiresAt"]?.jsonPrimitive?.content
                     
-                    // linea_id puede ser un string (ID) o un objeto (relación expandida)
                     val lineaId = try {
-                        val lineaElement = inv["linea_id"]
+                        val lineaElement = inv["lineId"]
                         when {
                             lineaElement == null -> {
                                 android.util.Log.w("AuthRepository", "linea_id es null en el JSON")
@@ -142,7 +137,6 @@ class AuthRepository(context: Context) {
                                 }
                             }
                             else -> {
-                                // Es un objeto (relación expandida), obtener el ID
                                 lineaElement.jsonObject["id"]?.jsonPrimitive?.content.also {
                                     android.util.Log.d("AuthRepository", "linea_id como objeto, ID: $it")
                                 }
@@ -160,7 +154,6 @@ class AuthRepository(context: Context) {
                         return@fold null
                     }
                     
-                    // Verificar expiración
                     if (expiresAt != null && expiresAt.isNotEmpty()) {
                         try {
                             val exp = java.time.OffsetDateTime.parse(expiresAt).toInstant()
@@ -189,7 +182,6 @@ class AuthRepository(context: Context) {
 
     private suspend fun markVehicleCodeAsUsed(code: String, userEmail: String) {
         try {
-            // NO codificar aquí - PocketBaseHttpClient ya codifica el filtro
             val filter = "code=\"$code\""
             android.util.Log.d("AuthRepository", "Marcando código como usado: $code")
             
@@ -213,11 +205,10 @@ class AuthRepository(context: Context) {
                     val codeId = items[0].jsonObject["id"]?.jsonPrimitive?.content ?: return@fold
                     android.util.Log.d("AuthRepository", "ID del código: $codeId")
                     
-                    // Marcar como usado (usar isUsed que es el nombre del campo en PocketBase)
                     val updateResult = httpClient.updateRecord(
                         collection = "vehicle_invitation_codes",
                         recordId = codeId,
-                        data = mapOf("isUsed" to true, "usado_por" to userEmail)
+                        data = mapOf("isUsed" to true, "usedBy" to userEmail)
                     )
                     android.util.Log.d("AuthRepository", "Código marcado como usado: $updateResult")
                 },
@@ -242,7 +233,6 @@ class AuthRepository(context: Context) {
     }
 
     fun logout() {
-        // Detener servicio de tracking
         _isInService.value = false
         stopLocationTrackingService()
         pocketBaseAuth.logout()
@@ -257,7 +247,6 @@ class AuthRepository(context: Context) {
             android.util.Log.d("AuthRepository", "setInService: $inService, autoId: $autoId")
             prefs.edit().putBoolean("isInService", inService).apply()
 
-            // Iniciar o detener el servicio de tracking
             if (inService) {
                 startLocationTrackingService(
                     userId = it.id,
@@ -309,7 +298,6 @@ class AuthRepository(context: Context) {
             UserRole.usuario
         }
     }
-    /** Expone el token de sesión activo para que AdminRepository lo use */
     fun getAuthToken(): String? = pocketBaseAuth.getAuthToken()
 
     fun restoreSession() {
@@ -346,7 +334,6 @@ class AuthRepository(context: Context) {
             putString("email", user.email)
             putString("name", user.name)
             putString("phone", user.phone)
-            // Guardar el primer rol de la lista
             putString("role", user.role.firstOrNull() ?: UserRole.usuario.name)
             putString("lineaId", user.lineaId)
             putBoolean("loggedIn", !isGuest)

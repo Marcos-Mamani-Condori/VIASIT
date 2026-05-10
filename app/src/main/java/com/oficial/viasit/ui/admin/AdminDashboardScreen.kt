@@ -27,20 +27,6 @@ import com.oficial.viasit.ui.admin.principal.RutasTabContent
 import com.oficial.viasit.ui.theme.*
 import com.oficial.viasit.viewmodels.AdminViewModel
 
-/**
- * Pantalla principal del panel de administración.
- *
- * ADMIN_PRINCIPAL → tabs: Líneas | Rutas | Invitaciones | Logs
- * ADMIN_LINEA     → tabs: Mi Línea | Códigos Vehículo | Logs
- *
- * Componentes por archivo:
- *  - ui/admin/principal/LineasTab.kt
- *  - ui/admin/principal/RutasTab.kt
- *  - ui/admin/principal/InvitacionesTab.kt
- *  - ui/admin/linea/MiLineaTab.kt
- *  - ui/admin/linea/VehicleCodesTab.kt
- *  - ui/admin/AuditoriaTab.kt
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AdminDashboardScreen(

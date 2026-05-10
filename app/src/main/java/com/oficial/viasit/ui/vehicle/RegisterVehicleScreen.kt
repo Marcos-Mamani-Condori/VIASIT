@@ -20,9 +20,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.oficial.viasit.viewmodels.AutosViewModel
 import com.oficial.viasit.viewmodels.AuthViewModel
 
-/**
- * Pantalla para que el conductor registre su vehículo
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RegisterVehicleScreen(
@@ -224,9 +221,6 @@ fun RegisterVehicleScreen(
     }
 }
 
-/**
- * Pantalla intermedia para conductores que ya tienen vehículo
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DriverWelcomeScreen(

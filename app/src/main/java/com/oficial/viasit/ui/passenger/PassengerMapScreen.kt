@@ -45,11 +45,6 @@ import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 
-/**
- * Mapa para pasajeros: muestra los autos en tiempo real Y las rutas
- * de las líneas trazadas como polylines coloreadas.
- * Reemplaza el uso de MainMapScreen en PassengerDashboardScreen.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PassengerMapScreen(passengerViewModel: PassengerViewModel) {
@@ -405,7 +400,6 @@ fun PassengerMapScreen(passengerViewModel: PassengerViewModel) {
     }
 }
 
-/** Pequeña leyenda coloreada en el mapa con los nombres de las líneas */
 @Composable
 private fun RoutePolylineLegend(
     routes: List<RoutePolyline>,

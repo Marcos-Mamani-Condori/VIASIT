@@ -12,19 +12,6 @@ import com.oficial.viasit.navigation.VIASITApp
 import com.oficial.viasit.ui.theme.VIASITTheme
 import org.maplibre.android.MapLibre
 
-/**
- * Activity principal.
- *
- * Antes contenía ~937 líneas con toda la UI mezclada.
- * Ahora solo gestiona permisos, ciclo de vida y el punto de entrada de Compose.
- *
- * Archivos extraídos:
- *  - navigation/AppNavigation.kt  → Screen sealed class + VIASITApp (navegación)
- *  - ui/map/MapScreen.kt          → MainMapScreen (pantalla del mapa)
- *  - ui/map/CarComponents.kt      → CarInfoCard, CarListSimple, CarListItem
- *  - ui/map/MapHelpers.kt         → funciones auxiliares de MapLibre
- *  - ui/vehicle/DriverDashboardHandler.kt → DriverDashboardHandler + DriverVehicleRegistrationScreen
- */
 class MainActivity : ComponentActivity() {
 
     private val requestPermissionLauncher = registerForActivityResult(

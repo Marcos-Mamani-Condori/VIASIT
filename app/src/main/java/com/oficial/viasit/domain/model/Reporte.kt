@@ -4,18 +4,18 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class Linea(
+data class Reporte(
     @SerialName("id")
     val id: String = "",
 
-    @SerialName("code")
-    val code: String = "",
+    @SerialName("description")
+    val descripcion: String = "",
 
-    @SerialName("name")
-    val name: String = "",
+    @SerialName("response")
+    val respuesta: String = "",
 
-    @SerialName("routeId")
-    val rutaId: String = "",
+    @SerialName("users")
+    val users: List<String> = emptyList(),
 
     @SerialName("created")
     val created: String = "",
@@ -27,5 +27,5 @@ data class Linea(
     val collectionId: String = "",
 
     @SerialName("collectionName")
-    val collectionName: String = "lines"
+    val collectionName: String = "reports"
 )

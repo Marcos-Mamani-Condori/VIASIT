@@ -18,12 +18,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.oficial.viasit.domain.model.Auto
 
-/**
- * Componentes UI relacionados con la visualización de vehículos en el mapa.
- * Extraídos de MainActivity.kt para mejorar la organización del código.
- */
-
-/** Tarjeta con información detallada de un vehículo seleccionado */
 @Composable
 fun CarInfoCard(car: Auto, onClose: () -> Unit) {
     Card(
@@ -59,7 +53,6 @@ fun CarInfoCard(car: Auto, onClose: () -> Unit) {
     }
 }
 
-/** Lista compacta de vehículos activos */
 @Composable
 fun CarListSimple(autos: List<Auto>, onCarClick: (Auto) -> Unit) {
     Card(

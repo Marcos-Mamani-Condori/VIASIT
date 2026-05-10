@@ -12,16 +12,6 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.util.concurrent.TimeUnit
 
-/**
- * Servicio de enrutamiento usando OSRM (Open Source Routing Machine).
- *
- * - Gratuito, sin API key
- * - Usa datos de OpenStreetMap
- * - Calcula la ruta real por calles entre los puntos dados
- *
- * Endpoint público: router.project-osrm.org
- * Perfil:           driving (conducción vehicular)
- */
 class RoutingService {
 
     private val client = OkHttpClient.Builder()
@@ -31,15 +21,6 @@ class RoutingService {
 
     private val json = Json { ignoreUnknownKeys = true }
 
-    /**
-     * Calcula la ruta por carreteras entre los puntos dados.
-     *
-     * @param points Lista de pares (lat, lng) — al menos 2 puntos
-     * @return Lista de (lat, lng) que forman la ruta por calles reales
-     *
-     * Si OSRM falla (sin conexión, error), devuelve los puntos originales
-     * como fallback (línea recta), para no bloquear al admin.
-     */
     suspend fun getRoute(points: List<Pair<Double, Double>>): Result<List<Pair<Double, Double>>> =
         withContext(Dispatchers.IO) {
             if (points.size < 2) return@withContext Result.failure(Exception("Se necesitan al menos 2 puntos"))
@@ -79,11 +60,6 @@ class RoutingService {
             }
         }
 
-    /**
-     * Convierte la lista de (lat,lng) al formato de almacenamiento de PocketBase.
-     * El primer y último punto son inicio y fin — los intermedios son los waypoints.
-     * Devuelve solo los waypoints intermedios en formato "lat,lng;lat,lng;..."
-     */
     fun routeToWaypointsString(routePoints: List<Pair<Double, Double>>): String {
         if (routePoints.size <= 2) return ""
         // Excluir el primer y último punto (ya guardados como start_point/end_point)

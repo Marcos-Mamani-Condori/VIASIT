@@ -15,7 +15,6 @@ import okhttp3.Request
 import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 
-/** Resultado de búsqueda de ubicación */
 @Serializable
 data class SearchResult(
     val name: String,
@@ -25,15 +24,6 @@ data class SearchResult(
     val type: String = ""
 )
 
-/**
- * Servicio de geocoding usando Nominatim (OpenStreetMap).
- *
- * Mejoras sobre la versión anterior:
- *  - Usa kotlinx.serialization en lugar de regex manuales (más robusto)
- *  - viewbox centrado en La Paz, Bolivia para mejorar resultados locales
- *  - Agrega "La Paz, Bolivia" al query si no viene ya especificado
- *  - countrycodes=bo siempre activo
- */
 class GeocodingService {
 
     companion object {
@@ -49,10 +39,6 @@ class GeocodingService {
 
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
-    /**
-     * Busca lugares en La Paz, Bolivia.
-     * Si el query no menciona La Paz, se le agrega automáticamente para mejorar resultados.
-     */
     suspend fun search(
         query: String,
         limit: Int = 5
@@ -104,10 +90,6 @@ class GeocodingService {
         }
     }
 
-    /**
-     * Parser robusto usando kotlinx.serialization.
-     * Reemplaza el parser manual con regex que fallaba en JSON anidado.
-     */
     private fun parseWithKotlinxSerialization(jsonString: String): List<SearchResult> {
         return try {
             val array = json.parseToJsonElement(jsonString) as? JsonArray

@@ -6,16 +6,13 @@ import com.oficial.viasit.data.remote.PocketBaseRealtimeClient
 import com.oficial.viasit.data.repository.AdminJsonParsers.parseLogsFromJson
 import com.oficial.viasit.data.repository.AdminJsonParsers.parseVehicleCodesFromJson
 
-/**
- * Repositorio de logs de auditoría.
- */
 internal class LogsRepository(
     private val client: PocketBaseRealtimeClient,
     private val shared: AdminRepositoryShared
 ) {
     suspend fun create(userEmail: String, description: String): Result<Unit> = try {
         client.createRecord("logs",
-            mapOf("user_id" to userEmail, "description" to description, "created_at" to shared.formatNow()),
+            mapOf("userid" to userEmail, "description" to description),
             shared.authToken()).map { }
     } catch (e: Exception) { Result.failure(e) }
 
@@ -25,22 +22,19 @@ internal class LogsRepository(
     } catch (e: Exception) { Result.failure(e) }
 
     suspend fun getByUser(userId: String): Result<List<LogEntry>> = try {
-        client.getList("logs", filter = "user_id='$userId'", sort = "-created", authToken = shared.authToken())
+        client.getList("logs", filter = "userid='$userId'", sort = "-created", authToken = shared.authToken())
             .map { parseLogsFromJson(it) }
     } catch (e: Exception) { Result.failure(e) }
 }
 
-/**
- * Repositorio de códigos de vehículo (para conductores).
- */
 internal class VehicleCodesRepository(
     private val client: PocketBaseRealtimeClient,
     private val shared: AdminRepositoryShared
 ) {
     suspend fun generate(lineaId: String, creadoPor: String, expiresInHours: Int = 72): Result<VehicleInvitationCode> = try {
         val code = shared.generateSecureCode()
-        val data = mapOf("code" to code, "linea_id" to lineaId, "creado_por" to creadoPor,
-            "expires_at" to shared.formatNowPlus(expiresInHours), "usadoPor" to "")
+        val data = mapOf("code" to code, "lineId" to lineaId, "createdBy" to creadoPor,
+            "expiresAt" to shared.formatNowPlus(expiresInHours), "usedBy" to "")
         client.createRecord("vehicle_invitation_codes", data, shared.authToken()).map { json ->
             VehicleInvitationCode(id = AdminJsonParsers.extractStringField(json, "id"),
                 code = code, lineaId = lineaId, creadoPor = creadoPor,
@@ -49,12 +43,12 @@ internal class VehicleCodesRepository(
     } catch (e: Exception) { Result.failure(e) }
 
     suspend fun getByLinea(lineaId: String): Result<List<VehicleInvitationCode>> = try {
-        client.getList("vehicle_invitation_codes", filter = "linea_id='$lineaId'",
+        client.getList("vehicle_invitation_codes", filter = "lineId='$lineaId'",
             sort = "-created", authToken = shared.authToken()).map { parseVehicleCodesFromJson(it) }
     } catch (e: Exception) { Result.failure(e) }
 
     suspend fun validate(code: String): Result<VehicleInvitationCode> = try {
-        client.getList("vehicle_invitation_codes", filter = "code='$code'&&usadoPor=''",
+        client.getList("vehicle_invitation_codes", filter = "code='$code'&&usedBy=''",
             authToken = shared.authToken()).fold(
             onSuccess = { json ->
                 val codes = parseVehicleCodesFromJson(json)
@@ -66,7 +60,7 @@ internal class VehicleCodesRepository(
     } catch (e: Exception) { Result.failure(e) }
 
     suspend fun markUsed(codeId: String, usadoPor: String): Result<Unit> =
-        client.updateRecord("vehicle_invitation_codes", codeId, mapOf("usadoPor" to usadoPor), shared.authToken()).map { }
+        client.updateRecord("vehicle_invitation_codes", codeId, mapOf("usedBy" to usadoPor, "isUsed" to true), shared.authToken()).map { }
 
     suspend fun delete(codeId: String): Result<Unit> =
         client.deleteRecord("vehicle_invitation_codes", codeId, shared.authToken()).map { }

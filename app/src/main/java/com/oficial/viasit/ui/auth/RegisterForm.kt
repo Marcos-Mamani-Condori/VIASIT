@@ -22,20 +22,6 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.oficial.viasit.ui.theme.*
 
-/**
- * Formulario de registro de nuevos usuarios.
- *
- * Campos:
- *  - Nombre completo
- *  - Correo electrónico
- *  - Teléfono (opcional)
- *  - Tipo de usuario (Pasajero / Conductor) → chips
- *  - Código de invitación (solo para conductores, animated)
- *  - Contraseña + confirmar contraseña
- *
- * Los conductores necesitan un código de invitación provisto por
- * el ADMIN_LINEA de su línea.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RegisterForm(

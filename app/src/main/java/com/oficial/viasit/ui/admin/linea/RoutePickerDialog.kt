@@ -16,10 +16,6 @@ import androidx.compose.ui.unit.dp
 import com.oficial.viasit.domain.model.Ruta
 import com.oficial.viasit.ui.theme.*
 
-/**
- * Diálogo para que ADMIN_LINEA seleccione una ruta existente y la asigne a su línea.
- * Muestra la lista de rutas disponibles con nombre, descripción e inicio/fin.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RoutePickerDialog(

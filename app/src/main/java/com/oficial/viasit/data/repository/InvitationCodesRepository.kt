@@ -4,9 +4,6 @@ import com.oficial.viasit.domain.model.InvitationCode
 import com.oficial.viasit.data.remote.PocketBaseRealtimeClient
 import com.oficial.viasit.data.repository.AdminJsonParsers.parseInvitationCodesFromJson
 
-/**
- * Repositorio de códigos de invitación para admins (ADMIN_LINEA / ADMIN_PRINCIPAL).
- */
 internal class InvitationCodesRepository(
     private val client: PocketBaseRealtimeClient,
     private val shared: AdminRepositoryShared
@@ -18,7 +15,7 @@ internal class InvitationCodesRepository(
                 "code" to code, "role" to role,
                 "expiresAt" to shared.formatNowPlus(expiresInHours), "isUsed" to false
             )
-            if (lineaId.isNotEmpty()) data["linea_id"] = lineaId
+            if (lineaId.isNotEmpty()) data["lineId"] = lineaId
             client.createRecord("invitation_codes", data, shared.authToken()).fold(
                 onSuccess = { json ->
                     Result.success(InvitationCode(

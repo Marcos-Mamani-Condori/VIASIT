@@ -13,15 +13,6 @@ import com.oficial.viasit.domain.model.UserRole
 import com.oficial.viasit.viewmodels.AutosViewModel
 import com.oficial.viasit.viewmodels.AuthViewModel
 
-/**
- * Handler del flujo de conductor: carga los vehículos del conductor y
- * decide si mostrar el dashboard o redirigir a registro.
- *
- * Extraído de MainActivity.kt para mejorar la organización.
- *
- * FIX aplicado: race condition corregida — onVehicleNotFound se llama
- * en LaunchedEffect(isLoading, vehicles), no dentro del callback async.
- */
 @Composable
 fun DriverDashboardHandler(
     authViewModel: AuthViewModel,
@@ -131,10 +122,6 @@ fun DriverDashboardHandler(
     }
 }
 
-/**
- * Pantalla envoltorio para registrar un vehículo nuevo.
- * Extraída de MainActivity.kt para mejorar la organización.
- */
 @Composable
 fun DriverVehicleRegistrationScreen(
     authViewModel: AuthViewModel,

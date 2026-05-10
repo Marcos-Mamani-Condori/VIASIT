@@ -24,19 +24,6 @@ import com.oficial.viasit.domain.model.AuthState
 import com.oficial.viasit.ui.theme.*
 import com.oficial.viasit.viewmodels.AuthViewModel
 
-/**
- * Pantalla raíz de autenticación.
- *
- * Es un shell delgado que:
- *  1. Observa el estado de autenticación del [AuthViewModel]
- *  2. Muestra el logo + título de VIASIT
- *  3. Renderiza [LoginForm] o [RegisterForm] con animación de slide
- *
- * Los componentes individuales están en:
- *  → [AuthComponents.kt]  — ViasitTextField, ViasitPrimaryButton, ErrorCard
- *  → [LoginForm.kt]       — formulario de inicio de sesión
- *  → [RegisterForm.kt]    — formulario de registro de cuenta nueva
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AuthScreen(

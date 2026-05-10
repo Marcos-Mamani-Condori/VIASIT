@@ -40,7 +40,7 @@ internal object AdminJsonParsers {
                 id        = extractStringField(block, "id"),
                 code      = extractStringField(block, "code"),
                 role      = extractStringField(block, "role"),
-                lineaId   = extractStringField(block, "linea_id"),
+                lineaId   = extractStringField(block, "lineId"),
                 isUsed    = block.contains("\"isUsed\":true") || block.contains("\"isUsed\": true"),
                 expiresAt = extractStringField(block, "expiresAt")
             )
@@ -51,7 +51,7 @@ internal object AdminJsonParsers {
         return regex.findAll(json).map { match ->
             val block = match.value
             Linea(id = extractStringField(block, "id"), name = extractStringField(block, "name"),
-                code = extractStringField(block, "code"), rutaId = extractStringField(block, "ruta_id"))
+                code = extractStringField(block, "code"), rutaId = extractStringField(block, "routeId"))
         }.toList()
     }
 
@@ -68,8 +68,8 @@ internal object AdminJsonParsers {
         id          = extractStringField(json, "id"),
         name        = extractStringField(json, "name"),
         description = extractStringField(json, "description"),
-        startPoint  = extractStringField(json, "start_point"),
-        endPoint    = extractStringField(json, "end_point"),
+        startPoint  = extractStringField(json, "startPoint"),
+        endPoint    = extractStringField(json, "endPoint"),
         waypoints   = extractStringField(json, "waypoints")
     )
 
@@ -78,10 +78,10 @@ internal object AdminJsonParsers {
             VehicleInvitationCode(
                 id        = extractStringField(block, "id"),
                 code      = extractStringField(block, "code"),
-                lineaId   = extractStringField(block, "linea_id"),
-                creadoPor = extractStringField(block, "creado_por"),
-                usadoPor  = extractStringField(block, "usadoPor"),
-                expiresAt = extractStringField(block, "expires_at")
+                lineaId   = extractStringField(block, "lineId"),
+                creadoPor = extractStringField(block, "createdBy"),
+                usadoPor  = extractStringField(block, "usedBy"),
+                expiresAt = extractStringField(block, "expiresAt")
             )
         }.filter { it.id.isNotEmpty() }
 }

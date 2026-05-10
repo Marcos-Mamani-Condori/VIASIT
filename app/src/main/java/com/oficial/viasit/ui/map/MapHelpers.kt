@@ -23,12 +23,6 @@ import org.maplibre.geojson.LineString
 import org.maplibre.geojson.Point
 import com.google.gson.JsonObject
 
-/**
- * Funciones auxiliares estáticas del mapa MapLibre.
- * Extraídas de MainActivity.kt para mejorar la organización del código.
- */
-
-/** Carga el ícono del auto en el estilo del mapa */
 fun addCarIconToStyle(style: Style, context: android.content.Context) {
     val drawable = ContextCompat.getDrawable(context, R.drawable.ic_car_icon)
     if (drawable != null) {
@@ -44,7 +38,6 @@ fun addCarIconToStyle(style: Style, context: android.content.Context) {
     }
 }
 
-/** Agrega el source GeoJSON y la capa de símbolos de autos al estilo */
 fun addCarsLayer(style: Style) {
     if (style.getSource("cars-source") == null) {
         style.addSource(GeoJsonSource("cars-source"))
@@ -62,7 +55,6 @@ fun addCarsLayer(style: Style) {
     }
 }
 
-/** Actualiza las posiciones de todos los autos en el source GeoJSON */
 fun updateCarsSource(style: Style, autos: List<Auto>) {
     val source = style.getSource("cars-source") as? GeoJsonSource ?: return
     // Filtrar coordenadas inválidas (0,0) que corresponden al océano Atlántico
@@ -78,7 +70,6 @@ fun updateCarsSource(style: Style, autos: List<Auto>) {
     source.setGeoJson(FeatureCollection.fromFeatures(features))
 }
 
-/** Anima la cámara hacia la ubicación actual del usuario */
 fun centerOnUser(map: MapLibreMap, context: android.content.Context) {
     if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
         == PackageManager.PERMISSION_GRANTED) {
@@ -92,7 +83,6 @@ fun centerOnUser(map: MapLibreMap, context: android.content.Context) {
     }
 }
 
-/** Activa el componente de ubicación en modo brújula */
 fun enableLocationComponent(style: Style, map: MapLibreMap, context: android.content.Context) {
     try {
         val locationComponent = map.locationComponent
@@ -112,10 +102,6 @@ fun enableLocationComponent(style: Style, map: MapLibreMap, context: android.con
 
 // ─── Rutas / Polylines ────────────────────────────────────────────────────────
 
-/**
- * Modelo ligero para pasar una ruta al mapa.
- * startPoint y endPoint son "lat,lng"
- */
 data class RoutePolyline(
     val id: String,
     val lineaName: String,
@@ -125,7 +111,6 @@ data class RoutePolyline(
     val color: String = "#3D5AFE"
 )
 
-/** Registra el source GeoJSON y la LineLayer para rutas. Llamar una vez al cargar el estilo. */
 fun addRoutesLayer(style: Style) {
     if (style.getSource("routes-source") == null) {
         style.addSource(GeoJsonSource("routes-source"))
@@ -148,10 +133,6 @@ fun addRoutesLayer(style: Style) {
     }
 }
 
-/**
- * Dibuja las rutas de las líneas en el mapa como polylines.
- * Parsea el formato "lat,lng" de los campos start_point y end_point de la colección 'rutas'.
- */
 fun updateRoutesSource(style: Style, routes: List<RoutePolyline>) {
     val source = style.getSource("routes-source") as? GeoJsonSource ?: return
 
@@ -199,7 +180,6 @@ fun updateRoutesSource(style: Style, routes: List<RoutePolyline>) {
     source.setGeoJson(FeatureCollection.fromFeatures(features))
 }
 
-/** Limpia todas las polylines de rutas del mapa */
 fun clearRoutesSource(style: Style) {
     val source = style.getSource("routes-source") as? GeoJsonSource ?: return
     source.setGeoJson(FeatureCollection.fromFeatures(emptyList()))

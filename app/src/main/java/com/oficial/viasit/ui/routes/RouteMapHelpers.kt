@@ -17,20 +17,6 @@ import org.maplibre.geojson.Feature
 import org.maplibre.geojson.FeatureCollection
 import org.maplibre.geojson.Point
 
-/**
- * Funciones auxiliares del mapa para la pantalla de creación de rutas.
- *
- * Separadas de RouteMapPickerScreen para que la pantalla solo
- * contenga lógica de UI y estado, no funciones de bajo nivel de MapLibre.
- *
- * Flujo de uso:
- *  1. Al cargar el estilo: [addMarkerIconsToStyle] → [addMarkerLayer] (x2)
- *  2. Al hacer clic en el mapa: [updateMarker] con el sourceId correspondiente
- *  3. Al resetear: [clearMarker] en ambos sources
- *  4. Botón de localización: [centerOnUser]
- */
-
-/** Dibuja los iconos de inicio (azul) y fin (verde) en el estilo del mapa */
 fun addMarkerIconsToStyle(mapStyle: Style, context: android.content.Context) {
     // Marcador INICIO — círculo azul con punto blanco en el centro
     run {
@@ -61,7 +47,6 @@ fun addMarkerIconsToStyle(mapStyle: Style, context: android.content.Context) {
     }
 }
 
-/** Registra un source GeoJSON vacío + una capa de símbolo para un marcador */
 fun addMarkerLayer(style: Style, sourceId: String, layerId: String, iconImage: String) {
     if (style.getSource(sourceId) == null) {
         style.addSource(GeoJsonSource(sourceId))
@@ -77,7 +62,6 @@ fun addMarkerLayer(style: Style, sourceId: String, layerId: String, iconImage: S
     }
 }
 
-/** Mueve el marcador a una nueva posición en el mapa */
 fun updateMarker(style: Style, sourceId: String, latLng: LatLng) {
     val source = style.getSource(sourceId) as? GeoJsonSource ?: return
     source.setGeoJson(
@@ -87,13 +71,11 @@ fun updateMarker(style: Style, sourceId: String, latLng: LatLng) {
     )
 }
 
-/** Elimina el marcador del mapa (deja el source vacío) */
 fun clearMarker(style: Style, sourceId: String) {
     val source = style.getSource(sourceId) as? GeoJsonSource ?: return
     source.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
 }
 
-/** Centra la cámara en la ubicación GPS actual del usuario */
 fun centerOnUserRoute(map: MapLibreMap, context: android.content.Context) {
     if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
         == PackageManager.PERMISSION_GRANTED) {
@@ -105,7 +87,6 @@ fun centerOnUserRoute(map: MapLibreMap, context: android.content.Context) {
     }
 }
 
-/** Activa el componente de ubicación en modo libre (sin seguimiento automático) */
 fun enableRouteLocationComponent(style: Style, map: MapLibreMap, context: android.content.Context) {
     try {
         val locationComponent = map.locationComponent

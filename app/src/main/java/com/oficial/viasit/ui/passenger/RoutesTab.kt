@@ -27,11 +27,6 @@ import com.oficial.viasit.domain.model.Ruta
 import com.oficial.viasit.ui.theme.*
 import com.oficial.viasit.viewmodels.PassengerViewModel
 
-/**
- * Pestaña "Rutas" del dashboard de pasajeros.
- * Al pulsar "Ver en mapa" en una línea, llama onViewOnMap(lineaId)
- * para que PassengerDashboardScreen cambie al tab Mapa con esa ruta.
- */
 @Composable
 fun RoutesTab(
     viewModel: PassengerViewModel,

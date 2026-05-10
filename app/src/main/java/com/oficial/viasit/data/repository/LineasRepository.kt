@@ -12,15 +12,15 @@ internal class LineasRepository(
 ) : ILineasRepository {
     suspend fun create(name: String, code: String, rutaId: String = ""): Result<Linea> = try {
         val data = mutableMapOf<String, Any>("name" to name, "code" to code)
-        if (rutaId.isNotEmpty()) data["ruta_id"] = rutaId
-        client.createRecord("lineas", data, shared.authToken()).map { json ->
+        if (rutaId.isNotEmpty()) data["routeId"] = rutaId
+        client.createRecord("lines", data, shared.authToken()).map { json ->
             Linea(id = AdminJsonParsers.extractStringField(json, "id"), name = name, code = code, rutaId = rutaId)
         }
     } catch (e: Exception) { Result.failure(e) }
 
     suspend fun getAll(): Result<List<Linea>> = try {
         Log.d("LineasRepository", "Consultando colección lineas...")
-        client.getList("lineas", perPage = 100, sort = "name", authToken = shared.authToken()).fold(
+        client.getList("lines", perPage = 100, sort = "name", authToken = shared.authToken()).fold(
             onSuccess = { json ->
                 Log.d("LineasRepository", "Respuesta lineas OK")
                 Result.success(parseLineasFromJson(json))
@@ -33,20 +33,20 @@ internal class LineasRepository(
     } catch (e: Exception) { Result.failure(e) }
 
     suspend fun getByRuta(rutaId: String): Result<List<Linea>> = try {
-        client.getList("lineas", filter = "ruta_id='$rutaId'", authToken = shared.authToken())
+        client.getList("lines", filter = "routeId='$rutaId'", authToken = shared.authToken())
             .map { parseLineasFromJson(it) }
     } catch (e: Exception) { Result.failure(e) }
 
     suspend fun update(lineaId: String, name: String, code: String, rutaId: String = ""): Result<Linea> = try {
         val data = mutableMapOf<String, Any>("name" to name, "code" to code)
-        if (rutaId.isNotEmpty()) data["ruta_id"] = rutaId
-        client.updateRecord("lineas", lineaId, data, shared.authToken())
+        if (rutaId.isNotEmpty()) data["routeId"] = rutaId
+        client.updateRecord("lines", lineaId, data, shared.authToken())
             .map { Linea(lineaId, name, code, rutaId) }
     } catch (e: Exception) { Result.failure(e) }
 
     suspend fun delete(lineaId: String): Result<Unit> =
-        client.deleteRecord("lineas", lineaId, shared.authToken()).map { }
+        client.deleteRecord("lines", lineaId, shared.authToken()).map { }
 
     suspend fun updateRuta(lineaId: String, rutaId: String): Result<Unit> =
-        client.updateRecord("lineas", lineaId, mapOf("ruta_id" to rutaId), shared.authToken()).map { }
+        client.updateRecord("lines", lineaId, mapOf("routeId" to rutaId), shared.authToken()).map { }
 }

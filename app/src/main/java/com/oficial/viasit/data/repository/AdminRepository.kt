@@ -8,18 +8,6 @@ import com.oficial.viasit.domain.model.Ruta
 import com.oficial.viasit.domain.model.VehicleInvitationCode
 import kotlinx.serialization.Serializable
 
-/**
- * Punto de entrada único para la capa de datos de administración.
- *
- * Este archivo solo coordina — la lógica real está en sub-repositorios:
- *
- *   AdminJsonParsers.kt           → parseo de JSON de PocketBase
- *   AdminRepositoryShared.kt      → utilidades de fecha, código y auth
- *   InvitationCodesRepository.kt  → códigos de invitación para admins
- *   LineasRepository.kt           → gestión de líneas de transporte
- *   RutasRepository.kt            → rutas y waypoints
- *   LogsAndVehicleCodesRepository.kt → auditoría y códigos de vehículo
- */
 class AdminRepository(
     private val client: PocketBaseRealtimeClient,
     private val authRepository: AuthRepository? = null
@@ -39,7 +27,6 @@ class AdminRepository(
     fun formatNow()               = shared.formatNow()
     fun generateSecureCode()      = shared.generateSecureCode()
 
-    /** Solo para parsers internos (AuthRepository los necesita) */
     fun extractStringField(json: String, field: String) = AdminJsonParsers.extractStringField(json, field)
     fun extractItemBlocks(json: String)                 = AdminJsonParsers.extractItemBlocks(json)
 

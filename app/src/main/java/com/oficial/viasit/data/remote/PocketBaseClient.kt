@@ -18,10 +18,9 @@ class PocketBaseRealtimeClient(private val autoDao: AutoData? = null) {
 
     companion object {
         private const val TAG = "PocketBaseClient"
-        private const val COLLECTION = "autos"
+        private const val COLLECTION = "vehicles"
         private val BASE_URL: String get() = BuildConfig.POCKETBASE_URL
 
-        /** Intervalo de polling de respaldo (garantiza que el script Python siempre se vea) */
         private const val POLL_INTERVAL_MS = 3_000L
     }
 
@@ -70,7 +69,6 @@ class PocketBaseRealtimeClient(private val autoDao: AutoData? = null) {
         }
     }
 
-    /** Polling periódico como respaldo y garantía de actualizaciones */
     private fun startPolling() {
         if (pollingJob?.isActive == true) return
         pollingJob = scope.launch {

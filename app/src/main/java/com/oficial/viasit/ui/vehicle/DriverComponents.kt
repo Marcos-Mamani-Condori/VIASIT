@@ -17,21 +17,6 @@ import androidx.compose.ui.unit.dp
 import com.oficial.viasit.domain.model.Auto
 import com.oficial.viasit.ui.theme.*
 
-/**
- * Componentes reutilizables del panel del conductor.
- *
- * Separados de [DriverDashboardScreen] para mantener el archivo
- * principal corto y cada componente legible por separado.
- *
- *  - [GreetingCard]         → saludo con nombre del usuario y conteo de vehículos
- *  - [VehicleSelectorCard]  → tarjeta que muestra el vehículo seleccionado
- *  - [ServiceToggleCard]    → switch para activar/desactivar el servicio
- *  - [StatusInfoCard]       → tarjeta informativa de estado (icono + título + mensaje)
- *  - [DashboardMenuItem]    → ítem del menú de acciones rápidas
- *  - [VehicleSelectorDialog]→ diálogo para elegir entre varios vehículos
- */
-
-// ── Tarjeta de saludo ─────────────────────────────────────────────────────────
 @Composable
 fun GreetingCard(name: String, vehicleCount: Int) {
     Column(

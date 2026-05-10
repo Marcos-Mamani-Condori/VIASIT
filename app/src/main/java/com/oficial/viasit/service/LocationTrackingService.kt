@@ -31,22 +31,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
-/**
- * Servicio de tracking de ubicación optimizado para enviar coordenadas a PocketBase.
- *
- * FIXES aplicados:
- * - Usa el cliente PocketBase compartido de AutosAplicacion (Fix 4) en lugar de crear
- *   una tercera instancia de OkHttpClient.
- * - calculateBearing() ahora usa FloatArray(2) donde result[1] es el bearing real (Fix 3).
- * - updateLocationRequest() solo re-registra si el intervalo cambió (Fix 9).
- *
- * Características:
- * - Umbral de distancia mínimo de 10 metros antes de enviar actualización
- * - Intervalos adaptativos basados en velocidad:
- *   - En movimiento (>5 km/h): 5 segundos
- *   - Lentamente (1-5 km/h): 10 segundos
- *   - Detenido (<1 km/h): 30 segundos
- */
 class LocationTrackingService : Service() {
 
     companion object {
@@ -225,14 +209,6 @@ class LocationTrackingService : Service() {
         }
     }
 
-    /**
-     * Calcula el bearing (ángulo de movimiento).
-     *
-     * FIX: Location.distanceBetween con array de 2 elementos:
-     *   result[0] = distancia en metros
-     *   result[1] = bearing inicial (el que necesitamos)
-     * Antes se usaba FloatArray(1) que solo da la distancia, nunca el bearing.
-     */
     private fun calculateBearing(location: Location): Double {
         // Primero usar el bearing del GPS si es válido
         if (location.hasBearing() && location.bearing > 0f) {

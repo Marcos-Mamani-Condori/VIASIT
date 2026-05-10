@@ -17,12 +17,6 @@ import com.oficial.viasit.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
 
-/**
- * Tab "Logs / Auditoría" — visible para ambos tipos de admin.
- *
- * Muestra el historial de actividad del sistema:
- * quién lo hizo, qué hizo y cuándo.
- */
 @Composable
 fun AuditoriaTabContent(
     logs: List<LogEntry>,

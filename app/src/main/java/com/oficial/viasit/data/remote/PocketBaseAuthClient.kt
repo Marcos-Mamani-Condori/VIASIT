@@ -14,13 +14,6 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.concurrent.TimeUnit
 
-/**
- * Cliente de autenticación para PocketBase.
- *
- * FIX: buildJsonString() eliminada. Ahora se usan clases serializables con
- * kotlinx.serialization para construir los cuerpos JSON correctamente, escapando
- * cualquier carácter especial en contraseñas/emails.
- */
 class PocketBaseAuthClient {
     companion object {
         private const val TAG = "PocketBaseAuth"
@@ -56,6 +49,7 @@ class PocketBaseAuthClient {
         val name: String,
         val phone: String,
         val role: List<String>,
+        @SerialName("lineId")
         val lineaId: String? = null
     )
 
@@ -198,6 +192,7 @@ data class UserResponse(
     val name: String = "",
     val phone: String = "",
     val role: List<String> = listOf("usuario"),
+    @SerialName("lineId")
     val lineaId: String? = null,
     val created: String = "",
     val updated: String = ""

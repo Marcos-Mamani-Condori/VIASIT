@@ -23,10 +23,6 @@ import com.oficial.viasit.domain.model.User
 import com.oficial.viasit.domain.model.UserRole
 import com.oficial.viasit.ui.theme.*
 
-/**
- * Pestaña "Perfil" del dashboard de pasajeros.
- * Muestra la información del usuario y el botón de cierre de sesión.
- */
 @Composable
 fun ProfileTab(user: User, onLogout: () -> Unit) {
 

@@ -19,15 +19,6 @@ import com.oficial.viasit.domain.model.Ruta
 import com.oficial.viasit.ui.admin.AdminTextField
 import com.oficial.viasit.ui.theme.*
 
-/**
- * Tab "Mi Línea" para ADMIN_LINEA.
- *
- * Flujo de asignación de ruta:
- *  1. Si no hay ruta → botón "Asignar ruta" abre modal con 2 opciones:
- *     a) Crear nueva ruta en mapa (OSRM)
- *     b) Seleccionar una ruta ya existente (RoutePickerDialog)
- *  2. Si ya hay ruta → botón "Modificar ruta" con las mismas opciones
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MiLineaTabContent(

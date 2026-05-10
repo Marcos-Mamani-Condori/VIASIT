@@ -17,15 +17,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.oficial.viasit.ui.theme.*
 
-/**
- * Componentes compartidos por todas las tabs del panel de administración.
- *
- *  - [EmptyState]    → mensaje vacío genérico con ícono
- *  - [AdminTextField] → campo de texto con el estilo oscuro del panel
- *  - [GeneratedCodeBanner] → banner verde que muestra el código recién generado con botón de copiar
- */
-
-/** Estado vacío genérico: ícono + mensaje centrado */
 @Composable
 fun EmptyState(message: String) {
     Box(
@@ -45,7 +36,6 @@ fun EmptyState(message: String) {
     }
 }
 
-/** TextField con el esquema de colores oscuro del panel admin */
 @Composable
 fun AdminTextField(
     value: String,
@@ -73,7 +63,6 @@ fun AdminTextField(
     )
 }
 
-/** Banner que muestra el código generado con botón de copiar al portapapeles */
 @Composable
 fun GeneratedCodeBanner(
     code: String,
@@ -124,7 +113,6 @@ fun GeneratedCodeBanner(
     }
 }
 
-/** Diálogo de confirmación para eliminar con fondo oscuro */
 @Composable
 fun DeleteConfirmDialog(
     title: String,

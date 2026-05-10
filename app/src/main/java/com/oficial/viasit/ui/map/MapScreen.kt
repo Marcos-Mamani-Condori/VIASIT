@@ -40,11 +40,6 @@ import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 
-/**
- * Pantalla principal del mapa.
- * Muestra todos los vehículos activos en tiempo real vía SSE.
- * Extraída de MainActivity.kt para mejorar la organización.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainMapScreen(

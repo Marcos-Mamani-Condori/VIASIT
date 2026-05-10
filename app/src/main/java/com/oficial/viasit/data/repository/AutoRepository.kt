@@ -2,10 +2,15 @@ package com.oficial.viasit.data.repository
 
 import android.util.Log
 import com.oficial.viasit.domain.model.Auto
+import com.oficial.viasit.domain.model.Reporte
 import com.oficial.viasit.data.local.AutoData
 import com.oficial.viasit.data.remote.PocketBaseRealtimeClient
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.decodeFromJsonElement
 
 class AutoRepository(
     private val pocketBaseClient: PocketBaseRealtimeClient,
@@ -57,34 +62,27 @@ class AutoRepository(
 
     suspend fun submitReporte(descripcion: String, userId: String): Result<Unit> =
         pocketBaseClient.createRecord(
-            "reportes",
-            mapOf("descripcion" to descripcion, "users" to userId),
+            "reports",
+            mapOf("description" to descripcion, "users" to userId),
             null
         ).map { }
 
-    data class Reporte(val id: String, val descripcion: String, val respuesta: String)
+    private val jsonParser = Json { ignoreUnknownKeys = true; isLenient = true }
 
     suspend fun getReportes(placa: String): Result<List<Reporte>> = try {
-        pocketBaseClient.getList("reportes", perPage = 100, sort = "-created", authToken = null)
-            .map { json ->
-                val idRgx   = Regex("\"id\"\\s*:\\s*\"([^\"]+)\"")
-                val descRgx = Regex("\"descripcion\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*?)\"")
-                val respRgx = Regex("\"respuesta\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*?)\"")
-                val itemRgx = Regex("\\{[^}]*\"descripcion\"[^}]*\\}")
-                itemRgx.findAll(json).mapNotNull { item ->
-                    val desc = descRgx.find(item.value)?.groupValues?.get(1) ?: return@mapNotNull null
-                    if (!desc.contains("[Bus: $placa]")) return@mapNotNull null
-                    val id   = idRgx.find(item.value)?.groupValues?.get(1) ?: ""
-                    val resp = respRgx.find(item.value)?.groupValues?.get(1) ?: ""
-                    Reporte(id, desc, resp)
-                }.toList()
+        pocketBaseClient.getList("reports", perPage = 100, sort = "-created", authToken = null)
+            .map { jsonStr ->
+                val jsonObject = jsonParser.decodeFromString<JsonObject>(jsonStr)
+                val items = jsonObject["items"]?.jsonArray ?: return@map emptyList()
+                val reportes = items.map { jsonParser.decodeFromJsonElement<Reporte>(it) }
+                reportes.filter { it.descripcion.contains("[Bus: $placa]") }
             }
     } catch (e: Exception) { Result.failure(e) }
 
     suspend fun responderReporte(reporteId: String, respuesta: String, authToken: String?): Result<Unit> =
         pocketBaseClient.updateRecord(
-            "reportes", reporteId,
-            mapOf("respuesta" to respuesta),
+            "reports", reporteId,
+            mapOf("response" to respuesta),
             authToken
         ).map { }
 

@@ -3,33 +3,23 @@ package com.oficial.viasit.domain.model
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-/**
- * Modelo de datos para Rutas
- * Colección PocketBase: rutas
- */
 @Serializable
 data class Ruta(
     @SerialName("id")
     val id: String = "",
 
-    // Nombre de la ruta
     @SerialName("name")
     val name: String = "",
 
-    // Descripción de la ruta
     @SerialName("description")
     val description: String = "",
 
-    // Punto de inicio (formato: "lat,lng" o dirección)
-    @SerialName("start_point")
+    @SerialName("startPoint")
     val startPoint: String = "",
 
-    // Punto de fin (formato: "lat,lng" o dirección)
-    @SerialName("end_point")
+    @SerialName("endPoint")
     val endPoint: String = "",
 
-    // Waypoints intermedios OPCIONALES (formato: "lat,lng;lat,lng;...")
-    // Si está vacío, el mapa dibuja una línea recta inicio → fin
     @SerialName("waypoints")
     val waypoints: String = "",
 
@@ -43,5 +33,5 @@ data class Ruta(
     val collectionId: String = "",
 
     @SerialName("collectionName")
-    val collectionName: String = "rutas"
+    val collectionName: String = "routes"
 )

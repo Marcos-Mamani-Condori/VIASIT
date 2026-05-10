@@ -21,14 +21,6 @@ import com.oficial.viasit.ui.admin.DeleteConfirmDialog
 import com.oficial.viasit.ui.admin.EmptyState
 import com.oficial.viasit.ui.theme.*
 
-/**
- * Tab "Líneas" — solo para ADMIN_PRINCIPAL.
- *
- * Muestra todas las líneas del sistema:
- *  - Botón para crear una nueva línea (abre un diálogo)
- *  - Lista de líneas con su código y ruta asignada
- *  - Botón eliminar (con confirmación) en cada fila
- */
 @Composable
 fun LineasTabContent(
     lineas: List<Linea>,

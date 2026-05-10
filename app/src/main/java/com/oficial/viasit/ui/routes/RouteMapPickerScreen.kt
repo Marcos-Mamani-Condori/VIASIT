@@ -52,17 +52,6 @@ import org.maplibre.geojson.FeatureCollection
 import org.maplibre.geojson.LineString
 import org.maplibre.geojson.Point
 
-/**
- * Pantalla para trazar una ruta en el mapa.
- *
- * Flujo:
- *  1. Toca el mapa → Inicio (azul)
- *  2. Toca → Fin (verde) → OSRM calcula la ruta por calles automáticamente
- *  3. Opcionalmente agrega puntos intermedios con "+ Punto" para forzar el paso por ellos
- *  4. "Guardar" → guarda inicio, fin y la ruta calculada como waypoints en PocketBase
- *
- * Si OSRM falla (sin internet) → usa línea recta como fallback.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RouteMapPickerScreen(
@@ -106,7 +95,6 @@ fun RouteMapPickerScreen(
 
     // ── Funciones de mapa ────────────────────────────────────────────────────
 
-    /** Dibuja la polyline en el mapa */
     fun drawPreviewLine(style: Style, points: List<Pair<Double, Double>>) {
         val src = style.getSource("preview-line-source") as? GeoJsonSource ?: return
         if (points.size >= 2) {
@@ -119,7 +107,6 @@ fun RouteMapPickerScreen(
         }
     }
 
-    /** Llama a OSRM y actualiza la polyline con la ruta por calles */
     fun recalculateRoute() {
         val start = startPoint ?: return
         val end   = endPoint   ?: return

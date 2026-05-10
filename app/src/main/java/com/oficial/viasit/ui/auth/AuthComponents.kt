@@ -17,15 +17,6 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.oficial.viasit.ui.theme.*
 
-/**
- * Componentes compartidos entre [LoginForm] y [RegisterForm].
- *
- *  - [ViasitTextField]     → campo de texto con el tema oscuro de VIASIT
- *  - [ViasitPrimaryButton] → botón principal con estado de carga
- *  - [ErrorCard]           → tarjeta roja para mostrar errores de autenticación
- */
-
-/** Campo de texto unificado con el estilo oscuro de VIASIT */
 @Composable
 fun ViasitTextField(
     value: String,
@@ -68,7 +59,6 @@ fun ViasitTextField(
     )
 }
 
-/** Botón principal con estado de carga animado */
 @Composable
 fun ViasitPrimaryButton(
     text: String,
@@ -97,7 +87,6 @@ fun ViasitPrimaryButton(
     }
 }
 
-/** Tarjeta de error para mensajes de fallo de autenticación */
 @Composable
 fun ErrorCard(message: String) {
     Row(
