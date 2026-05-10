@@ -49,7 +49,7 @@ internal class InvitationCodesRepository(
     override suspend fun delete(codeId: String): Result<Unit> =
         client.deleteRecord("invitation_codes", codeId, shared.authToken()).map { }
 
-    override suspend fun markUsed(codeId: String, userEmail: String): Result<Unit> =
+    override suspend fun markUsed(codeId: String, userId: String): Result<Unit> =
         client.updateRecord("invitation_codes", codeId,
-            mapOf("isUsed" to true, "usedBy" to userEmail), shared.authToken()).map { }
+            mapOf("isUsed" to true, "usedBy" to userId), shared.authToken()).map { }
 }

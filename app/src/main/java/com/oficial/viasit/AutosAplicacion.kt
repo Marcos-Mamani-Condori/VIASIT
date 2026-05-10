@@ -1,7 +1,6 @@
 package com.oficial.viasit
 
 import android.app.Application
-import android.util.Log
 import com.oficial.viasit.data.local.AppDatabase
 import com.oficial.viasit.data.remote.PocketBaseRealtimeClient
 import com.oficial.viasit.data.repository.AdminRepository
@@ -44,13 +43,11 @@ class AutosAplicacion : Application() {
     override fun onCreate() {
         super.onCreate()
         instance = this
-        Log.d("AutosAplicacion", "Inicializado")
     }
 
     override fun onTerminate() {
         super.onTerminate()
         pocketBaseClient.release()
-        Log.d("AutosAplicacion", "Recursos liberados")
     }
 
     companion object {

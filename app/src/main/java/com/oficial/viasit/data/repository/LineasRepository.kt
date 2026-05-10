@@ -1,6 +1,5 @@
 package com.oficial.viasit.data.repository
 
-import android.util.Log
 import com.oficial.viasit.domain.model.Linea
 import com.oficial.viasit.data.remote.PocketBaseRealtimeClient
 import com.oficial.viasit.data.repository.AdminJsonParsers.parseLineasFromJson
@@ -10,7 +9,7 @@ internal class LineasRepository(
     private val client: PocketBaseRealtimeClient,
     private val shared: AdminRepositoryShared
 ) : ILineasRepository {
-    suspend fun create(name: String, code: String, rutaId: String = ""): Result<Linea> = try {
+    override suspend fun create(name: String, code: String, rutaId: String): Result<Linea> = try {
         val data = mutableMapOf<String, Any>("name" to name, "code" to code)
         if (rutaId.isNotEmpty()) data["routeId"] = rutaId
         client.createRecord("lines", data, shared.authToken()).map { json ->
@@ -18,35 +17,26 @@ internal class LineasRepository(
         }
     } catch (e: Exception) { Result.failure(e) }
 
-    suspend fun getAll(): Result<List<Linea>> = try {
-        Log.d("LineasRepository", "Consultando colección lineas...")
-        client.getList("lines", perPage = 100, sort = "name", authToken = shared.authToken()).fold(
-            onSuccess = { json ->
-                Log.d("LineasRepository", "Respuesta lineas OK")
-                Result.success(parseLineasFromJson(json))
-            },
-            onFailure = { e ->
-                Log.e("LineasRepository", "Error getLineas: ${e.message}")
-                Result.failure(e)
-            }
-        )
+    override suspend fun getAll(): Result<List<Linea>> = try {
+        client.getList("lines", perPage = 100, sort = "name", authToken = shared.authToken())
+            .map { parseLineasFromJson(it) }
     } catch (e: Exception) { Result.failure(e) }
 
-    suspend fun getByRuta(rutaId: String): Result<List<Linea>> = try {
+    override suspend fun getByRuta(rutaId: String): Result<List<Linea>> = try {
         client.getList("lines", filter = "routeId='$rutaId'", authToken = shared.authToken())
             .map { parseLineasFromJson(it) }
     } catch (e: Exception) { Result.failure(e) }
 
-    suspend fun update(lineaId: String, name: String, code: String, rutaId: String = ""): Result<Linea> = try {
+    override suspend fun update(lineaId: String, name: String, code: String, rutaId: String): Result<Linea> = try {
         val data = mutableMapOf<String, Any>("name" to name, "code" to code)
         if (rutaId.isNotEmpty()) data["routeId"] = rutaId
         client.updateRecord("lines", lineaId, data, shared.authToken())
             .map { Linea(lineaId, name, code, rutaId) }
     } catch (e: Exception) { Result.failure(e) }
 
-    suspend fun delete(lineaId: String): Result<Unit> =
+    override suspend fun delete(lineaId: String): Result<Unit> =
         client.deleteRecord("lines", lineaId, shared.authToken()).map { }
 
-    suspend fun updateRuta(lineaId: String, rutaId: String): Result<Unit> =
+    override suspend fun updateRuta(lineaId: String, rutaId: String): Result<Unit> =
         client.updateRecord("lines", lineaId, mapOf("routeId" to rutaId), shared.authToken()).map { }
 }

@@ -1,6 +1,5 @@
 package com.oficial.viasit.data.remote
 
-import android.util.Log
 import com.oficial.viasit.BuildConfig
 import com.oficial.viasit.domain.model.User
 import kotlinx.coroutines.Dispatchers
@@ -16,7 +15,6 @@ import java.util.concurrent.TimeUnit
 
 class PocketBaseAuthClient {
     companion object {
-        private const val TAG = "PocketBaseAuth"
         private val BASE_URL: String = BuildConfig.POCKETBASE_URL
     }
 
@@ -67,19 +65,13 @@ class PocketBaseAuthClient {
                 val response = okHttpclient.newCall(request).execute()
                 if (response.isSuccessful) {
                     val responseBody = response.body?.string() ?: ""
-                    Log.d(TAG, "Login response: $responseBody")
                     val authResponse = json.decodeFromString<AuthResponse>(responseBody)
                     authToken = authResponse.token
-                    val user = authResponse.user.toDomain()
-                    Log.d(TAG, "Login exitoso: ${user.email}, role: ${user.role}, lineaId: ${user.lineaId}")
-                    Result.success(user)
+                    Result.success(authResponse.user.toDomain())
                 } else {
-                    val error = response.body?.string() ?: "Error desconocido"
-                    Log.e(TAG, "Error login: ${response.code} - $error")
                     Result.failure(Exception("Error login: ${response.code}"))
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Error login", e)
                 Result.failure(e)
             }
         }
@@ -117,8 +109,6 @@ class PocketBaseAuthClient {
                     lineaId = lineaId.ifEmpty { null }
                 )
                 val body = json.encodeToString(reqObj).toRequestBody("application/json".toMediaType())
-                
-                Log.d(TAG, "Registrando usuario: email=$email, name=$name, role=$role, lineaId=$lineaId")
 
                 val request = Request.Builder()
                     .url("$BASE_URL/api/collections/users/records")
@@ -128,16 +118,12 @@ class PocketBaseAuthClient {
                 val response = okHttpclient.newCall(request).execute()
                 if (response.isSuccessful) {
                     val userResponse = json.decodeFromString<UserResponse>(response.body?.string() ?: "")
-                    val user = userResponse.toDomain()
-                    Log.d(TAG, "Register exitoso: ${user.email}, lineaId: ${user.lineaId}")
-                    Result.success(user)
+                    Result.success(userResponse.toDomain())
                 } else {
                     val error = response.body?.string() ?: "Error desconocido"
-                    Log.e(TAG, "Error register: ${response.code} - $error")
                     Result.failure(Exception(error))
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Error register", e)
                 Result.failure(e)
             }
         }
@@ -160,7 +146,6 @@ class PocketBaseAuthClient {
                     Result.failure(Exception("Error al obtener usuario: ${response.code}"))
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Error getCurrentUser", e)
                 Result.failure(e)
             }
         }
@@ -168,7 +153,6 @@ class PocketBaseAuthClient {
 
     fun logout() {
         authToken = null
-        Log.d(TAG, "Logout exitoso")
     }
 
     fun isAuthenticated(): Boolean = authToken != null

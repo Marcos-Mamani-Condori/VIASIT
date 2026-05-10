@@ -68,7 +68,6 @@ fun RegisterAdminScreen(
             result.fold(
                 onSuccess = { code ->
                     if (code != null) {
-                        android.util.Log.d("RegisterAdmin", "Código validado: role=${code.role}, lineaId=${code.lineaId}")
                         codeValidated = true
                         validatedCodeRole = code.role
                         validatedCodeLineaId = code.lineaId
@@ -77,10 +76,7 @@ fun RegisterAdminScreen(
                         codeValidated = false
                     }
                 },
-                onFailure = { error ->
-                    android.util.Log.e("RegisterAdmin", "Error validando código: ${error.message}")
-                    codeValidated = false
-                }
+                onFailure = { codeValidated = false }
             )
         } else {
             codeValidated = false
@@ -123,8 +119,6 @@ fun RegisterAdminScreen(
             isLoading = true
             errorMessage = null
 
-            android.util.Log.d("RegisterAdmin", "Iniciando registro con role=$validatedCodeRole, lineaId=$validatedCodeLineaId")
-
             val request = AdminRegisterRequest(
                 email = email,
                 password = password,
@@ -151,23 +145,14 @@ fun RegisterAdminScreen(
                     val codeValidation = adminRepository.validateInvitationCode(invitationCode)
                     codeValidation.fold(
                         onSuccess = { code ->
-                            if (code != null) adminRepository.useInvitationCode(code.id, email)
+                            if (code != null) adminRepository.useInvitationCode(code.id, user.id)
                         },
                         onFailure = { }
                     )
-                    
-                    val loginResult = authRepository.login(email, password)
-                    loginResult.fold(
-                        onSuccess = { loggedInUser ->
-                            android.util.Log.d("RegisterAdmin", "Login automático exitoso: ${loggedInUser.email}, lineaId: ${loggedInUser.lineaId}")
-                            successMessage = "Registro exitoso"
-                            onRegisterSuccess()
-                        },
-                        onFailure = { loginError ->
-                            android.util.Log.e("RegisterAdmin", "Error en login automático: ${loginError.message}")
-                            // Aún así navegamos, el usuario puede hacer login manualmente
-                            onRegisterSuccess()
-                        }
+
+                    authRepository.login(email, password).fold(
+                        onSuccess = { successMessage = "Registro exitoso"; onRegisterSuccess() },
+                        onFailure = { onRegisterSuccess() }
                     )
                 },
                 onFailure = { error ->

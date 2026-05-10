@@ -40,7 +40,7 @@ class AdminRepository(
     suspend fun getInvitationCodes(): Result<List<InvitationCode>>                     = invitaciones.getAll()
     suspend fun validateInvitationCode(code: String): Result<InvitationCode>           = invitaciones.validate(code)
     suspend fun deleteInvitationCode(codeId: String): Result<Unit>                     = invitaciones.delete(codeId)
-    suspend fun useInvitationCode(codeId: String, userEmail: String): Result<Unit>     = invitaciones.markUsed(codeId, userEmail)
+    suspend fun useInvitationCode(codeId: String, userId: String): Result<Unit>     = invitaciones.markUsed(codeId, userId)
 
     suspend fun createLinea(name: String, code: String, rutaId: String = ""): Result<Linea>                          = lineas.create(name, code, rutaId)
     suspend fun getLineas(): Result<List<Linea>>                                                                      = lineas.getAll()
