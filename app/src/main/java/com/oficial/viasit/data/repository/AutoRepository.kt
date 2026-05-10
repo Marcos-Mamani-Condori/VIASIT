@@ -12,37 +12,39 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.decodeFromJsonElement
 
+import com.oficial.viasit.domain.repository.IAutoRepository
+
 class AutoRepository(
     private val pocketBaseClient: PocketBaseRealtimeClient,
     private val dao: AutoData
-) {
+) : IAutoRepository {
     companion object {
         private const val TAG = "AutoRepository"
     }
 
-    val autos: StateFlow<List<Auto>> = pocketBaseClient.autos
+    override val autos: StateFlow<List<Auto>> = pocketBaseClient.autos
 
-    fun startRealtimeSubscription() {
+    override fun startRealtimeSubscription() {
         pocketBaseClient.startRealtimeSubscription()
         Log.d(TAG, "Realtime iniciado")
     }
 
-    fun stopRealtimeSubscription() {
+    override fun stopRealtimeSubscription() {
         pocketBaseClient.stopRealtimeSubscription()
     }
 
-    suspend fun refreshAutos() {
+    override suspend fun refreshAutos() {
         pocketBaseClient.fetchAutos()
     }
 
-    suspend fun syncWithLocalCache() {
+    override suspend fun syncWithLocalCache() {
         val cachedAutos = dao.getAllAutos().first()
         if (cachedAutos.isNotEmpty()) {
             Log.d(TAG, "Cargando ${cachedAutos.size} autos desde caché local")
         }
     }
 
-    suspend fun registerAuto(userId: String, placa: String, lineaCode: String): Result<Auto> {
+    override suspend fun registerAuto(userId: String, placa: String, lineaCode: String): Result<Auto> {
         return pocketBaseClient.registerAuto(
             userId = userId,
             placa = placa,
@@ -52,39 +54,12 @@ class AutoRepository(
         )
     }
 
-    suspend fun getAutoByUserId(userId: String): Result<Auto?> {
+    override suspend fun getAutoByUserId(userId: String): Result<Auto?> {
         return pocketBaseClient.getAutoByUserId(userId)
     }
 
-    suspend fun updateAutoLocation(autoId: String, lat: Double, lng: Double, angulo: Double): Result<Auto> {
+    override suspend fun updateAutoLocation(autoId: String, lat: Double, lng: Double, angulo: Double): Result<Auto> {
         return pocketBaseClient.updateAutoLocation(autoId, lat, lng, angulo)
     }
 
-    suspend fun submitReporte(descripcion: String, userId: String): Result<Unit> =
-        pocketBaseClient.createRecord(
-            "reports",
-            mapOf("description" to descripcion, "users" to userId),
-            null
-        ).map { }
-
-    private val jsonParser = Json { ignoreUnknownKeys = true; isLenient = true }
-
-    suspend fun getReportes(placa: String): Result<List<Reporte>> = try {
-        pocketBaseClient.getList("reports", perPage = 100, sort = "-created", authToken = null)
-            .map { jsonStr ->
-                val jsonObject = jsonParser.decodeFromString<JsonObject>(jsonStr)
-                val items = jsonObject["items"]?.jsonArray ?: return@map emptyList()
-                val reportes = items.map { jsonParser.decodeFromJsonElement<Reporte>(it) }
-                reportes.filter { it.descripcion.contains("[Bus: $placa]") }
-            }
-    } catch (e: Exception) { Result.failure(e) }
-
-    suspend fun responderReporte(reporteId: String, respuesta: String, authToken: String?): Result<Unit> =
-        pocketBaseClient.updateRecord(
-            "reports", reporteId,
-            mapOf("response" to respuesta),
-            authToken
-        ).map { }
-
 }
-

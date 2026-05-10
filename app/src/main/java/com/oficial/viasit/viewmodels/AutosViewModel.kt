@@ -7,14 +7,19 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.oficial.viasit.AutosAplicacion
 import com.oficial.viasit.data.repository.AutoRepository
+import com.oficial.viasit.data.repository.ReportesRepository
 import com.oficial.viasit.domain.model.Auto
+import com.oficial.viasit.domain.model.Reporte
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-class AutosViewModel(private val repository: AutoRepository) : ViewModel() {
+class AutosViewModel(
+    private val repository: AutoRepository,
+    private val reportesRepository: ReportesRepository
+) : ViewModel() {
 
     val autosUiState: StateFlow<List<Auto>> = repository.autos
 
@@ -90,16 +95,16 @@ class AutosViewModel(private val repository: AutoRepository) : ViewModel() {
 
     fun submitReporte(descripcion: String, userId: String, onResult: (Boolean) -> Unit) {
         viewModelScope.launch {
-            repository.submitReporte(descripcion, userId).fold(
+            reportesRepository.submitReporte(descripcion, userId).fold(
                 onSuccess = { onResult(true) },
                 onFailure = { onResult(false) }
             )
         }
     }
 
-    fun fetchReportes(placa: String, callback: (List<AutoRepository.Reporte>) -> Unit) {
+    fun fetchReportes(placa: String, callback: (List<Reporte>) -> Unit) {
         viewModelScope.launch {
-            repository.getReportes(placa).fold(
+            reportesRepository.getReportes(placa).fold(
                 onSuccess = { callback(it) },
                 onFailure = { callback(emptyList()) }
             )
@@ -108,7 +113,7 @@ class AutosViewModel(private val repository: AutoRepository) : ViewModel() {
 
     fun responderReporte(reporteId: String, respuesta: String, authToken: String?, onResult: (Boolean) -> Unit) {
         viewModelScope.launch {
-            repository.responderReporte(reporteId, respuesta, authToken).fold(
+            reportesRepository.responderReporte(reporteId, respuesta, authToken).fold(
                 onSuccess = { onResult(true) },
                 onFailure = { onResult(false) }
             )
@@ -124,7 +129,7 @@ class AutosViewModel(private val repository: AutoRepository) : ViewModel() {
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as AutosAplicacion
-                AutosViewModel(app.repository)
+                AutosViewModel(app.repository, app.reportesRepository)
             }
         }
     }

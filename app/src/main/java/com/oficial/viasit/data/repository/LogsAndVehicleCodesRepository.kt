@@ -5,23 +5,25 @@ import com.oficial.viasit.domain.model.VehicleInvitationCode
 import com.oficial.viasit.data.remote.PocketBaseRealtimeClient
 import com.oficial.viasit.data.repository.AdminJsonParsers.parseLogsFromJson
 import com.oficial.viasit.data.repository.AdminJsonParsers.parseVehicleCodesFromJson
+import com.oficial.viasit.domain.repository.ILogsRepository
+import com.oficial.viasit.domain.repository.IVehicleCodesRepository
 
 internal class LogsRepository(
     private val client: PocketBaseRealtimeClient,
     private val shared: AdminRepositoryShared
-) {
-    suspend fun create(userEmail: String, description: String): Result<Unit> = try {
+) : ILogsRepository {
+    override suspend fun create(userEmail: String, description: String): Result<Unit> = try {
         client.createRecord("logs",
             mapOf("userid" to userEmail, "description" to description),
             shared.authToken()).map { }
     } catch (e: Exception) { Result.failure(e) }
 
-    suspend fun getAll(limit: Int = 50): Result<List<LogEntry>> = try {
+    override suspend fun getAll(limit: Int): Result<List<LogEntry>> = try {
         client.getList("logs", perPage = limit, sort = "-created", authToken = shared.authToken())
             .map { parseLogsFromJson(it) }
     } catch (e: Exception) { Result.failure(e) }
 
-    suspend fun getByUser(userId: String): Result<List<LogEntry>> = try {
+    override suspend fun getByUser(userId: String): Result<List<LogEntry>> = try {
         client.getList("logs", filter = "userid='$userId'", sort = "-created", authToken = shared.authToken())
             .map { parseLogsFromJson(it) }
     } catch (e: Exception) { Result.failure(e) }
@@ -30,8 +32,8 @@ internal class LogsRepository(
 internal class VehicleCodesRepository(
     private val client: PocketBaseRealtimeClient,
     private val shared: AdminRepositoryShared
-) {
-    suspend fun generate(lineaId: String, creadoPor: String, expiresInHours: Int = 72): Result<VehicleInvitationCode> = try {
+) : IVehicleCodesRepository {
+    override suspend fun generate(lineaId: String, creadoPor: String, expiresInHours: Int): Result<VehicleInvitationCode> = try {
         val code = shared.generateSecureCode()
         val data = mapOf("code" to code, "lineId" to lineaId, "createdBy" to creadoPor,
             "expiresAt" to shared.formatNowPlus(expiresInHours), "usedBy" to "")
@@ -42,12 +44,12 @@ internal class VehicleCodesRepository(
         }
     } catch (e: Exception) { Result.failure(e) }
 
-    suspend fun getByLinea(lineaId: String): Result<List<VehicleInvitationCode>> = try {
+    override suspend fun getByLinea(lineaId: String): Result<List<VehicleInvitationCode>> = try {
         client.getList("vehicle_invitation_codes", filter = "lineId='$lineaId'",
             sort = "-created", authToken = shared.authToken()).map { parseVehicleCodesFromJson(it) }
     } catch (e: Exception) { Result.failure(e) }
 
-    suspend fun validate(code: String): Result<VehicleInvitationCode> = try {
+    override suspend fun validate(code: String): Result<VehicleInvitationCode> = try {
         client.getList("vehicle_invitation_codes", filter = "code='$code'&&usedBy=''",
             authToken = shared.authToken()).fold(
             onSuccess = { json ->
@@ -59,9 +61,9 @@ internal class VehicleCodesRepository(
         )
     } catch (e: Exception) { Result.failure(e) }
 
-    suspend fun markUsed(codeId: String, usadoPor: String): Result<Unit> =
+    override suspend fun markUsed(codeId: String, usadoPor: String): Result<Unit> =
         client.updateRecord("vehicle_invitation_codes", codeId, mapOf("usedBy" to usadoPor, "isUsed" to true), shared.authToken()).map { }
 
-    suspend fun delete(codeId: String): Result<Unit> =
+    override suspend fun delete(codeId: String): Result<Unit> =
         client.deleteRecord("vehicle_invitation_codes", codeId, shared.authToken()).map { }
 }

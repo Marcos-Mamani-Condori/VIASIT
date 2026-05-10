@@ -7,6 +7,7 @@ import com.oficial.viasit.data.remote.PocketBaseRealtimeClient
 import com.oficial.viasit.data.repository.AdminRepository
 import com.oficial.viasit.data.repository.AutoRepository
 import com.oficial.viasit.data.repository.AuthRepository
+import com.oficial.viasit.data.repository.ReportesRepository
 import com.oficial.viasit.domain.usecases.LoginUseCase
 import com.oficial.viasit.domain.usecases.RegisterUseCase
 
@@ -31,6 +32,10 @@ class AutosAplicacion : Application() {
 
     val loginUseCase by lazy { LoginUseCase(authRepository) }
     val registerUseCase by lazy { RegisterUseCase(authRepository) }
+
+    val reportesRepository: ReportesRepository by lazy {
+        ReportesRepository(pocketBaseClient)
+    }
 
     val adminRepository: AdminRepository by lazy {
         AdminRepository(pocketBaseClient, authRepository)
