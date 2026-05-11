@@ -24,7 +24,8 @@ object AuthValidators {
             form.password.length < 8 -> form.copy(emailError = null, passwordError = "Minimo 8 caracteres", confirmPasswordError = null, nameError = null, error = null)
             form.confirmPassword != form.password -> form.copy(emailError = null, passwordError = null, confirmPasswordError = "No coinciden", nameError = null, error = null)
             form.name.isBlank() -> form.copy(emailError = null, passwordError = null, confirmPasswordError = null, nameError = "Nombre requerido", error = null)
-            form.role == "conductor" && form.invitationCode.isBlank() -> form.copy(emailError = null, passwordError = null, confirmPasswordError = null, nameError = null, error = "Los conductores necesitan un código de invitación")
+            form.role == "conductor" && form.invitationCode.isBlank() -> form.copy(emailError = null, passwordError = null, confirmPasswordError = null, nameError = null, error = "Ingresa tu código de invitación para continuar")
+            form.role == "conductor" && form.invitationCode.length < 8 -> form.copy(emailError = null, passwordError = null, confirmPasswordError = null, nameError = null, error = "Código de invitación inválido")
             else -> form.copy(emailError = null, passwordError = null, confirmPasswordError = null, nameError = null, error = null)
         }
     }

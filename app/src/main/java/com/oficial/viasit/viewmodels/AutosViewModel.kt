@@ -30,11 +30,41 @@ class AutosViewModel(
 
     val autosUiState: StateFlow<List<Auto>> = getAutosUseCase()
 
+    // Historial ligero en memoria (Breadcrumbs) - Máximo 15 puntos por bus
+    private val _tails = MutableStateFlow<Map<String, List<Pair<Double, Double>>>>(emptyMap())
+    val tails: StateFlow<Map<String, List<Pair<Double, Double>>>> = _tails.asStateFlow()
+
     private val _vehicleForm = MutableStateFlow(VehicleFormState())
     val vehicleFormState: StateFlow<VehicleFormState> = _vehicleForm.asStateFlow()
 
     init {
         startRealtimeSubscription()
+        observeAutosForTails()
+    }
+
+    private fun observeAutosForTails() {
+        viewModelScope.launch {
+            autosUiState.collect { autos ->
+                val currentTails = _tails.value.toMutableMap()
+                var changed = false
+                autos.forEach { auto ->
+                    if (auto.lat != 0.0 && auto.lng != 0.0) {
+                        val list = currentTails[auto.id]?.toMutableList() ?: mutableListOf()
+                        val lastPos = list.lastOrNull()
+                        // Solo agregamos si la posición cambió significativamente
+                        if (lastPos == null || lastPos.first != auto.lat || lastPos.second != auto.lng) {
+                            list.add(auto.lat to auto.lng)
+                            if (list.size > 15) list.removeAt(0) // Límite de 15 puntos para no pesar
+                            currentTails[auto.id] = list
+                            changed = true
+                        }
+                    }
+                }
+                if (changed) {
+                    _tails.value = currentTails
+                }
+            }
+        }
     }
 
     fun refresh() {

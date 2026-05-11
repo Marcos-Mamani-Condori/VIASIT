@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -24,6 +25,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.oficial.viasit.domain.model.Auto
+import com.oficial.viasit.domain.model.Linea
 import com.oficial.viasit.viewmodels.AutosViewModel
 import com.oficial.viasit.ui.map.RoutePolyline
 import com.oficial.viasit.ui.map.addCarsLayer
@@ -52,6 +55,7 @@ fun PassengerMapScreen(passengerViewModel: PassengerViewModel) {
     val lifecycleOwner = LocalLifecycleOwner.current
     val autosViewModel: AutosViewModel = viewModel(factory = AutosViewModel.Factory)
     val autos          by autosViewModel.autosUiState.collectAsState()
+    val tails          by autosViewModel.tails.collectAsState()
     val rutas          by passengerViewModel.rutas.collectAsState()
     val lineas         by passengerViewModel.lineas.collectAsState()
     val scope          = rememberCoroutineScope()
@@ -59,6 +63,14 @@ fun PassengerMapScreen(passengerViewModel: PassengerViewModel) {
 
     var mapInstance  by remember { mutableStateOf<MapLibreMap?>(null) }
     var mapStyle      by remember { mutableStateOf<Style?>(null) }  // se asigna cuando el estilo termina de cargar
+
+    var showVehicleSheet by remember { mutableStateOf(false) }
+    var showTails by remember { mutableStateOf(true) } // Interruptor para el rastro ligero
+    var selectedVehicleIdForSheet by remember { mutableStateOf<String?>(null) }
+    val sheetState = rememberModalBottomSheetState()
+    val selectedVehicleForSheet = remember(selectedVehicleIdForSheet, autos) {
+        autos.find { it.id == selectedVehicleIdForSheet }
+    }
 
     val geocodingService   = remember { GeocodingService() }
     var searchQuery        by remember { mutableStateOf("") }
@@ -96,7 +108,29 @@ fun PassengerMapScreen(passengerViewModel: PassengerViewModel) {
                     addCarsLayer(style)
                     addRoutesLayer(style)
                     enableLocationComponent(style, map, context)
-                    mapStyle = style  // ✅ estilo listo — ahora sí se puede dibujar
+                    mapStyle = style
+                }
+
+                map.addOnMapClickListener { point ->
+                    val pixel = map.projection.toScreenLocation(point)
+                    
+                    // 1. Detectar clics en clusters para expandirlos
+                    val clusters = map.queryRenderedFeatures(pixel, "clusters-layer")
+                    if (clusters.isNotEmpty()) {
+                        val currentZoom = map.cameraPosition.zoom
+                        map.animateCamera(CameraUpdateFactory.zoomTo(currentZoom + 2.0))
+                        return@addOnMapClickListener true
+                    }
+
+                    // 2. Detectar clics en vehículos individuales
+                    val features = map.queryRenderedFeatures(pixel, "cars-layer")
+                    if (features.isNotEmpty()) {
+                        val feature = features[0]
+                        val autoId = feature.getStringProperty("id") ?: ""
+                        selectedVehicleIdForSheet = autoId
+                        showVehicleSheet = true
+                        true
+                    } else false
                 }
             }
         }
@@ -118,9 +152,24 @@ fun PassengerMapScreen(passengerViewModel: PassengerViewModel) {
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    LaunchedEffect(autos, mapStyle) {
+    LaunchedEffect(autos, mapStyle, selectedLineaId) {
         val activeAutos = autos.filter { it.isActive() }
-        mapStyle?.let { style -> updateCarsSource(style, activeAutos) }
+        val filteredAutos = if (selectedLineaId != null) {
+            activeAutos.filter { it.lineaId == selectedLineaId }
+        } else {
+            activeAutos
+        }
+        mapStyle?.let { style -> updateCarsSource(style, filteredAutos) }
+    }
+
+    LaunchedEffect(tails, mapStyle, showTails) {
+        mapStyle?.let { style ->
+            if (showTails) {
+                com.oficial.viasit.ui.map.updateTailsSource(style, tails)
+            } else {
+                com.oficial.viasit.ui.map.updateTailsSource(style, emptyMap())
+            }
+        }
     }
 
     LaunchedEffect(routePolylines, mapStyle) {
@@ -363,6 +412,18 @@ fun PassengerMapScreen(passengerViewModel: PassengerViewModel) {
         }
 
         FloatingActionButton(
+            onClick = { showTails = !showTails },
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 16.dp, bottom = 128.dp)
+                .size(40.dp),
+            containerColor = if (showTails) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+            contentColor = if (showTails) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary
+        ) {
+            Icon(Icons.Default.Timeline, "Ver rastro", modifier = Modifier.size(20.dp))
+        }
+
+        FloatingActionButton(
             onClick = { mapInstance?.let { centerOnUser(it, context) } },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
@@ -382,6 +443,126 @@ fun PassengerMapScreen(passengerViewModel: PassengerViewModel) {
                     .padding(start = 12.dp, bottom = 16.dp)
             )
         }
+
+        if (showVehicleSheet && selectedVehicleForSheet != null) {
+            val auto = selectedVehicleForSheet!!
+            val linea = lineas.find { it.id == auto.lineaId }
+            ModalBottomSheet(
+                onDismissRequest = {
+                    showVehicleSheet = false
+                    selectedVehicleIdForSheet = null
+                },
+                sheetState = sheetState,
+                containerColor = MaterialTheme.colorScheme.surface,
+                tonalElevation = 8.dp,
+                dragHandle = { BottomSheetDefaults.DragHandle() }
+            ) {
+                VehicleInfoContent(auto = auto, lineaName = linea?.name ?: "Desconocida")
+            }
+        }
+    }
+}
+
+@Composable
+fun VehicleInfoContent(auto: Auto, lineaName: String) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp)
+            .padding(bottom = 24.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                color = MaterialTheme.colorScheme.primaryContainer,
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.size(56.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.Default.DirectionsBus,
+                        contentDescription = null,
+                        modifier = Modifier.size(32.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = auto.placa,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "Conductor: ${auto.driverName}",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    text = "Línea: $lineaName",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            InfoItem(
+                label = "Última actualización",
+                value = auto.getLastUpdateText(),
+                icon = Icons.Default.Update
+            )
+            InfoItem(
+                label = "Código Interno",
+                value = auto.code.ifBlank { "N/A" },
+                icon = Icons.Default.Fingerprint,
+                alignment = Alignment.End
+            )
+        }
+    }
+}
+
+@Composable
+fun InfoItem(
+    label: String,
+    value: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    alignment: Alignment.Horizontal = Alignment.Start
+) {
+    Column(horizontalAlignment = alignment) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (alignment == Alignment.Start) {
+                Icon(icon, null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
+                Spacer(modifier = Modifier.width(4.dp))
+            }
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+            if (alignment == Alignment.End) {
+                Spacer(modifier = Modifier.width(4.dp))
+                Icon(icon, null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
+            }
+        }
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
     }
 }
 

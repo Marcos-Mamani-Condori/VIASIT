@@ -93,8 +93,13 @@ fun DriverDashboardHandler(
             selectedVehicleId = selectedVehicleId,
             isInService       = isInService,
             onToggleInService = { enabled ->
-                if (enabled && selectedVehicleId != null) {
-                    authViewModel.setInService(true, selectedVehicleId!!)
+                if (enabled) {
+                    if (selectedVehicleId != null) {
+                        authViewModel.setInService(true, selectedVehicleId!!)
+                    } else {
+                        // Aquí podrías mostrar un Toast o un mensaje de error
+                        android.util.Log.w("DriverDashboardHandler", "Intento de activar servicio sin vehículo")
+                    }
                 } else {
                     authViewModel.setInService(false)
                 }

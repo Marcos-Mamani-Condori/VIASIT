@@ -14,20 +14,18 @@ class RegisterUseCase(
             return Result.failure(Exception("Las contraseñas no coinciden"))
         }
         if (request.role == "conductor" && request.invitationCode.isNotBlank()) {
-            val validationResult = adminRepository.validateVehicleInvitationCode(request.invitationCode)
+            val validationResult = adminRepository.validateInvitationCode(request.invitationCode)
             if (validationResult.isFailure) {
                 return Result.failure(Exception("Código de invitación inválido o expirado"))
             }
             val code = validationResult.getOrNull()
                 ?: return Result.failure(Exception("Código de invitación inválido o expirado"))
-            if (code.expiresAt.isNotEmpty()) {
-                val expired = try {
-                    val exp = java.time.OffsetDateTime.parse(code.expiresAt).toInstant()
-                    exp.isBefore(java.time.Instant.now())
-                } catch (e: Exception) {
-                    true
-                }
-                if (expired) return Result.failure(Exception("El código de invitación ha expirado"))
+            
+            if (code.role != "conductor") {
+                return Result.failure(Exception("Este código no es válido para conductores"))
+            }
+            if (code.isExpired()) {
+                return Result.failure(Exception("El código de invitación ha expirado"))
             }
         }
         return authRepository.register(request)

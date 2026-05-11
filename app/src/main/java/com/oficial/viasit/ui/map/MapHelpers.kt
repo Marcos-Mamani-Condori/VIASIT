@@ -40,8 +40,18 @@ fun addCarIconToStyle(style: Style, context: android.content.Context) {
 
 fun addCarsLayer(style: Style) {
     if (style.getSource("cars-source") == null) {
-        style.addSource(GeoJsonSource("cars-source"))
+        // Habilitamos clustering para evitar solapamientos
+        style.addSource(
+            GeoJsonSource("cars-source", 
+                org.maplibre.android.style.sources.GeoJsonOptions()
+                    .withCluster(true)
+                    .withClusterMaxZoom(14)
+                    .withClusterRadius(50)
+            )
+        )
     }
+    
+    // Capa para vehículos individuales
     if (style.getLayer("cars-layer") == null) {
         val symbolLayer = SymbolLayer("cars-layer", "cars-source").withProperties(
             PropertyFactory.iconImage("car-icon"),
@@ -50,8 +60,35 @@ fun addCarsLayer(style: Style) {
             PropertyFactory.iconIgnorePlacement(true),
             PropertyFactory.iconAnchor("center"),
             PropertyFactory.iconRotate(Expression.get("angulo"))
-        )
+        ).withFilter(Expression.has("id")) // Solo si tiene ID (no es cluster)
         style.addLayer(symbolLayer)
+    }
+
+    // Capa para los círculos de los clusters
+    if (style.getLayer("clusters-layer") == null) {
+        val clusters = org.maplibre.android.style.layers.CircleLayer("clusters-layer", "cars-source")
+        clusters.setProperties(
+            PropertyFactory.circleColor(android.graphics.Color.parseColor("#3D5AFE")),
+            PropertyFactory.circleRadius(18f),
+            PropertyFactory.circleStrokeColor(android.graphics.Color.WHITE),
+            PropertyFactory.circleStrokeWidth(2f)
+        )
+        clusters.setFilter(Expression.has("point_count"))
+        style.addLayer(clusters)
+    }
+
+    // Capa para el texto con la cuenta en los clusters
+    if (style.getLayer("cluster-count-layer") == null) {
+        val count = SymbolLayer("cluster-count-layer", "cars-source")
+        count.setProperties(
+            PropertyFactory.textField(Expression.toString(Expression.get("point_count"))),
+            PropertyFactory.textSize(12f),
+            PropertyFactory.textColor(android.graphics.Color.WHITE),
+            PropertyFactory.textIgnorePlacement(true),
+            PropertyFactory.textAllowOverlap(true)
+        )
+        count.setFilter(Expression.has("point_count"))
+        style.addLayer(count)
     }
 }
 
@@ -61,8 +98,11 @@ fun updateCarsSource(style: Style, autos: List<Auto>) {
         .filter { it.lat != 0.0 || it.lng != 0.0 }
         .map { auto ->
             val properties = JsonObject().apply {
+                addProperty("id", auto.id)
                 addProperty("placa", auto.placa)
+                addProperty("lineaId", auto.lineaId)
                 addProperty("angulo", auto.angulo)
+                addProperty("userId", auto.userId)
             }
             Feature.fromGeometry(Point.fromLngLat(auto.lng, auto.lat), properties)
         }
@@ -127,6 +167,31 @@ fun addRoutesLayer(style: Style) {
             style.addLayer(lineLayer)
         }
     }
+
+    // Capa extra para el rastro (tails) de los buses - Más fina y transparente
+    if (style.getSource("tails-source") == null) {
+        style.addSource(GeoJsonSource("tails-source"))
+    }
+    if (style.getLayer("tails-layer") == null) {
+        val tailsLayer = LineLayer("tails-layer", "tails-source").withProperties(
+            PropertyFactory.lineColor("#3D5AFE"),
+            PropertyFactory.lineWidth(2.5f),
+            PropertyFactory.lineOpacity(0.4f), // Muy sutil
+            PropertyFactory.lineDasharray(arrayOf(2f, 1f)), // Punteada
+            PropertyFactory.lineCap(org.maplibre.android.style.layers.Property.LINE_CAP_ROUND)
+        )
+        style.addLayerBelow(tailsLayer, "routes-layer")
+    }
+}
+
+fun updateTailsSource(style: Style, tails: Map<String, List<Pair<Double, Double>>>) {
+    val source = style.getSource("tails-source") as? GeoJsonSource ?: return
+    val features = tails.mapNotNull { (_, points) ->
+        if (points.size < 2) return@mapNotNull null
+        val latLngs = points.map { Point.fromLngLat(it.second, it.first) }
+        Feature.fromGeometry(LineString.fromLngLats(latLngs))
+    }
+    source.setGeoJson(FeatureCollection.fromFeatures(features))
 }
 
 fun updateRoutesSource(style: Style, routes: List<RoutePolyline>) {
@@ -139,6 +204,27 @@ fun updateRoutesSource(style: Style, routes: List<RoutePolyline>) {
 
     val features = routes.mapIndexedNotNull { index, route ->
         try {
+            // Caso 1: Historial de migajas (muchos puntos en un string separado por pipe '|')
+            if (route.waypoints.contains("|")) {
+                val points = route.waypoints.split("|").mapNotNull { p ->
+                    val parts = p.split(",")
+                    if (parts.size >= 2) {
+                        val lat = parts[0].toDoubleOrNull() ?: return@mapNotNull null
+                        val lng = parts[1].toDoubleOrNull() ?: return@mapNotNull null
+                        Point.fromLngLat(lng, lat)
+                    } else null
+                }
+                if (points.size < 2) return@mapIndexedNotNull null
+                val lineString = LineString.fromLngLats(points)
+                val props = com.google.gson.JsonObject().apply {
+                    addProperty("color", route.color)
+                    addProperty("linea", route.lineaName)
+                    addProperty("isHistory", true)
+                }
+                return@mapIndexedNotNull Feature.fromGeometry(lineString, props)
+            }
+
+            // Caso 2: Ruta normal (Inicio, Fin y Waypoints separados por ';')
             val startParts = route.startPoint.split(",").map { it.trim().toDouble() }
             val endParts   = route.endPoint.split(",").map { it.trim().toDouble() }
             if (startParts.size < 2 || endParts.size < 2) return@mapIndexedNotNull null

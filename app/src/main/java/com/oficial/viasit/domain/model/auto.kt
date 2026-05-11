@@ -60,6 +60,9 @@ data class Auto(
     @SerialName("plate")
     val placa: String = "",
 
+    @SerialName("lineaId")
+    val lineaId: String = "",
+
     @SerialName("lat")
     val lat: Double = 0.0,
 
@@ -79,15 +82,31 @@ data class Auto(
     val collectionId: String = "",
 
     @SerialName("collectionName")
-    val collectionName: String = "vehicles"
+    val collectionName: String = "vehicles",
+
+    @SerialName("expand")
+    val expand: JsonObject? = null
 ) {
-    fun isActive(maxAgeMinutes: Int = 2): Boolean {
+    val driverName: String
+        get() = try {
+            val userObj = expand?.get("userid") as? JsonObject
+            userObj?.get("name")?.let { 
+                if (it is JsonPrimitive) it.content else "Conductor desconocido"
+            } ?: "Conductor"
+        } catch (e: Exception) {
+            "Conductor"
+        }
+
+    fun isActive(maxAgeMinutes: Int = 10): Boolean {
         return try {
-            if (updated.isEmpty()) return false
+            if (updated.isEmpty() || (lat == 0.0 && lng == 0.0)) return false
             val normalized = updated.replace(" ", "T")
             val updateTime = java.time.OffsetDateTime.parse(normalized)
             val now = java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC)
             val minutesSinceUpdate = java.time.Duration.between(updateTime, now).toMinutes()
+            
+            // Un vehículo es "activo" si se ha actualizado en los últimos 10 min
+            // y no está en coordenadas 0,0 (que indica error de GPS)
             minutesSinceUpdate < maxAgeMinutes
         } catch (e: Exception) {
             false

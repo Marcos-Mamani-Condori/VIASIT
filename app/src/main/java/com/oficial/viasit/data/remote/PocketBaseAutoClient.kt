@@ -12,16 +12,10 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import java.util.concurrent.TimeUnit
 
 class PocketBaseAutoClient(
@@ -60,7 +54,7 @@ class PocketBaseAutoClient(
     suspend fun fetchAutos() {
         try {
             val request = Request.Builder()
-                .url("$BASE_URL/api/collections/$COLLECTION/records?perPage=200")
+                .url("$BASE_URL/api/collections/$COLLECTION/records?perPage=200&expand=userid")
                 .get().build()
             val responseBody = withContext(Dispatchers.IO) {
                 okHttpClient.newCall(request).execute().use { resp ->
@@ -110,19 +104,15 @@ class PocketBaseAutoClient(
     suspend fun registerAuto(userId: String, placa: String, lineaCode: String, lat: Double, lng: Double): Result<Auto> {
         return withContext(Dispatchers.IO) {
             try {
-                Log.d(TAG, "registerAuto: userId=$userId, placa=$placa, lineaCode=$lineaCode")
-
-                val lineaId = if (lineaCode.length == 15 && lineaCode.all { it.isLetterOrDigit() }) {
-                    lineaCode
-                } else {
-                    validateInvitationCode(lineaCode)
-                        ?: return@withContext Result.failure(Exception("Codigo de invitacion invalido o expirado"))
-                }
+                Log.d(TAG, "registerAuto: userId=$userId, placa=$placa, lineaId=$lineaCode")
+                
+                // Usamos el lineaId directamente (asignado previamente al usuario)
+                val lineaId = lineaCode
 
                 val existingAuto = getAutoByUserId(userId).getOrNull()
                 if (existingAuto != null) {
-                    Log.d(TAG, "Auto existente encontrado (id=${existingAuto.id}), actualizando en lugar de crear")
-                    val body = "{\"lat\":$lat,\"lng\":$lng,\"angle\":0}"
+                    Log.d(TAG, "Re-vinculando auto existente: id=${existingAuto.id}")
+                    val body = """{"plate":"$placa","lat":$lat,"lng":$lng,"angle":0,"lineaId":"$lineaId"}"""
                         .toRequestBody("application/json".toMediaType())
                     val resp = okHttpClient.newCall(
                         Request.Builder().url("$BASE_URL/api/collections/$COLLECTION/records/${existingAuto.id}").patch(body).build()
@@ -132,11 +122,11 @@ class PocketBaseAutoClient(
                         updateUserLinea(userId, lineaId)
                         Result.success(updated)
                     } else {
-                        Result.failure(Exception("Error al reactivar auto: ${resp.code}"))
+                        Result.failure(Exception("Error al actualizar vehículo: ${resp.code}"))
                     }
                 }
 
-                val body = "{\"userid\":\"$userId\",\"plate\":\"$placa\",\"lat\":$lat,\"lng\":$lng,\"angle\":0}"
+                val body = "{\"userid\":\"$userId\",\"plate\":\"$placa\",\"lat\":$lat,\"lng\":$lng,\"angle\":0,\"lineaId\":\"$lineaId\"}"
                     .toRequestBody("application/json".toMediaType())
                 Log.d(TAG, "Creando nuevo auto...")
                 val resp = okHttpClient.newCall(
@@ -169,49 +159,18 @@ class PocketBaseAutoClient(
         }
     }
 
-    private suspend fun validateInvitationCode(code: String): String? {
-        return withContext(Dispatchers.IO) {
-            try {
-                val filter = java.net.URLEncoder.encode("code=\"$code\" && isUsed=false", "UTF-8")
-                val resp = okHttpClient.newCall(
-                    Request.Builder()
-                        .url("$BASE_URL/api/collections/vehicle_invitation_codes/records?perPage=1&filter=$filter")
-                        .get().build()
-                ).execute()
-                if (!resp.isSuccessful) return@withContext null
-                val obj = json.decodeFromString<JsonObject>(resp.body?.string() ?: "{}")
-                val items = obj["items"]?.jsonArray ?: return@withContext null
-                if (items.isEmpty()) return@withContext null
-                val inv = items[0].jsonObject
-                val expiresAt = inv["expiresAt"]?.jsonPrimitive?.content
-                if (expiresAt != null) {
-                    try {
-                        val fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.systemDefault())
-                        val exp = java.time.LocalDateTime.parse(expiresAt, fmt).atZone(ZoneId.systemDefault()).toInstant()
-                        if (exp.isBefore(Instant.now())) return@withContext null
-                    } catch (_: Exception) {}
-                }
-                inv["lineId"]?.jsonPrimitive?.content
-            } catch (e: Exception) { Log.e(TAG, "validateInvitationCode", e); null }
-        }
-    }
-
     suspend fun getAutoByUserId(userId: String): Result<Auto?> {
         return withContext(Dispatchers.IO) {
             try {
                 val filter = "userid.id=\"$userId\""
                 val encodedFilter = java.net.URLEncoder.encode(filter, "UTF-8")
-                val url = "$BASE_URL/api/collections/$COLLECTION/records?perPage=1&filter=$encodedFilter"
-                Log.d(TAG, "Buscando auto con URL: $url")
+                val url = "$BASE_URL/api/collections/$COLLECTION/records?perPage=1&filter=$encodedFilter&expand=userid"
                 val resp = okHttpClient.newCall(Request.Builder().url(url).get().build()).execute()
                 if (resp.isSuccessful) {
                     val responseBody = resp.body?.string() ?: ""
-                    Log.d(TAG, "Respuesta búsqueda auto: $responseBody")
                     val list = json.decodeFromString<ListResponse>(responseBody)
-                    Log.d(TAG, "Autos encontrados: ${list.items.size}")
                     Result.success(list.items.firstOrNull())
                 } else {
-                    Log.e(TAG, "Error al buscar auto: ${resp.code}")
                     Result.failure(Exception("Error al buscar auto: ${resp.code}"))
                 }
             } catch (e: Exception) { Log.e(TAG, "getAutoByUserId", e); Result.failure(e) }

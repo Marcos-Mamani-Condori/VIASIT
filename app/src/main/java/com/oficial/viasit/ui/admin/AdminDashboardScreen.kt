@@ -20,12 +20,13 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.oficial.viasit.domain.model.User
 import com.oficial.viasit.ui.admin.linea.MiLineaTabContent
-import com.oficial.viasit.ui.admin.linea.VehicleCodesTabContent
 import com.oficial.viasit.ui.admin.principal.InvitacionesTabContent
 import com.oficial.viasit.ui.admin.principal.LineasTabContent
 import com.oficial.viasit.ui.admin.principal.RutasTabContent
+import com.oficial.viasit.ui.passenger.PassengerMapScreen
 import com.oficial.viasit.ui.theme.*
 import com.oficial.viasit.viewmodels.AdminViewModel
+import com.oficial.viasit.viewmodels.PassengerViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -33,16 +34,25 @@ fun AdminDashboardScreen(
     currentUser: User,
     onLogout: () -> Unit,
     onNavigateToRoutePicker: ((String, String) -> Unit)? = null,
-    viewModel: AdminViewModel = viewModel(factory = AdminViewModel.Factory)
+    viewModel: AdminViewModel = viewModel(factory = AdminViewModel.Factory),
+    passengerViewModel: PassengerViewModel = viewModel(factory = PassengerViewModel.Factory)
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
 
     val tabs: List<Pair<String, ImageVector>> = if (currentUser.isAdminPrincipal) {
-        listOf("Líneas" to Icons.Default.DirectionsBus, "Rutas" to Icons.Default.Route,
-            "Invitaciones" to Icons.Default.Key, "Logs" to Icons.Default.History)
+        listOf(
+            "Mapa" to Icons.Default.Map,
+            "Líneas" to Icons.Default.DirectionsBus,
+            "Rutas" to Icons.Default.Route,
+            "Invitaciones" to Icons.Default.Key,
+            "Logs" to Icons.Default.History
+        )
     } else {
-        listOf("Mi Línea" to Icons.Default.Route, "Códigos Vehículo" to Icons.Default.DirectionsCar,
-            "Logs" to Icons.Default.History)
+        listOf(
+            "Mapa" to Icons.Default.Map,
+            "Mi Línea" to Icons.Default.Route,
+            "Logs" to Icons.Default.History
+        )
     }
 
     LaunchedEffect(Unit) {
@@ -53,8 +63,6 @@ fun AdminDashboardScreen(
         } else {
             viewModel.loadLineas()
             viewModel.loadRutas()
-            if (currentUser.lineaId.isNotEmpty())
-                viewModel.loadVehicleInvitationCodes(currentUser.lineaId)
         }
         viewModel.loadLogs()
     }
@@ -94,12 +102,13 @@ fun AdminDashboardScreen(
 
             if (currentUser.isAdminPrincipal) {
                 when (selectedTab) {
-                    0 -> LineasTabContent(
+                    0 -> PassengerMapScreen(passengerViewModel = passengerViewModel)
+                    1 -> LineasTabContent(
                         lineas        = uiState.lineas, isLoading = uiState.isLoading,
                         onCreateLinea = { n, c, r -> viewModel.createLinea(n, c, r, currentUser.id) },
                         onDeleteLinea = { viewModel.deleteLinea(it, currentUser.id) }
                     )
-                    1 -> RutasTabContent(
+                    2 -> RutasTabContent(
                         rutas     = uiState.rutas,
                         lineas    = uiState.lineas,
                         isLoading = uiState.isLoading,
@@ -107,7 +116,7 @@ fun AdminDashboardScreen(
                             viewModel.deleteRuta(rutaId, rutaName, lineaId, currentUser.id)
                         }
                     )
-                    2 -> InvitacionesTabContent(
+                    3 -> InvitacionesTabContent(
                         invitationCodes = uiState.invitationCodes, lineas = uiState.lineas,
                         isLoading       = uiState.isLoading, generatedCode = uiState.generatedCode,
                         onGenerateCode  = { role, lineaId ->
@@ -115,11 +124,17 @@ fun AdminDashboardScreen(
                         },
                         onDeleteCode = { viewModel.deleteInvitationCode(it, currentUser.id) }
                     )
-                    3 -> AuditoriaTabContent(logs = uiState.logs, isLoading = uiState.isLoading)
+                    4 -> AuditoriaTabContent(logs = uiState.logs, isLoading = uiState.isLoading)
                 }
             } else {
                 when (selectedTab) {
-                    0 -> MiLineaTabContent(
+                    0 -> {
+                        LaunchedEffect(Unit) {
+                            passengerViewModel.selectLinea(currentUser.lineaId)
+                        }
+                        PassengerMapScreen(passengerViewModel = passengerViewModel)
+                    }
+                    1 -> MiLineaTabContent(
                         lineaId   = currentUser.lineaId,
                         lineas    = uiState.lineas,
                         rutas     = uiState.rutas,
@@ -132,14 +147,6 @@ fun AdminDashboardScreen(
                             viewModel.assignRutaToLinea(currentUser.lineaId, rutaId, rutaName, currentUser.id)
                         },
                         onNavigateToRoutePicker = onNavigateToRoutePicker
-                    )
-                    1 -> VehicleCodesTabContent(
-                        lineaId       = currentUser.lineaId, vehicleCodes = uiState.vehicleCodes,
-                        isLoading     = uiState.isLoading, generatedCode = uiState.generatedVehicleCode,
-                        onGenerateCode = {
-                            viewModel.generateVehicleInvitationCode(currentUser.lineaId, currentUser.email, 72, currentUser.id)
-                        },
-                        onDeleteCode = { viewModel.deleteVehicleInvitationCode(it, currentUser.lineaId, currentUser.id) }
                     )
                     2 -> AuditoriaTabContent(logs = uiState.logs, isLoading = uiState.isLoading)
                 }

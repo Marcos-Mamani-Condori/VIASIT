@@ -40,6 +40,7 @@ class PocketBaseRealtimeClient(private val autoDao: AutoData? = null) {
     private var eventSource: EventSource? = null
     private var clientId: String? = null
     private var pollingJob: Job? = null
+    private var retryCount = 0
 
     private val autoClient = PocketBaseAutoClient(okHttpclient, autoDao, _autos)
     private val http = PocketBaseHttpClient.create()
@@ -86,6 +87,7 @@ class PocketBaseRealtimeClient(private val autoDao: AutoData? = null) {
         val listener = object : EventSourceListener() {
             override fun onOpen(eventSource: EventSource, response: Response) {
                 Log.d(TAG, "SSE conectado a $BASE_URL")
+                retryCount = 0 // Reiniciamos contador al conectar con éxito
             }
 
             override fun onEvent(eventSource: EventSource, id: String?, type: String?, data: String) {
@@ -98,11 +100,19 @@ class PocketBaseRealtimeClient(private val autoDao: AutoData? = null) {
             }
 
             override fun onFailure(eventSource: EventSource, t: Throwable?, response: Response?) {
-                Log.w(TAG, "SSE no disponible (${t?.message}) — polling activo como respaldo")
+                Log.w(TAG, "SSE no disponible (${t?.message}) — reintentando...")
                 this@PocketBaseRealtimeClient.eventSource = null
+                
+                // Estrategia de reconexión exponencial: 2s, 4s, 8s, 16s... hasta 60s
+                val delayMillis = (Math.pow(2.0, retryCount.toDouble()) * 1000).toLong().coerceAtMost(60_000L)
+                retryCount++
+                
                 scope.launch {
-                    delay(10_000)
-                    if (pollingJob?.isActive == true) connectSSE()
+                    delay(delayMillis)
+                    if (pollingJob?.isActive == true) { // Solo si el cliente sigue "vivo"
+                        Log.d(TAG, "Reintentando SSE (intento $retryCount) tras ${delayMillis/1000}s")
+                        connectSSE()
+                    }
                 }
             }
         }
