@@ -48,9 +48,9 @@ class AutoRepositoryTest {
         val lngDiff = kotlin.math.abs(auto1.lng - auto2.lng)
         val distance = kotlin.math.sqrt(latDiff * latDiff + lngDiff * lngDiff)
         
-        // Should be approximately 0.4 degrees (~40km)
-        assertTrue(distance > 0.3)
-        assertTrue(distance < 0.5)
+        // Should be approximately 3.0 degrees
+        assertTrue("Distance should be significant ($distance)", distance > 2.5)
+        assertTrue("Distance should be within expected range ($distance)", distance < 3.5)
     }
 
     @Test

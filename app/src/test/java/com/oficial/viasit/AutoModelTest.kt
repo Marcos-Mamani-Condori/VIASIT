@@ -15,11 +15,10 @@ class AutoModelTest {
 
         assertEquals("", auto.id)
         assertEquals("", auto.placa)
-        assertEquals("", auto.linea)
+        assertEquals("", auto.code)
         assertEquals(0.0, auto.lat, 0.0001)
         assertEquals(0.0, auto.lng, 0.0001)
         assertEquals(0.0, auto.angulo, 0.0001)
-        assertEquals("", auto.colectivoid)
     }
 
     @Test
@@ -27,20 +26,18 @@ class AutoModelTest {
         val auto = Auto(
             id = "rec123",
             placa = "ABC-123",
-            linea = "Mercedes-Benz",
+            code = "L01",
             lat = -17.7833,
             lng = -63.1821,
             angulo = 45.0,
-            colectivoid = "col001"
         )
 
         assertEquals("rec123", auto.id)
         assertEquals("ABC-123", auto.placa)
-        assertEquals("Mercedes-Benz", auto.linea)
+        assertEquals("L01", auto.code)
         assertEquals(-17.7833, auto.lat, 0.0001)
         assertEquals(-63.1821, auto.lng, 0.0001)
         assertEquals(45.0, auto.angulo, 0.0001)
-        assertEquals("col001", auto.colectivoid)
     }
 
     @Test

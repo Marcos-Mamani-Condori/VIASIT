@@ -10,6 +10,9 @@ class RegisterUseCase(
     private val adminRepository: IAdminRepository
 ) {
     suspend operator fun invoke(request: RegisterRequest): Result<User> {
+        if (request.password != request.passwordConfirm) {
+            return Result.failure(Exception("Las contraseñas no coinciden"))
+        }
         if (request.role == "conductor" && request.invitationCode.isNotBlank()) {
             val validationResult = adminRepository.validateVehicleInvitationCode(request.invitationCode)
             if (validationResult.isFailure) {
