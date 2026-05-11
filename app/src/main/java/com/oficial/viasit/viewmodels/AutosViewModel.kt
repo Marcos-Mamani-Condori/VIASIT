@@ -6,10 +6,9 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.oficial.viasit.AutosAplicacion
-import com.oficial.viasit.data.repository.AutoRepository
-import com.oficial.viasit.data.repository.ReportesRepository
 import com.oficial.viasit.domain.model.Auto
 import com.oficial.viasit.domain.model.Reporte
+import com.oficial.viasit.domain.usecases.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -17,27 +16,33 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class AutosViewModel(
-    private val repository: AutoRepository,
-    private val reportesRepository: ReportesRepository
+    private val getAutosUseCase: GetAutosUseCase,
+    private val registerVehicleUseCase: RegisterVehicleUseCase,
+    private val getAutoByUserIdUseCase: GetAutoByUserIdUseCase,
+    private val startRealtimeAutosUseCase: StartRealtimeAutosUseCase,
+    private val stopRealtimeAutosUseCase: StopRealtimeAutosUseCase,
+    private val refreshAutosUseCase: RefreshAutosUseCase,
+    private val syncAutosUseCase: SyncAutosUseCase,
+    private val submitReporteUseCase: SubmitReporteUseCase,
+    private val getReportesUseCase: GetReportesUseCase,
+    private val responderReporteUseCase: ResponderReporteUseCase
 ) : ViewModel() {
 
-    val autosUiState: StateFlow<List<Auto>> = repository.autos
+    val autosUiState: StateFlow<List<Auto>> = getAutosUseCase()
 
     private val _vehicleForm = MutableStateFlow(VehicleFormState())
     val vehicleFormState: StateFlow<VehicleFormState> = _vehicleForm.asStateFlow()
 
     init {
-        viewModelScope.launch {
-            repository.startRealtimeSubscription()
-        }
+        startRealtimeSubscription()
     }
 
     fun refresh() {
-        viewModelScope.launch { repository.refreshAutos() }
+        viewModelScope.launch { refreshAutosUseCase() }
     }
 
     fun syncWithCache() {
-        viewModelScope.launch { repository.syncWithLocalCache() }
+        viewModelScope.launch { syncAutosUseCase() }
     }
 
     fun updatePlaca(placa: String) {
@@ -63,10 +68,10 @@ class AutosViewModel(
         }
         _vehicleForm.update { it.copy(isLoading = true, error = null) }
         viewModelScope.launch {
-            repository.registerAuto(userId, placa, linea).fold(
+            registerVehicleUseCase(userId, placa, linea).fold(
                 onSuccess = {
                     _vehicleForm.update { it.copy(isLoading = false, isSuccess = true) }
-                    repository.refreshAutos()
+                    refreshAutosUseCase()
                     onSuccess()
                 },
                 onFailure = { e ->
@@ -78,7 +83,7 @@ class AutosViewModel(
 
     fun getDriverAuto(userId: String, callback: (Auto?) -> Unit) {
         viewModelScope.launch {
-            repository.getAutoByUserId(userId).fold(
+            getAutoByUserIdUseCase(userId).fold(
                 onSuccess = { auto -> callback(auto) },
                 onFailure = { callback(null) }
             )
@@ -86,16 +91,16 @@ class AutosViewModel(
     }
 
     fun startRealtimeSubscription() {
-        viewModelScope.launch { repository.startRealtimeSubscription() }
+        viewModelScope.launch { startRealtimeAutosUseCase() }
     }
 
     fun stopRealtimeSubscription() {
-        repository.stopRealtimeSubscription()
+        stopRealtimeAutosUseCase()
     }
 
     fun submitReporte(descripcion: String, userId: String, onResult: (Boolean) -> Unit) {
         viewModelScope.launch {
-            reportesRepository.submitReporte(descripcion, userId).fold(
+            submitReporteUseCase(descripcion, userId).fold(
                 onSuccess = { onResult(true) },
                 onFailure = { onResult(false) }
             )
@@ -104,16 +109,16 @@ class AutosViewModel(
 
     fun fetchReportes(placa: String, callback: (List<Reporte>) -> Unit) {
         viewModelScope.launch {
-            reportesRepository.getReportes(placa).fold(
+            getReportesUseCase(placa).fold(
                 onSuccess = { callback(it) },
                 onFailure = { callback(emptyList()) }
             )
         }
     }
 
-    fun responderReporte(reporteId: String, respuesta: String, authToken: String?, onResult: (Boolean) -> Unit) {
+    fun responderReporte(reporteId: String, respuesta: String, onResult: (Boolean) -> Unit) {
         viewModelScope.launch {
-            reportesRepository.responderReporte(reporteId, respuesta, authToken).fold(
+            responderReporteUseCase(reporteId, respuesta).fold(
                 onSuccess = { onResult(true) },
                 onFailure = { onResult(false) }
             )
@@ -122,14 +127,25 @@ class AutosViewModel(
 
     override fun onCleared() {
         super.onCleared()
-        repository.stopRealtimeSubscription()
+        stopRealtimeAutosUseCase()
     }
 
     companion object {
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as AutosAplicacion
-                AutosViewModel(app.repository, app.reportesRepository)
+                AutosViewModel(
+                    app.getAutosUseCase,
+                    app.registerVehicleUseCase,
+                    app.getAutoByUserIdUseCase,
+                    app.startRealtimeAutosUseCase,
+                    app.stopRealtimeAutosUseCase,
+                    app.refreshAutosUseCase,
+                    app.syncAutosUseCase,
+                    app.submitReporteUseCase,
+                    app.getReportesUseCase,
+                    app.responderReporteUseCase
+                )
             }
         }
     }

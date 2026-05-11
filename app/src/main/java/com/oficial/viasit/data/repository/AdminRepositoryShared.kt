@@ -6,7 +6,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 internal class AdminRepositoryShared(
-    private val authRepository: AuthRepository? = null,
+    private val authRepository: com.oficial.viasit.domain.repository.IAuthRepository? = null,
     private val getToken: () -> String?
 ) {
     fun authToken(): String? = getToken()

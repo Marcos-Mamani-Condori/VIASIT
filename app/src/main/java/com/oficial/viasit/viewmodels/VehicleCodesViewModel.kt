@@ -1,14 +1,15 @@
 package com.oficial.viasit.viewmodels
 
-import com.oficial.viasit.domain.repository.IAdminRepository
-import com.oficial.viasit.domain.model.VehicleInvitationCode
+import com.oficial.viasit.domain.usecases.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 
 internal class VehicleCodesHandler(
     private val scope: CoroutineScope,
-    private val repository: IAdminRepository
+    private val getVehicleInvitationCodesUseCase: GetVehicleInvitationCodesUseCase,
+    private val generateVehicleInvitationCodeUseCase: GenerateVehicleInvitationCodeUseCase,
+    private val deleteVehicleInvitationCodeUseCase: DeleteVehicleInvitationCodeUseCase
 ) {
     fun generateVehicleInvitationCode(
         lineaId: String, creadoPor: String, expiresInHours: Int = 72,
@@ -16,7 +17,7 @@ internal class VehicleCodesHandler(
     ) {
         scope.launch {
             state.value = state.value.copy(isLoading = true, error = null, generatedVehicleCode = null)
-            repository.generateVehicleInvitationCode(lineaId, creadoPor, expiresInHours).fold(
+            generateVehicleInvitationCodeUseCase(lineaId, creadoPor, expiresInHours).fold(
                 onSuccess = { code ->
                     state.value = state.value.copy(isLoading = false, generatedVehicleCode = code.code, successMessage = "Código generado: ${code.code}")
                     if (currentUserId.isNotEmpty()) onLog(currentUserId, "Generó código de vehículo: ${code.code} (línea: $lineaId)")
@@ -30,7 +31,7 @@ internal class VehicleCodesHandler(
     fun loadVehicleInvitationCodes(lineaId: String, state: MutableStateFlow<AdminUiState>) {
         scope.launch {
             state.value = state.value.copy(isLoading = true, error = null)
-            repository.getVehicleInvitationCodesByLinea(lineaId).fold(
+            getVehicleInvitationCodesUseCase(lineaId).fold(
                 onSuccess = { codes -> state.value = state.value.copy(isLoading = false, vehicleCodes = codes) },
                 onFailure = { state.value = state.value.copy(isLoading = false, error = it.message ?: "Error al cargar códigos") }
             )
@@ -43,7 +44,7 @@ internal class VehicleCodesHandler(
     ) {
         scope.launch {
             state.value = state.value.copy(isLoading = true, error = null)
-            repository.deleteVehicleInvitationCode(codeId).fold(
+            deleteVehicleInvitationCodeUseCase(codeId).fold(
                 onSuccess = {
                     state.value = state.value.copy(isLoading = false, successMessage = "Código eliminado")
                     if (currentUserId.isNotEmpty()) onLog(currentUserId, "Eliminó código de vehículo: $codeId")

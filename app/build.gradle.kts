@@ -36,7 +36,7 @@ android {
             dimension = "environment"
             applicationIdSuffix = ".dev"
             versionNameSuffix = "-dev"
-            buildConfigField("String", "POCKETBASE_URL", "\"http://192.168.1.17:8090\"")
+            buildConfigField("String", "POCKETBASE_URL", "\"http://192.168.1.19:8090\"")
         }
         create("prod") {
             dimension = "environment"

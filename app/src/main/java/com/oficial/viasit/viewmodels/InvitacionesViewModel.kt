@@ -1,13 +1,15 @@
 package com.oficial.viasit.viewmodels
 
-import com.oficial.viasit.domain.repository.IAdminRepository
+import com.oficial.viasit.domain.usecases.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 
 internal class InvitacionesHandler(
     private val scope: CoroutineScope,
-    private val repository: IAdminRepository
+    private val getInvitationCodesUseCase: GetInvitationCodesUseCase,
+    private val generateInvitationCodeUseCase: GenerateInvitationCodeUseCase,
+    private val deleteInvitationCodeUseCase: DeleteInvitationCodeUseCase
 ) {
     fun generateInvitationCode(
         role: String = "ADMIN_LINEA", lineaId: String = "", expiresInHours: Int = 24,
@@ -15,7 +17,7 @@ internal class InvitacionesHandler(
     ) {
         scope.launch {
             state.value = state.value.copy(isLoading = true, error = null, generatedCode = null)
-            repository.generateInvitationCode(role, lineaId, expiresInHours).fold(
+            generateInvitationCodeUseCase(role, lineaId, expiresInHours).fold(
                 onSuccess = { code ->
                     state.value = state.value.copy(isLoading = false, generatedCode = code.code, successMessage = "Código generado: ${code.code}")
                     if (currentUserId.isNotEmpty()) onLog(currentUserId, "Generó código: ${code.code} (rol: $role)")
@@ -29,7 +31,7 @@ internal class InvitacionesHandler(
     fun loadInvitationCodes(state: MutableStateFlow<AdminUiState>) {
         scope.launch {
             state.value = state.value.copy(isLoading = true, error = null)
-            repository.getInvitationCodes().fold(
+            getInvitationCodesUseCase().fold(
                 onSuccess = { codes -> state.value = state.value.copy(isLoading = false, invitationCodes = codes) },
                 onFailure = { state.value = state.value.copy(isLoading = false, error = it.message ?: "Error al cargar códigos") }
             )
@@ -42,7 +44,7 @@ internal class InvitacionesHandler(
     ) {
         scope.launch {
             state.value = state.value.copy(isLoading = true, error = null)
-            repository.deleteInvitationCode(codeId).fold(
+            deleteInvitationCodeUseCase(codeId).fold(
                 onSuccess = {
                     state.value = state.value.copy(isLoading = false, successMessage = "Código eliminado")
                     if (currentUserId.isNotEmpty()) onLog(currentUserId, "Eliminó código: $codeId")

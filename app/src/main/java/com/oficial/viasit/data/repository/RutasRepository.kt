@@ -10,10 +10,10 @@ internal class RutasRepository(
     private val client: PocketBaseRealtimeClient,
     private val shared: AdminRepositoryShared
 ) : IRutasRepository {
-    suspend fun create(
+    override suspend fun create(
         name: String, description: String,
-        startPoint: String = "", endPoint: String = "",
-        lineaId: String = "", waypoints: String = ""
+        startPoint: String, endPoint: String,
+        lineaId: String, waypoints: String
     ): Result<Ruta> = try {
         val data = mutableMapOf<String, Any>("name" to name, "description" to description)
         if (startPoint.isNotEmpty()) data["startPoint"] = startPoint
@@ -25,15 +25,15 @@ internal class RutasRepository(
         }
     } catch (e: Exception) { Result.failure(e) }
 
-    suspend fun getById(rutaId: String): Result<Ruta> = try {
+    override suspend fun getById(rutaId: String): Result<Ruta> = try {
         client.getRecord("routes", rutaId, shared.authToken()).map { parseRutaFromJson(it) }
     } catch (e: Exception) { Result.failure(e) }
 
-    suspend fun getAll(): Result<List<Ruta>> = try {
+    override suspend fun getAll(): Result<List<Ruta>> = try {
         client.getList("routes", perPage = 100, sort = "name", authToken = shared.authToken())
             .map { json -> extractItemBlocks(json).map { parseRutaFromJson(it) }.filter { it.id.isNotEmpty() } }
     } catch (e: Exception) { Result.failure(e) }
 
-    suspend fun delete(rutaId: String): Result<Unit> =
+    override suspend fun delete(rutaId: String): Result<Unit> =
         client.deleteRecord("routes", rutaId, shared.authToken()).map { }
 }

@@ -3,10 +3,9 @@ package com.oficial.viasit.viewmodels
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.oficial.viasit.data.repository.AuthRepository
-import com.oficial.viasit.domain.usecases.LoginUseCase
-import com.oficial.viasit.domain.usecases.RegisterUseCase
-import com.oficial.viasit.domain.usecases.AuthValidators
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
+import com.oficial.viasit.domain.usecases.*
 import com.oficial.viasit.domain.model.AuthState
 import com.oficial.viasit.domain.model.RegisterRequest
 import com.oficial.viasit.domain.model.UserRole
@@ -19,11 +18,18 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class AuthViewModel(
-    private val authRepository: AuthRepository,
     private val loginUseCase: LoginUseCase,
-    private val registerUseCase: RegisterUseCase
+    private val registerUseCase: RegisterUseCase,
+    private val logoutUseCase: LogoutUseCase,
+    private val enterAsGuestUseCase: EnterAsGuestUseCase,
+    private val setDriverInServiceUseCase: SetDriverInServiceUseCase,
+    private val getAuthStateUseCase: GetAuthStateUseCase,
+    private val getIsInServiceUseCase: GetIsInServiceUseCase,
+    private val restoreSessionUseCase: RestoreSessionUseCase
 ) : ViewModel() {
-    val authState: StateFlow<AuthState> = authRepository.authState
+
+    val authState: StateFlow<AuthState> = getAuthStateUseCase()
+    val isInService: StateFlow<Boolean> = getIsInServiceUseCase()
 
     private val _loginForm = MutableStateFlow(LoginFormState())
     val loginForm: StateFlow<LoginFormState> = _loginForm.asStateFlow()
@@ -31,7 +37,7 @@ class AuthViewModel(
     private val _registerForm = MutableStateFlow(RegisterFormState())
     val registerForm: StateFlow<RegisterFormState> = _registerForm.asStateFlow()
 
-    init { authRepository.restoreSession() }
+    init { restoreSessionUseCase() }
 
     fun updateLoginEmail(email: String) { _loginForm.update { it.copy(email = email) } }
     fun updateLoginPassword(password: String) { _loginForm.update { it.copy(password = password) } }
@@ -52,12 +58,8 @@ class AuthViewModel(
         viewModelScope.launch {
             val result = loginUseCase(form.email, form.password)
             result.fold(
-                onSuccess = { user ->
-                    _loginForm.update { it.copy(isLoading = false, isSuccess = true) }
-                },
-                onFailure = { e ->
-                    _loginForm.update { it.copy(isLoading = false, error = e.message) }
-                }
+                onSuccess = { _loginForm.update { it.copy(isLoading = false, isSuccess = true) } },
+                onFailure = { e -> _loginForm.update { it.copy(isLoading = false, error = e.message) } }
             )
         }
     }
@@ -79,36 +81,37 @@ class AuthViewModel(
                 invitationCode = form.invitationCode
             ))
             result.fold(
-                onSuccess = { user ->
-                    _registerForm.update { it.copy(isLoading = false, isSuccess = true) }
-                },
-                onFailure = { e ->
-                    _registerForm.update { it.copy(isLoading = false, error = e.message) }
-                }
+                onSuccess = { _registerForm.update { it.copy(isLoading = false, isSuccess = true) } },
+                onFailure = { e -> _registerForm.update { it.copy(isLoading = false, error = e.message) } }
             )
         }
     }
 
-    fun enterAsGuest() { authRepository.enterAsGuest() }
-    fun logout() { authRepository.logout() }
-    fun setInService(isInService: Boolean, autoId: String = "") { authRepository.setInService(isInService, autoId) }
-    val isInService: StateFlow<Boolean> = authRepository.isInService
-    fun isLoggedIn(): Boolean = authRepository.isLoggedIn()
-    fun isGuest(): Boolean = authRepository.isGuestMode()
-    fun isDriver(): Boolean = authRepository.isDriver()
-    fun getUserRole(): UserRole = authRepository.getUserRole()
-    fun getUserId(): String? = authRepository.getUserId()
+    fun enterAsGuest() { enterAsGuestUseCase() }
+    fun logout() { logoutUseCase() }
+    fun setInService(isInService: Boolean, autoId: String = "") { setDriverInServiceUseCase(isInService, autoId) }
+
+    fun isLoggedIn(): Boolean = authState.value is AuthState.Authenticated
+    fun isGuest(): Boolean = (authState.value as? AuthState.Authenticated)?.user?.isGuest == true
+    fun isDriver(): Boolean = (authState.value as? AuthState.Authenticated)?.user?.userRole == UserRole.conductor
+    fun getUserRole(): UserRole = (authState.value as? AuthState.Authenticated)?.user?.userRole ?: UserRole.usuario
+    fun getUserId(): String? = (authState.value as? AuthState.Authenticated)?.user?.id
+    fun getAuthToken(): String? = (authState.value as? AuthState.Authenticated)?.user?.token
 
     companion object {
-        val Factory: ViewModelProvider.Factory = object : ViewModelProvider.Factory {
-            @Suppress("UNCHECKED_CAST")
-            override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                val app = com.oficial.viasit.AutosAplicacion.instance
-                return AuthViewModel(
-                    authRepository = app.authRepository,
+        val Factory: ViewModelProvider.Factory = viewModelFactory {
+            initializer {
+                val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as com.oficial.viasit.AutosAplicacion
+                AuthViewModel(
                     loginUseCase = app.loginUseCase,
-                    registerUseCase = app.registerUseCase
-                ) as T
+                    registerUseCase = app.registerUseCase,
+                    logoutUseCase = app.logoutUseCase,
+                    enterAsGuestUseCase = app.enterAsGuestUseCase,
+                    setDriverInServiceUseCase = app.setDriverInServiceUseCase,
+                    getAuthStateUseCase = app.getAuthStateUseCase,
+                    getIsInServiceUseCase = app.getIsInServiceUseCase,
+                    restoreSessionUseCase = app.restoreSessionUseCase
+                )
             }
         }
     }

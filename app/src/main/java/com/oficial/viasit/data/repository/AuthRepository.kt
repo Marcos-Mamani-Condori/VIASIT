@@ -138,7 +138,7 @@ class AuthRepository(context: Context) : IAuthRepository {
         val roleStr = prefs.getString("role", UserRole.usuario.name) ?: UserRole.usuario.name
         return try { UserRole.valueOf(roleStr) } catch (e: Exception) { UserRole.usuario }
     }
-    fun getAuthToken(): String? = pocketBaseAuth.getAuthToken()
+    override fun getAuthToken(): String? = pocketBaseAuth.getAuthToken()
 
     override fun restoreSession() {
         val user = getCurrentUser()
@@ -161,7 +161,8 @@ class AuthRepository(context: Context) : IAuthRepository {
             name = prefs.getString("name", "") ?: "",
             phone = prefs.getString("phone", "") ?: "",
             role = listOf(roleStr),
-            lineaId = prefs.getString("lineaId", "") ?: ""
+            lineaId = prefs.getString("lineaId", "") ?: "",
+            token = prefs.getString("token", "") ?: ""
         )
     }
 
@@ -173,6 +174,7 @@ class AuthRepository(context: Context) : IAuthRepository {
             putString("phone", user.phone)
             putString("role", user.role.firstOrNull() ?: UserRole.usuario.name)
             putString("lineaId", user.lineaId)
+            putString("token", user.token)
             putBoolean("loggedIn", !isGuest)
             putBoolean("isGuest", isGuest)
             apply()

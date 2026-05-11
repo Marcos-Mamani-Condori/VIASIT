@@ -20,6 +20,7 @@ interface IAuthRepository {
     fun isDriver(): Boolean
     fun getUserRole(): UserRole
     fun getUserId(): String?
+    fun getAuthToken(): String?
     fun restoreSession()
     fun getCurrentUser(): User?
 }

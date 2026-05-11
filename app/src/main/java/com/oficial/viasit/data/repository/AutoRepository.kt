@@ -9,7 +9,8 @@ import kotlinx.coroutines.flow.first
 
 class AutoRepository(
     private val pocketBaseClient: PocketBaseRealtimeClient,
-    private val dao: AutoData
+    private val dao: AutoData,
+    private val authRepository: com.oficial.viasit.domain.repository.IAuthRepository
 ) : IAutoRepository {
 
     override val autos: StateFlow<List<Auto>> = pocketBaseClient.autos
@@ -31,6 +32,7 @@ class AutoRepository(
     }
 
     override suspend fun registerAuto(userId: String, placa: String, lineaCode: String): Result<Auto> {
+        pocketBaseClient.authToken = authRepository.getAuthToken()
         return pocketBaseClient.registerAuto(
             userId = userId,
             placa = placa,
@@ -41,10 +43,12 @@ class AutoRepository(
     }
 
     override suspend fun getAutoByUserId(userId: String): Result<Auto?> {
+        pocketBaseClient.authToken = authRepository.getAuthToken()
         return pocketBaseClient.getAutoByUserId(userId)
     }
 
     override suspend fun updateAutoLocation(autoId: String, lat: Double, lng: Double, angulo: Double): Result<Auto> {
+        pocketBaseClient.authToken = authRepository.getAuthToken()
         return pocketBaseClient.updateAutoLocation(autoId, lat, lng, angulo)
     }
 }

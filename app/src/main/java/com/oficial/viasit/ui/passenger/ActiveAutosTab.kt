@@ -59,15 +59,15 @@ fun ActiveAutosTab(
         if (query.isBlank()) autosActivos
         else autosActivos.filter { it.placa.contains(query.trim(), ignoreCase = true) }
     }
+    var userLocation by remember { mutableStateOf<Location?>(null) }
     val filtradosOrdenados = remember(filtrados, userLocation) {
-        val loc = userLocation ?: return@remember filtrados
-        filtrados.sortedBy { auto ->
+        val loc = userLocation
+        if (loc == null) filtrados
+        else filtrados.sortedBy { auto ->
             if (auto.lat == 0.0 && auto.lng == 0.0) Float.MAX_VALUE.toDouble()
             else { val r = FloatArray(1); Location.distanceBetween(loc.latitude, loc.longitude, auto.lat, auto.lng, r); r[0].toDouble() }
         }
     }
-
-    var userLocation by remember { mutableStateOf<Location?>(null) }
     LaunchedEffect(Unit) {
         val ok = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
                  ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
@@ -88,7 +88,7 @@ fun ActiveAutosTab(
     var selectedAuto    by remember { mutableStateOf<Auto?>(null) }
     var showReportDialog by remember { mutableStateOf(false) }
     var showReportesDialog by remember { mutableStateOf(false) }
-    var reportesList   by remember { mutableStateOf<List<String>>(emptyList()) }
+    var reportesList   by remember { mutableStateOf<List<com.oficial.viasit.domain.model.Reporte>>(emptyList()) }
     var reportesLoading by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxSize().background(Slate950)) {
@@ -155,7 +155,7 @@ fun ActiveAutosTab(
                             modifier = Modifier.fillMaxWidth()
                                 .clickable {
                                     passengerViewModel.buscarLineasPorDestino(result.lat, result.lon, result.name)
-                                    destinoQuery   = result.name
+                                    passengerViewModel.setDestinoQuery(result.name)
                                     destinoResults = emptyList()
                                 }
                                 .padding(12.dp),
@@ -338,7 +338,7 @@ fun ActiveAutosTab(
                         }
                         else -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             reportesList.forEach { rep ->
-                                val texto = rep.replace(Regex("""^\[Bus: [^\]]+\]\s*"""), "")
+                                val texto = rep.descripcion.replace(Regex("""^\[Bus: [^\]]+\]\s*"""), "")
                                 Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Slate800).padding(12.dp),
                                     verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     Icon(Icons.Default.ChatBubbleOutline, null, tint = Slate500, modifier = Modifier.size(14.dp).padding(top = 2.dp))
@@ -404,7 +404,7 @@ fun ActiveAutosTab(
                             if (reportText.isNotBlank()) {
                                 isLoading = true
                                 val desc = if (auto != null && auto.placa.isNotBlank()) "[Bus: ${auto.placa}] $reportText" else reportText
-                                autosViewModel.submitReporte(desc) { ok -> isLoading = false; if (ok) enviado = true }
+                                autosViewModel.submitReporte(desc, currentUser.id) { ok -> isLoading = false; if (ok) enviado = true }
                             }
                         },
                         enabled = reportText.isNotBlank() && !isLoading,

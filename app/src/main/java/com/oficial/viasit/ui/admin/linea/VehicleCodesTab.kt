@@ -137,21 +137,21 @@ fun VehicleCodeItem(code: VehicleInvitationCode, onCopy: () -> Unit, onDelete: (
             modifier = Modifier
                 .size(40.dp)
                 .clip(RoundedCornerShape(10.dp))
-                .background(if (code.usadoPor.isNotEmpty()) Slate700.copy(0.4f) else Cyan500.copy(0.12f)),
+                .background(if (code.usedBy.isNotEmpty()) Slate700.copy(0.4f) else Cyan500.copy(0.12f)),
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                if (code.usadoPor.isNotEmpty()) Icons.Default.CheckCircle else Icons.Default.DirectionsBus,
+                if (code.usedBy.isNotEmpty()) Icons.Default.CheckCircle else Icons.Default.DirectionsBus,
                 null,
-                tint = if (code.usadoPor.isNotEmpty()) Slate500 else Cyan400,
+                tint = if (code.usedBy.isNotEmpty()) Slate500 else Cyan400,
                 modifier = Modifier.size(20.dp)
             )
         }
         Column(modifier = Modifier.weight(1f)) {
             Text(code.code, style = MaterialTheme.typography.titleSmall,
-                color = if (code.usadoPor.isNotEmpty()) Slate500 else Color.White,
+                color = if (code.usedBy.isNotEmpty()) Slate500 else Color.White,
                 fontWeight = FontWeight.SemiBold)
-            Text(if (code.usadoPor.isNotEmpty()) "Usado por: ${code.usadoPor}" else "Disponible",
+            Text(if (code.usedBy.isNotEmpty()) "Usado por: ${code.usedBy}" else "Disponible",
                 style = MaterialTheme.typography.labelSmall, color = Slate600)
         }
         IconButton(onClick = onCopy,   modifier = Modifier.size(36.dp)) {

@@ -9,24 +9,37 @@ import com.oficial.viasit.AutosAplicacion
 import com.oficial.viasit.domain.model.Auto
 import com.oficial.viasit.domain.model.Linea
 import com.oficial.viasit.domain.model.Ruta
+import com.oficial.viasit.domain.usecases.GetLineasUseCase
+import com.oficial.viasit.domain.usecases.GetRutasUseCase
+import com.oficial.viasit.domain.usecases.SearchLineasByDestinationUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-class PassengerViewModel(application: Application) : AndroidViewModel(application) {
+class PassengerViewModel(
+    application: Application,
+    private val getLineasUseCase: GetLineasUseCase,
+    private val getRutasUseCase: GetRutasUseCase,
+    private val searchLineasByDestinationUseCase: SearchLineasByDestinationUseCase
+) : AndroidViewModel(application) {
 
     companion object {
         private const val TAG = "PassengerVM"
 
         val Factory: ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
-            override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T =
-                PassengerViewModel(AutosAplicacion.instance) as T
+            override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+                val app = AutosAplicacion.instance
+                return PassengerViewModel(
+                    app,
+                    app.getLineasUseCase,
+                    app.getRutasUseCase,
+                    app.searchLineasByDestinationUseCase
+                ) as T
+            }
         }
     }
-
-    private val adminRepository = AutosAplicacion.instance.adminRepository
 
     private val _lineas = MutableStateFlow<List<Linea>>(emptyList())
     val lineas: StateFlow<List<Linea>> = _lineas.asStateFlow()
@@ -68,11 +81,8 @@ class PassengerViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             _isLoading.value = true
             _error.value = null
-            adminRepository.getLineas().fold(
+            getLineasUseCase().fold(
                 onSuccess = { lineas ->
-                    lineas.forEach { linea ->
-                        Log.d(TAG, "Linea: ${linea.name} | rutaId='${linea.rutaId}'")
-                    }
                     _lineas.value = lineas
                     loadRutas()
                 },
@@ -86,11 +96,8 @@ class PassengerViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     private suspend fun loadRutas() {
-        adminRepository.getRutas().fold(
+        getRutasUseCase().fold(
             onSuccess = { rutas ->
-                rutas.forEach { ruta ->
-                    Log.d(TAG, "Ruta: ${ruta.name} | id='${ruta.id}'")
-                }
                 _rutas.value = rutas.associateBy { it.id }
             },
             onFailure = { Log.w(TAG, "No se pudieron cargar rutas") }
@@ -99,11 +106,12 @@ class PassengerViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun buscarLineasPorDestino(lat: Double, lng: Double, nombre: String) {
-        val coincidentes = _lineas.value.filter { linea ->
-            val ruta = _rutas.value[linea.rutaId] ?: return@filter false
-            rutaPasaCercaDe(ruta, lat, lng, radioMetros = 800.0)
-        }
-        _destinoLineas.value = coincidentes
+        _destinoLineas.value = searchLineasByDestinationUseCase(
+            lat = lat,
+            lng = lng,
+            lineas = _lineas.value,
+            rutasMap = _rutas.value
+        )
         _destinoNombre.value = nombre
     }
 
@@ -115,30 +123,5 @@ class PassengerViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setDestinoQuery(q: String) {
         _destinoQuery.value = q
-    }
-
-    private fun rutaPasaCercaDe(ruta: Ruta, lat: Double, lng: Double, radioMetros: Double): Boolean {
-        val puntos = buildList {
-            parsePunto(ruta.startPoint)?.let { add(it) }
-            parsePunto(ruta.endPoint)?.let { add(it) }
-            if (ruta.waypoints.isNotBlank()) {
-                ruta.waypoints.split(";").forEach { seg ->
-                    parsePunto(seg)?.let { add(it) }
-                }
-            }
-        }
-        return puntos.any { (pLat, pLng) ->
-            val result = FloatArray(1)
-            android.location.Location.distanceBetween(lat, lng, pLat, pLng, result)
-            result[0] <= radioMetros
-        }
-    }
-
-    private fun parsePunto(s: String): Pair<Double, Double>? {
-        val parts = s.trim().split(",")
-        if (parts.size < 2) return null
-        val pLat = parts[0].trim().toDoubleOrNull() ?: return null
-        val pLng = parts[1].trim().toDoubleOrNull() ?: return null
-        return pLat to pLng
     }
 }

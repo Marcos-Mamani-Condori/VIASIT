@@ -29,7 +29,6 @@ fun Auto.toEntity(): AutoEntity {
         lat = this.lat,
         lng = this.lng,
         angulo = this.angulo,
-        colectivoid = this.colectivoid
     )
 }
 
@@ -46,7 +45,6 @@ fun AutoEntity.toAuto(): Auto {
         lat = this.lat,
         lng = this.lng,
         angulo = this.angulo,
-        colectivoid = this.colectivoid
     )
 }
 

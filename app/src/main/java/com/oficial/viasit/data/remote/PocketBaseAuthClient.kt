@@ -67,7 +67,7 @@ class PocketBaseAuthClient {
                     val responseBody = response.body?.string() ?: ""
                     val authResponse = json.decodeFromString<AuthResponse>(responseBody)
                     authToken = authResponse.token
-                    Result.success(authResponse.user.toDomain())
+                    Result.success(authResponse.user.toDomain(authToken))
                 } else {
                     Result.failure(Exception("Error login: ${response.code}"))
                 }
@@ -141,7 +141,7 @@ class PocketBaseAuthClient {
                 val response = okHttpclient.newCall(request).execute()
                 if (response.isSuccessful) {
                     val authResponse = json.decodeFromString<AuthResponse>(response.body?.string() ?: "")
-                    Result.success(authResponse.user.toDomain())
+                    Result.success(authResponse.user.toDomain(authToken))
                 } else {
                     Result.failure(Exception("Error al obtener usuario: ${response.code}"))
                 }
@@ -178,12 +178,13 @@ data class UserResponse(
     val created: String = "",
     val updated: String = ""
 ) {
-    fun toDomain() = com.oficial.viasit.domain.model.User(
+    fun toDomain(token: String? = null) = com.oficial.viasit.domain.model.User(
         id = id,
         email = email,
         name = name,
         phone = phone,
         role = role,
-        lineaId = lineaId ?: ""
+        lineaId = lineaId ?: "",
+        token = token ?: ""
     )
 }

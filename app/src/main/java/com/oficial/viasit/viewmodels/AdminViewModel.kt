@@ -5,30 +5,55 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.oficial.viasit.AutosAplicacion
-import com.oficial.viasit.domain.repository.IAdminRepository
+import com.oficial.viasit.domain.usecases.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
-class AdminViewModel(application: Application) : AndroidViewModel(application) {
+class AdminViewModel(
+    application: Application,
+    private val getLineasUseCase: GetLineasUseCase,
+    private val createLineaUseCase: CreateLineaUseCase,
+    private val updateLineaUseCase: UpdateLineaUseCase,
+    private val deleteLineaUseCase: DeleteLineaUseCase,
+    private val getInvitationCodesUseCase: GetInvitationCodesUseCase,
+    private val generateInvitationCodeUseCase: GenerateInvitationCodeUseCase,
+    private val deleteInvitationCodeUseCase: DeleteInvitationCodeUseCase,
+    private val getRutasUseCase: GetRutasUseCase,
+    private val createRutaUseCase: CreateRutaUseCase,
+    private val deleteRutaUseCase: DeleteRutaUseCase,
+    private val assignRutaToLineaUseCase: AssignRutaToLineaUseCase,
+    private val getLogsUseCase: GetLogsUseCase,
+    private val createLogUseCase: CreateLogUseCase,
+    private val getVehicleInvitationCodesUseCase: GetVehicleInvitationCodesUseCase,
+    private val generateVehicleInvitationCodeUseCase: GenerateVehicleInvitationCodeUseCase,
+    private val deleteVehicleInvitationCodeUseCase: DeleteVehicleInvitationCodeUseCase
+) : AndroidViewModel(application) {
 
     companion object {
         val Factory: ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
-            override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T =
-                AdminViewModel(AutosAplicacion.instance) as T
+            override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+                val app = AutosAplicacion.instance
+                return AdminViewModel(
+                    app,
+                    app.getLineasUseCase, app.createLineaUseCase, app.updateLineaUseCase, app.deleteLineaUseCase,
+                    app.getInvitationCodesUseCase, app.generateInvitationCodeUseCase, app.deleteInvitationCodeUseCase,
+                    app.getRutasUseCase, app.createRutaUseCase, app.deleteRutaUseCase, app.assignRutaToLineaUseCase,
+                    app.getLogsUseCase, app.createLogUseCase,
+                    app.getVehicleInvitationCodesUseCase, app.generateVehicleInvitationCodeUseCase, app.deleteVehicleInvitationCodeUseCase
+                ) as T
+            }
         }
     }
-
-    private val adminRepository: IAdminRepository = (application as AutosAplicacion).adminRepository
 
     private val _uiState = MutableStateFlow(AdminUiState())
     val uiState: StateFlow<AdminUiState> = _uiState
 
-    private val lineasHandler       = LineasHandler(viewModelScope, adminRepository)
-    private val invitacionesHandler = InvitacionesHandler(viewModelScope, adminRepository)
-    private val logsHandler         = LogsHandler(viewModelScope, adminRepository)
-    private val rutasHandler        = RutasHandler(viewModelScope, adminRepository)
-    private val vehicleCodesHandler = VehicleCodesHandler(viewModelScope, adminRepository)
+    private val lineasHandler       = LineasHandler(viewModelScope, getLineasUseCase, createLineaUseCase, updateLineaUseCase, deleteLineaUseCase)
+    private val invitacionesHandler = InvitacionesHandler(viewModelScope, getInvitationCodesUseCase, generateInvitationCodeUseCase, deleteInvitationCodeUseCase)
+    private val logsHandler         = LogsHandler(viewModelScope, getLogsUseCase, createLogUseCase)
+    private val rutasHandler        = RutasHandler(viewModelScope, getRutasUseCase, createRutaUseCase, deleteRutaUseCase, assignRutaToLineaUseCase, getLineasUseCase)
+    private val vehicleCodesHandler = VehicleCodesHandler(viewModelScope, getVehicleInvitationCodesUseCase, generateVehicleInvitationCodeUseCase, deleteVehicleInvitationCodeUseCase)
 
     private val logAction: (String, String) -> Unit = { userId, desc -> logsHandler.createLog(userId, desc) }
 

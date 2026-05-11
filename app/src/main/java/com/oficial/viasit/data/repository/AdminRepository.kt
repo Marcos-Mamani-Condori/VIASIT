@@ -11,7 +11,7 @@ import kotlinx.serialization.Serializable
 
 class AdminRepository(
     private val client: PocketBaseRealtimeClient,
-    private val authRepository: AuthRepository? = null
+    private val authRepository: com.oficial.viasit.domain.repository.IAuthRepository? = null
 ) : IAdminRepository {
     @Serializable
     data class PocketBaseListResponse<T>(
@@ -20,7 +20,7 @@ class AdminRepository(
         val items: List<T> = emptyList()
     )
 
-    private fun getAuthToken() = authRepository?.getCurrentUser()?.let { client.authToken } ?: client.authToken
+    private fun getAuthToken() = authRepository?.getAuthToken() ?: client.authToken
 
     private val shared = AdminRepositoryShared(authRepository) { getAuthToken() }
     

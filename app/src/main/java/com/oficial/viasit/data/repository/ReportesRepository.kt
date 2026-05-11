@@ -9,7 +9,8 @@ import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonArray
 
 class ReportesRepository(
-    private val client: PocketBaseRealtimeClient
+    private val client: PocketBaseRealtimeClient,
+    private val authRepository: com.oficial.viasit.domain.repository.IAuthRepository
 ) : IReportesRepository {
 
     private val jsonParser = Json { ignoreUnknownKeys = true; isLenient = true }
@@ -31,10 +32,12 @@ class ReportesRepository(
             }
     } catch (e: Exception) { Result.failure(e) }
 
-    override suspend fun responderReporte(reporteId: String, respuesta: String, authToken: String?): Result<Unit> =
-        client.updateRecord(
+    override suspend fun responderReporte(reporteId: String, respuesta: String): Result<Unit> {
+        val token = authRepository.getAuthToken()
+        return client.updateRecord(
             "reports", reporteId,
             mapOf("response" to respuesta),
-            authToken
+            token
         ).map { }
+    }
 }

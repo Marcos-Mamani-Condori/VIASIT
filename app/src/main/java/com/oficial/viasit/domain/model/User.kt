@@ -31,6 +31,9 @@ data class User(
     @SerialName("lineId")
     val lineaId: String = "",
     
+    @SerialName("token")
+    val token: String = "",
+    
     @SerialName("created")
     val created: String = "",
     

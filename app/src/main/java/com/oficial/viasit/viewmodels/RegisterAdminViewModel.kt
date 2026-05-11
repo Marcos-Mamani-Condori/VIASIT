@@ -3,17 +3,19 @@ package com.oficial.viasit.viewmodels
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.oficial.viasit.data.repository.AuthRepository
 import com.oficial.viasit.domain.model.RegisterRequest
-import com.oficial.viasit.domain.repository.IAdminRepository
+import com.oficial.viasit.domain.usecases.RegisterUseCase
+import com.oficial.viasit.domain.usecases.ValidateInvitationCodeUseCase
+import com.oficial.viasit.domain.usecases.UseInvitationCodeUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 class RegisterAdminViewModel(
-    private val adminRepository: IAdminRepository,
-    private val authRepository: AuthRepository
+    private val registerUseCase: RegisterUseCase,
+    private val validateInvitationCodeUseCase: ValidateInvitationCodeUseCase,
+    private val useInvitationCodeUseCase: UseInvitationCodeUseCase
 ) : ViewModel() {
 
     private val _isLoading = MutableStateFlow(false)
@@ -47,8 +49,7 @@ class RegisterAdminViewModel(
         viewModelScope.launch {
             _isLoading.value = true
             _errorMessage.value = null
-            val result = adminRepository.validateInvitationCode(code)
-            result.fold(
+            validateInvitationCodeUseCase(code).fold(
                 onSuccess = { validationCode ->
                     if (validationCode != null) {
                         _codeValidated.value = true
@@ -78,14 +79,13 @@ class RegisterAdminViewModel(
             _isLoading.value = true
             _errorMessage.value = null
 
-            val result = authRepository.register(request)
+            val result = registerUseCase(request)
 
             result.fold(
                 onSuccess = { user ->
-                    val codeValidation = adminRepository.validateInvitationCode(invitationCode)
-                    codeValidation.fold(
+                    validateInvitationCodeUseCase(invitationCode).fold(
                         onSuccess = { code ->
-                            if (code != null) adminRepository.useInvitationCode(code.id, user.id)
+                            if (code != null) useInvitationCodeUseCase(code.id, user.id)
                         },
                         onFailure = { }
                     )
@@ -106,8 +106,9 @@ class RegisterAdminViewModel(
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
                 val app = com.oficial.viasit.AutosAplicacion.instance
                 return RegisterAdminViewModel(
-                    adminRepository = app.adminRepository,
-                    authRepository = app.authRepository
+                    registerUseCase = app.registerUseCase,
+                    validateInvitationCodeUseCase = app.validateInvitationCodeUseCase,
+                    useInvitationCodeUseCase = app.useInvitationCodeUseCase
                 ) as T
             }
         }

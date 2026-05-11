@@ -120,8 +120,7 @@ fun VIASITApp() {
         Screen.RegisterAdmin -> {
             RegisterAdminScreen(
                 onRegisterSuccess = { currentScreen = Screen.AdminDashboard },
-                onNavigateBack    = { currentScreen = Screen.Auth },
-                authState         = authState
+                onNavigateBack    = { currentScreen = Screen.Auth }
             )
         }
 
@@ -142,7 +141,7 @@ fun VIASITApp() {
                         eLat      = routeData.endPoint?.lat  ?: 0.0,
                         eLng      = routeData.endPoint?.lng  ?: 0.0,
                         lineaId   = screen.lineaId,
-                        email     = currentUser?.email ?: "",
+                        userId    = currentUser?.id ?: "",
                         waypoints = routeData.waypoints.map { Pair(it.lat, it.lng) }
                     )
                     currentScreen = Screen.AdminDashboard
