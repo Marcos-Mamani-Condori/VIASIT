@@ -18,11 +18,16 @@ internal class LogsRepository(
             shared.authToken()).map { }
     } catch (e: Exception) { Result.failure(e) }
 
-    override suspend fun getAll(limit: Int, filter: String): Result<List<LogEntry>> = try {
-        var pbFilter = if (filter.isNotEmpty()) "(description ~ '$filter' || userid.name ~ '$filter')" else ""
+    override suspend fun getAll(limit: Int, filter: String, timeFilter: String): Result<List<LogEntry>> = try {
+        var pbFilter = ""
         
-        // Soporte para filtros de tiempo: hoy, ayer, semana, mes
-        val timeFilter = when (filter.lowercase()) {
+        // Limpieza profunda del filtro: si es vacío o "todos", no filtramos por texto
+        val cleanFilter = filter.trim().lowercase()
+        if (cleanFilter.isNotEmpty() && cleanFilter != "todos") {
+            pbFilter = "description ~ '$filter'"
+        }
+
+        val timePart = when (timeFilter.lowercase()) {
             "hoy" -> "created >= '${shared.getStartDateForFilter("today")}'"
             "ayer" -> "created >= '${shared.getStartDateForFilter("yesterday")}' && created < '${shared.getStartDateForFilter("today")}'"
             "semana" -> "created >= '${shared.getStartDateForFilter("last_week")}'"
@@ -30,16 +35,26 @@ internal class LogsRepository(
             else -> ""
         }
 
-        if (timeFilter.isNotEmpty()) {
-            pbFilter = if (pbFilter.isNotEmpty()) "($pbFilter) && ($timeFilter)" else timeFilter
+        if (timePart.isNotEmpty()) {
+            pbFilter = if (pbFilter.isNotEmpty()) "($pbFilter) && ($timePart)" else timePart
         }
 
-        client.getList("logs", perPage = limit, sort = "-created", filter = pbFilter, authToken = shared.authToken())
-            .map { parseLogsFromJson(it) }
-    } catch (e: Exception) { Result.failure(e) }
+        println("DEBUG: LogsRepository - Filtro PB: $pbFilter")
+
+        client.getList("logs", perPage = limit, sort = "-created", filter = pbFilter, expand = "userid", authToken = shared.authToken())
+            .map { json ->
+                println("DEBUG: LogsRepository - Respuesta Cruda: $json")
+                parseLogsFromJson(json)
+            }.onFailure { 
+                println("DEBUG: LogsRepository - Error en getList: ${it.message}")
+            }
+    } catch (e: Exception) { 
+        println("DEBUG: LogsRepository - Excepción: ${e.message}")
+        Result.failure(e) 
+    }
 
     override suspend fun getByUser(userId: String): Result<List<LogEntry>> = try {
-        client.getList("logs", filter = "userid='$userId'", sort = "-created", authToken = shared.authToken())
+        client.getList("logs", filter = "userid='$userId'", sort = "-created", expand = "userid", authToken = shared.authToken())
             .map { parseLogsFromJson(it) }
     } catch (e: Exception) { Result.failure(e) }
 }

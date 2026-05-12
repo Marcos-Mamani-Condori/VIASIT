@@ -57,6 +57,7 @@ class AdminViewModel(
     private val getAllReportesUseCase: GetAllReportesUseCase,
     private val getAppealsUseCase: GetAppealsUseCase,
     private val resolveAppealUseCase: ResolveAppealUseCase,
+    private val responderReporteUseCase: ResponderReporteUseCase,
     private val getAutosUseCase: GetAutosUseCase
 ) : AndroidViewModel(application) {
 
@@ -74,6 +75,7 @@ class AdminViewModel(
                     app.getVehicleInvitationCodesUseCase, app.generateVehicleInvitationCodeUseCase, app.deleteVehicleInvitationCodeUseCase,
                     app.getUsersByLineaUseCase, app.setUserActiveStatusUseCase, app.deleteUserUseCase,
                     app.getAllReportesUseCase, app.getAppealsUseCase, app.resolveAppealUseCase,
+                    app.responderReporteUseCase,
                     app.getAutosUseCase
                 ) as T
             }
@@ -90,7 +92,7 @@ class AdminViewModel(
     private val logsHandler         = LogsHandler(viewModelScope, getLogsUseCase, createLogUseCase)
     private val rutasHandler        = RutasHandler(viewModelScope, getRutasUseCase, createRutaUseCase, deleteRutaUseCase, assignRutaToLineaUseCase, getLineasUseCase)
     private val vehicleCodesHandler = VehicleCodesHandler(viewModelScope, getVehicleInvitationCodesUseCase, generateVehicleInvitationCodeUseCase, deleteVehicleInvitationCodeUseCase)
-    private val usersHandler        = AdminUsersHandler(viewModelScope, getUsersByLineaUseCase, setUserActiveStatusUseCase, deleteUserUseCase, getAllReportesUseCase, getAppealsUseCase, resolveAppealUseCase)
+    private val usersHandler        = AdminUsersHandler(viewModelScope, getUsersByLineaUseCase, setUserActiveStatusUseCase, deleteUserUseCase, getAllReportesUseCase, getAppealsUseCase, resolveAppealUseCase, responderReporteUseCase)
 
     private val logAction: (String, String) -> Unit = { userId, desc -> logsHandler.createLog(userId, desc) }
 
@@ -133,6 +135,9 @@ class AdminViewModel(
     fun loadAppeals() = usersHandler.loadAppeals(_uiState)
     fun resolveAppeal(appealId: String, targetUserId: String, accept: Boolean, adminId: String) =
         usersHandler.resolveAppeal(appealId, targetUserId, accept, adminId, _uiState, logAction)
+
+    fun responderReporte(reporteId: String, respuesta: String, adminId: String) =
+        usersHandler.responderReporte(reporteId, respuesta, adminId, _uiState, logAction)
 
     fun clearMessages() { _uiState.value = _uiState.value.copy(error = null, successMessage = null, generatedCode = null) }
 }

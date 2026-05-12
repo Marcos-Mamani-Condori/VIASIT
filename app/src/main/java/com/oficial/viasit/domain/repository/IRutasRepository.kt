@@ -4,6 +4,7 @@ import com.oficial.viasit.domain.model.Ruta
 
 interface IRutasRepository {
     suspend fun getAll(): Result<List<Ruta>>
+    suspend fun getByLinea(lineaId: String): Result<List<Ruta>>
     suspend fun getById(rutaId: String): Result<Ruta>
     suspend fun create(
         name: String,

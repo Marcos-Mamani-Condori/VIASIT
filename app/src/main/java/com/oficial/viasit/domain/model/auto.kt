@@ -2,9 +2,7 @@ package com.oficial.viasit.domain.model
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.*
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.serialDescriptor
@@ -13,33 +11,14 @@ import kotlinx.serialization.encoding.Encoder
 
 object UserIdSerializer : KSerializer<String> {
     override val descriptor: SerialDescriptor = serialDescriptor<String>()
-    
-    override fun serialize(encoder: Encoder, value: String) {
-        encoder.encodeString(value)
-    }
-    
+    override fun serialize(encoder: Encoder, value: String) = encoder.encodeString(value)
     override fun deserialize(decoder: Decoder): String {
-        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder 
-            ?: return decoder.decodeString()
+        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder ?: return decoder.decodeString()
         val element = jsonDecoder.decodeJsonElement()
         return when (element) {
             is JsonPrimitive -> element.content
-            is JsonObject -> element["id"]?.let { 
-                (it as? JsonPrimitive)?.content ?: ""
-            } ?: ""
-            is kotlinx.serialization.json.JsonArray -> {
-                if (element.isEmpty()) ""
-                else {
-                    val first = element[0]
-                    when (first) {
-                        is JsonPrimitive -> first.content
-                        is JsonObject -> first["id"]?.let { 
-                            (it as? JsonPrimitive)?.content ?: ""
-                        } ?: ""
-                        else -> ""
-                    }
-                }
-            }
+            is JsonObject -> element["id"]?.jsonPrimitive?.content ?: ""
+            is JsonArray -> if (element.isNotEmpty()) (element[0] as? JsonObject)?.get("id")?.jsonPrimitive?.content ?: "" else ""
             else -> ""
         }
     }
@@ -78,21 +57,20 @@ data class Auto(
     @SerialName("updated")
     val updated: String = "",
 
-    @SerialName("collectionId")
-    val collectionId: String = "",
-
-    @SerialName("collectionName")
-    val collectionName: String = "vehicles",
-
     @SerialName("expand")
     val expand: JsonObject? = null
 ) {
     val driverName: String
         get() = try {
-            val userObj = expand?.get("userid") as? JsonObject
-            userObj?.get("name")?.let { 
-                if (it is JsonPrimitive) it.content else "Conductor desconocido"
-            } ?: "Conductor"
+            val userExpand = expand?.get("userid")
+            val userObj = when (userExpand) {
+                is JsonObject -> userExpand
+                is JsonArray -> if (userExpand.isNotEmpty()) userExpand[0] as? JsonObject else null
+                else -> null
+            }
+            userObj?.get("name")?.jsonPrimitive?.content 
+                ?: userObj?.get("email")?.jsonPrimitive?.content 
+                ?: "Conductor ($userId)".take(15)
         } catch (e: Exception) {
             "Conductor"
         }
@@ -103,30 +81,20 @@ data class Auto(
             val normalized = updated.replace(" ", "T")
             val updateTime = java.time.OffsetDateTime.parse(normalized)
             val now = java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC)
-            val minutesSinceUpdate = java.time.Duration.between(updateTime, now).toMinutes()
-            
-            // Un vehículo es "activo" si se ha actualizado en los últimos 10 min
-            // y no está en coordenadas 0,0 (que indica error de GPS)
-            minutesSinceUpdate < maxAgeMinutes
-        } catch (e: Exception) {
-            false
-        }
+            java.time.Duration.between(updateTime, now).toMinutes() < maxAgeMinutes
+        } catch (e: Exception) { false }
     }
 
     fun getLastUpdateText(): String {
         return try {
             if (updated.isEmpty()) return "Sin datos"
-            val normalized = updated.replace(" ", "T")
-            val updateTime = java.time.OffsetDateTime.parse(normalized)
-            val now = java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC)
-            val minutesSinceUpdate = java.time.Duration.between(updateTime, now).toMinutes()
+            val updateTime = java.time.OffsetDateTime.parse(updated.replace(" ", "T"))
+            val minutes = java.time.Duration.between(updateTime, java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC)).toMinutes()
             when {
-                minutesSinceUpdate < 1 -> "Hace un momento"
-                minutesSinceUpdate < 60 -> "Hace ${minutesSinceUpdate.toInt()} min"
-                else -> "Hace ${(minutesSinceUpdate / 60).toInt()} h"
+                minutes < 1 -> "En línea"
+                minutes < 60 -> "Hace $minutes min"
+                else -> "Hace ${minutes/60} h"
             }
-        } catch (e: Exception) {
-            "Desconocido"
-        }
+        } catch (e: Exception) { "Desconocido" }
     }
 }

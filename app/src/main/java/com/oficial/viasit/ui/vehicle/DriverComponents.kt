@@ -9,6 +9,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -27,12 +28,12 @@ fun GreetingCard(name: String, vehicleCount: Int) {
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        Text("Hola, $name 👋",
+        Text(name,
             style = MaterialTheme.typography.headlineSmall,
             color = Color.White, fontWeight = FontWeight.Bold)
         Text(
             if (vehicleCount == 0) "No tienes vehículos registrados"
-            else "$vehicleCount vehículo${if (vehicleCount != 1) "s" else ""} disponible${if (vehicleCount != 1) "s" else ""}",
+            else "Vehículo vinculado y activo",
             style = MaterialTheme.typography.bodyMedium, color = Slate400
         )
     }
@@ -45,8 +46,9 @@ fun VehicleSelectorCard(
     lineaId: String?,
     onShowSelector: () -> Unit
 ) {
+    val isChangeRestricted = vehicles.size <= 1
     Card(
-        onClick  = onShowSelector,
+        onClick  = if (isChangeRestricted) ({}) else onShowSelector,
         modifier = Modifier.fillMaxWidth(),
         shape    = RoundedCornerShape(16.dp),
         colors   = CardDefaults.cardColors(containerColor = SurfaceElevated)
@@ -63,16 +65,16 @@ fun VehicleSelectorCard(
                 Icon(Icons.Default.DirectionsBus, null, tint = Brand400, modifier = Modifier.size(24.dp))
             }
             Column(modifier = Modifier.weight(1f)) {
-                Text("Vehículo activo", style = MaterialTheme.typography.labelSmall, color = Slate400)
+                Text("Vehículo vinculado", style = MaterialTheme.typography.labelSmall, color = Slate400)
                 Text(
-                    selectedVehicle?.placa ?: "Sin vehículo seleccionado",
+                    selectedVehicle?.placa ?: "Sin vehículo vinculado",
                     style = MaterialTheme.typography.titleMedium,
                     color = if (selectedVehicle != null) Color.White else Slate500,
                     fontWeight = FontWeight.SemiBold
                 )
                 lineaId?.let { Text("Línea: $it", style = MaterialTheme.typography.bodySmall, color = Brand400) }
             }
-            if (vehicles.size > 1) {
+            if (!isChangeRestricted) {
                 Icon(Icons.Default.ExpandMore, null, tint = Slate400)
             }
         }
@@ -149,10 +151,11 @@ fun StatusInfoCard(icon: ImageVector, title: String, message: String, accentColo
 }
 
 @Composable
-fun DashboardMenuItem(icon: ImageVector, title: String, subtitle: String, iconColor: Color, onClick: () -> Unit) {
+fun DashboardMenuItem(icon: ImageVector, title: String, subtitle: String, iconColor: Color, enabled: Boolean = true, onClick: () -> Unit) {
     Card(
         onClick  = onClick,
-        modifier = Modifier.fillMaxWidth(),
+        enabled  = enabled,
+        modifier = Modifier.fillMaxWidth().then(if (!enabled) Modifier.alpha(0.6f) else Modifier),
         shape    = RoundedCornerShape(14.dp),
         colors   = CardDefaults.cardColors(containerColor = SurfaceElevated)
     ) {

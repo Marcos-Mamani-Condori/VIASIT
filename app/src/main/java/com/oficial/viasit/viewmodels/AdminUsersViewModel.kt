@@ -12,13 +12,18 @@ internal class AdminUsersHandler(
     private val deleteUserUseCase: DeleteUserUseCase,
     private val getAllReportesUseCase: GetAllReportesUseCase,
     private val getAppealsUseCase: GetAppealsUseCase,
-    private val resolveAppealUseCase: ResolveAppealUseCase
+    private val resolveAppealUseCase: ResolveAppealUseCase,
+    private val responderReporteUseCase: ResponderReporteUseCase
 ) {
     fun loadUsers(lineaId: String, state: MutableStateFlow<AdminUiState>) {
         scope.launch {
             state.value = state.value.copy(isLoading = true, error = null)
             getUsersByLineaUseCase(lineaId).fold(
-                onSuccess = { users -> state.value = state.value.copy(isLoading = false, users = users) },
+                onSuccess = { users -> 
+                    // Filtramos para mostrar SOLO conductores en esta pestaña
+                    val onlyDrivers = users.filter { it.isDriver }
+                    state.value = state.value.copy(isLoading = false, users = onlyDrivers) 
+                },
                 onFailure = { error -> state.value = state.value.copy(isLoading = false, error = error.message ?: "Error al cargar usuarios") }
             )
         }
@@ -68,6 +73,20 @@ internal class AdminUsersHandler(
                     loadAppeals(state)
                 },
                 onFailure = { error -> state.value = state.value.copy(isLoading = false, error = error.message ?: "Error al resolver apelación") }
+            )
+        }
+    }
+
+    fun responderReporte(reporteId: String, respuesta: String, currentUserId: String, state: MutableStateFlow<AdminUiState>, onLog: (String, String) -> Unit) {
+        scope.launch {
+            state.value = state.value.copy(isLoading = true, error = null)
+            responderReporteUseCase(reporteId, respuesta).fold(
+                onSuccess = {
+                    state.value = state.value.copy(isLoading = false, successMessage = "Reporte respondido")
+                    onLog(currentUserId, "Respondió reporte $reporteId")
+                    loadAllReportes(state)
+                },
+                onFailure = { error -> state.value = state.value.copy(isLoading = false, error = error.message ?: "Error al responder reporte") }
             )
         }
     }

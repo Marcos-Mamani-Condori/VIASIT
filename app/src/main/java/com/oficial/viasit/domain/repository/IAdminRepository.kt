@@ -6,7 +6,7 @@ import com.oficial.viasit.domain.model.LogEntry
 import com.oficial.viasit.domain.model.Ruta
 import com.oficial.viasit.domain.model.VehicleInvitationCode
 
-interface IAdminRepository {
+interface IAdminRepository : ILogsRepository {
 
     suspend fun generateInvitationCode(role: String = "ADMIN_LINEA", lineaId: String = "", expiresInHours: Int = 24): Result<InvitationCode>
     suspend fun getInvitationCodes(): Result<List<InvitationCode>>
@@ -27,9 +27,7 @@ interface IAdminRepository {
     suspend fun getRutaByLinea(linea: Linea): Result<Ruta?>
     suspend fun deleteRuta(rutaId: String): Result<Unit>
 
-    suspend fun createLog(userId: String, description: String, type: String = "info"): Result<Unit>
-    suspend fun getLogs(limit: Int = 50, filter: String = ""): Result<List<LogEntry>>
-    suspend fun getLogsByUser(userId: String): Result<List<LogEntry>>
+    // Logs (Heredados de ILogsRepository: create, getAll, getByUser)
 
     // --- Gestión de Usuarios (NUEVO) ---
     suspend fun getUsersByLinea(lineaId: String): Result<List<com.oficial.viasit.domain.model.User>>

@@ -17,6 +17,7 @@ import com.oficial.viasit.viewmodels.AuthViewModel
 fun DriverDashboardHandler(
     authViewModel: AuthViewModel,
     onNavigateToMap: () -> Unit,
+    onNavigateToMyRoute: (String) -> Unit,
     onNavigateToRegisterVehicle: () -> Unit,
     onLogout: () -> Unit,
     onVehicleNotFound: () -> Unit
@@ -113,6 +114,11 @@ fun DriverDashboardHandler(
             },
             onNavigateToRegisterVehicle = onNavigateToRegisterVehicle,
             onNavigateToMap             = onNavigateToMap,
+            onNavigateToMyRoute         = { 
+                currentUser.lineaId.let { id ->
+                    if (id.isNotBlank()) onNavigateToMyRoute(id)
+                }
+            },
             onNavigateToManageVehicle   = onNavigateToRegisterVehicle,
             onLogout                    = onLogout
         )

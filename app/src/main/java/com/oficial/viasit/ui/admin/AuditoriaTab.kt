@@ -206,7 +206,7 @@ fun LogEntryItem(log: LogEntry) {
                 ) {
                     Icon(Icons.Default.Person, null, modifier = Modifier.size(12.dp), tint = Slate500)
                     Text(
-                        "Responsable: ${log.userName.ifEmpty { log.userId.take(12) + "..." }}",
+                        "Responsable: ${log.userName.ifEmpty { log.userId.take(if (log.userId.length > 12) 12 else log.userId.length) + "..." }}",
                         style = MaterialTheme.typography.labelSmall,
                         color = Slate500
                     )
@@ -218,8 +218,9 @@ fun LogEntryItem(log: LogEntry) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     val dateStr = try {
-                        val parseFmt = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS'Z'", Locale.getDefault())
-                        val d = parseFmt.parse(log.created)
+                        val inputFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS'Z'", Locale.getDefault())
+                        inputFormat.timeZone = TimeZone.getTimeZone("UTC")
+                        val d = inputFormat.parse(log.created)
                         if (d != null) displayFormat.format(d) else log.created
                     } catch (e: Exception) { log.created }
                     

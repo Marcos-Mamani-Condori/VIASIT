@@ -9,18 +9,26 @@ import com.oficial.viasit.domain.model.VehicleInvitationCode
 internal object AdminJsonParsers {
 
     fun extractStringField(json: String, field: String): String =
-        Regex(""""$field"\s*:\s*"([^"]*)"""").find(json)?.groupValues?.get(1) ?: ""
+        Regex(""""$field"\s*:\s*"([^"]*)"|"$field"\s*:\s*(\w+)""").find(json)?.let { 
+            it.groupValues[1].ifEmpty { it.groupValues[2] }
+        } ?: ""
 
     fun extractItemBlocks(json: String): List<String> {
-        val arrayStart = json.indexOf('[', json.indexOf("\"items\":"))
+        val itemsKeyIndex = json.indexOf("\"items\"")
+        if (itemsKeyIndex == -1) return emptyList()
+        val arrayStart = json.indexOf('[', itemsKeyIndex)
         if (arrayStart == -1) return emptyList()
+        
         val blocks = mutableListOf<String>()
         var depth = 0; var blockStart = -1; var i = arrayStart + 1
         while (i < json.length) {
             when (json[i]) {
                 '{' -> { if (depth == 0) blockStart = i; depth++ }
                 '}' -> { depth--
-                    if (depth == 0 && blockStart != -1) { blocks.add(json.substring(blockStart, i + 1)); blockStart = -1 }
+                    if (depth == 0 && blockStart != -1) { 
+                        blocks.add(json.substring(blockStart, i + 1))
+                        blockStart = -1 
+                    }
                 }
                 ']' -> if (depth == 0) break
             }
@@ -52,12 +60,40 @@ internal object AdminJsonParsers {
         }.filter { it.id.isNotEmpty() }
     }
 
+    fun extractNestedObject(json: String, startIndex: Int): String {
+        val startBrace = json.indexOf('{', startIndex)
+        if (startBrace == -1) return ""
+        var depth = 0
+        for (i in startBrace until json.length) {
+            if (json[i] == '{') depth++
+            else if (json[i] == '}') {
+                depth--
+                if (depth == 0) return json.substring(startBrace, i + 1)
+            }
+        }
+        return ""
+    }
+
     fun parseLogsFromJson(json: String): List<LogEntry> {
         return extractItemBlocks(json).map { block ->
+            val expandStart = block.indexOf("\"expand\"")
+            var displayName = ""
+            if (expandStart != -1) {
+                val expandBlock = extractNestedObject(block, expandStart)
+                // Buscamos cualquier objeto dentro de expand que tenga 'name' o 'email'
+                // PocketBase puede llamar al campo 'users', 'userId', 'userid', etc.
+                val nameMatch = Regex(""""name"\s*:\s*"([^"]+)"""").find(expandBlock)
+                val emailMatch = Regex(""""email"\s*:\s*"([^"]+)"""").find(expandBlock)
+                
+                displayName = nameMatch?.groupValues?.get(1) 
+                    ?: emailMatch?.groupValues?.get(1) 
+                    ?: ""
+            }
+
             LogEntry(
                 id = extractStringField(block, "id"),
-                userId = extractStringField(block, "userid"),
-                userName = extractStringField(block, "userName"),
+                userId = extractStringField(block, "userid").ifEmpty { extractStringField(block, "userId") }.ifEmpty { extractStringField(block, "users") },
+                userName = displayName.ifEmpty { "Sistema" },
                 description = extractStringField(block, "description"),
                 type = extractStringField(block, "type").ifEmpty { "info" },
                 created = extractStringField(block, "created")

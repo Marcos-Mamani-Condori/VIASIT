@@ -39,6 +39,8 @@ import com.oficial.viasit.ui.map.clearRoutesSource
 import com.oficial.viasit.ui.map.updateRoutesSource
 import com.oficial.viasit.ui.routes.GeocodingService
 import com.oficial.viasit.ui.routes.SearchResult
+import com.oficial.viasit.ui.theme.*
+import com.oficial.viasit.ui.theme.Rose500
 import com.oficial.viasit.viewmodels.PassengerViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -65,12 +67,13 @@ fun PassengerMapScreen(
     val focusManager   = LocalFocusManager.current
 
     var mapInstance  by remember { mutableStateOf<MapLibreMap?>(null) }
-    var mapStyle      by remember { mutableStateOf<Style?>(null) }  // se asigna cuando el estilo termina de cargar
+    var mapStyle      by remember { mutableStateOf<Style?>(null) } 
 
     var showVehicleSheet by remember { mutableStateOf(false) }
-    var showTails by remember { mutableStateOf(true) } // Interruptor para el rastro ligero
+    var showTails by remember { mutableStateOf(true) }
     var selectedVehicleIdForSheet by remember { mutableStateOf<String?>(null) }
     val sheetState = rememberModalBottomSheetState()
+    
     val selectedVehicleForSheet = remember(selectedVehicleIdForSheet, autos) {
         autos.find { it.id == selectedVehicleIdForSheet }
     }
@@ -117,7 +120,6 @@ fun PassengerMapScreen(
                 map.addOnMapClickListener { point ->
                     val pixel = map.projection.toScreenLocation(point)
                     
-                    // 1. Detectar clics en clusters para expandirlos
                     val clusters = map.queryRenderedFeatures(pixel, "clusters-layer")
                     if (clusters.isNotEmpty()) {
                         val currentZoom = map.cameraPosition.zoom
@@ -125,12 +127,15 @@ fun PassengerMapScreen(
                         return@addOnMapClickListener true
                     }
 
-                    // 2. Detectar clics en vehículos individuales
                     val features = map.queryRenderedFeatures(pixel, "cars-layer")
                     if (features.isNotEmpty()) {
                         val feature = features[0]
                         val autoId = feature.getStringProperty("id") ?: ""
+                        val placa = feature.getStringProperty("placa") ?: ""
                         selectedVehicleIdForSheet = autoId
+                        if (placa.isNotEmpty()) {
+                            passengerViewModel.loadReportesForVehicle(placa)
+                        }
                         showVehicleSheet = true
                         true
                     } else false
@@ -210,6 +215,7 @@ fun PassengerMapScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         AndroidView({ mapView }, modifier = Modifier.fillMaxSize())
 
+        // Top Search & Info Bar
         Column(
             modifier = Modifier
                 .align(Alignment.TopCenter)
@@ -238,7 +244,7 @@ fun PassengerMapScreen(
                     )
                     if (selectedLineaId != null && routePolylines.isNotEmpty()) {
                         Text(
-                            "Ruta: ${routePolylines.first().lineaName} · ${autos.count { it.isActive() }} minibús(es)",
+                            "Ruta: ${routePolylines.first().lineaName} · ${autos.count { it.isActive() }} unidad(es)",
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                         )
@@ -270,6 +276,7 @@ fun PassengerMapScreen(
                 }
             }
 
+            // Search Bar
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -414,17 +421,22 @@ fun PassengerMapScreen(
             }
         }
 
+        // Botón de Rastro (Tails) - Movido y mejorado
         if (showTailsButton) {
-            FloatingActionButton(
+            SmallFloatingActionButton(
                 onClick = { showTails = !showTails },
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(end = 16.dp, bottom = 128.dp)
-                    .size(40.dp),
+                    .padding(end = 16.dp, bottom = 75.dp),
                 containerColor = if (showTails) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
-                contentColor = if (showTails) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary
+                contentColor = if (showTails) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary,
+                shape = CircleShape
             ) {
-                Icon(Icons.Default.Route, "Ver recorrido", modifier = Modifier.size(20.dp))
+                Icon(
+                    if (showTails) Icons.Default.Visibility else Icons.Default.VisibilityOff, 
+                    "Ver rastro", 
+                    modifier = Modifier.size(18.dp)
+                )
             }
         }
 
@@ -449,9 +461,12 @@ fun PassengerMapScreen(
             )
         }
 
+        // Bottom Sheet for Vehicle Info
         if (showVehicleSheet && selectedVehicleForSheet != null) {
             val auto = selectedVehicleForSheet!!
             val linea = lineas.find { it.id == auto.lineaId }
+            val reportes by passengerViewModel.selectedVehicleReportes.collectAsState()
+
             ModalBottomSheet(
                 onDismissRequest = {
                     showVehicleSheet = false
@@ -462,20 +477,36 @@ fun PassengerMapScreen(
                 tonalElevation = 8.dp,
                 dragHandle = { BottomSheetDefaults.DragHandle() }
             ) {
-                VehicleInfoContent(auto = auto, lineaName = linea?.name ?: "Desconocida")
+                VehicleInfoContent(
+                    auto = auto,
+                    lineaName = linea?.name ?: "Desconocida",
+                    reportes = reportes,
+                    onReportClick = { desc ->
+                        passengerViewModel.reportarMalServicio(auto.placa, auto.userId, desc)
+                    }
+                )
             }
         }
     }
 }
 
 @Composable
-fun VehicleInfoContent(auto: Auto, lineaName: String) {
+fun VehicleInfoContent(
+    auto: Auto,
+    lineaName: String,
+    reportes: List<com.oficial.viasit.domain.model.Reporte>,
+    onReportClick: (String) -> Unit
+) {
+    var showReportDialog by remember { mutableStateOf(false) }
+    var reportText by remember { mutableStateOf("") }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(16.dp)
-            .padding(bottom = 24.dp)
+            .padding(bottom = 32.dp)
     ) {
+        // Header
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
@@ -483,13 +514,13 @@ fun VehicleInfoContent(auto: Auto, lineaName: String) {
             Surface(
                 color = MaterialTheme.colorScheme.primaryContainer,
                 shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.size(56.dp)
+                modifier = Modifier.size(60.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         Icons.Default.DirectionsBus,
                         contentDescription = null,
-                        modifier = Modifier.size(32.dp),
+                        modifier = Modifier.size(36.dp),
                         tint = MaterialTheme.colorScheme.primary
                     )
                 }
@@ -499,43 +530,155 @@ fun VehicleInfoContent(auto: Auto, lineaName: String) {
                 Text(
                     text = auto.placa,
                     style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.Black,
                     color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "Conductor: ${auto.driverName}",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Medium
                 )
                 Text(
                     text = "Línea: $lineaName",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
                 )
+            }
+            
+            // Reputation Badge (Muro de la Verdad)
+            Surface(
+                color = if (reportes.isEmpty()) Color(0xFF10B981).copy(alpha = 0.1f) else Color(0xFFF43F5E).copy(alpha = 0.1f),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        if (reportes.isEmpty()) Icons.Default.Shield else Icons.Default.Warning,
+                        null,
+                        modifier = Modifier.size(14.dp),
+                        tint = if (reportes.isEmpty()) Color(0xFF10B981) else Color(0xFFF43F5E)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        if (reportes.isEmpty()) "Sin denuncias" else "${reportes.size} Reportes",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (reportes.isEmpty()) Color(0xFF10B981) else Color(0xFFF43F5E),
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        Spacer(modifier = Modifier.height(24.dp))
-
+        
+        // Stats Row
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             InfoItem(
-                label = "Última actualización",
-                value = auto.getLastUpdateText(),
-                icon = Icons.Default.Update
+                label = "Conductor",
+                value = auto.driverName.ifBlank { "Asignando..." },
+                icon = Icons.Default.Person
             )
             InfoItem(
-                label = "Código Interno",
-                value = auto.code.ifBlank { "N/A" },
-                icon = Icons.Default.Fingerprint,
+                label = "Actualizado",
+                value = auto.getLastUpdateText(),
+                icon = Icons.Default.Update,
                 alignment = Alignment.End
             )
         }
+
+        Spacer(modifier = Modifier.height(24.dp))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Reports History (Social Justice / Truth Wall)
+        if (reportes.isNotEmpty()) {
+            Text(
+                "Muro de la Verdad (Reportes Recientes)",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                reportes.take(3).forEach { reporte ->
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                reporte.descripcion.replace("[Unidad: ${auto.placa}]", "").trim(),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                "Reportado por: ${reporte.reporterName}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                                fontSize = 9.sp
+                            )
+                        }
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(24.dp))
+        }
+
+        // Action Button
+        Button(
+            onClick = { showReportDialog = true },
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(containerColor = Rose500),
+            shape = RoundedCornerShape(12.dp),
+            contentPadding = PaddingValues(16.dp)
+        ) {
+            Icon(Icons.Default.ReportProblem, null)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Reportar Incidente o Mal Trato", fontWeight = FontWeight.Bold)
+        }
+    }
+
+    if (showReportDialog) {
+        AlertDialog(
+            onDismissRequest = { showReportDialog = false },
+            title = { Text("Reportar Vehículo ${auto.placa}") },
+            text = {
+                Column {
+                    Text("Tu reporte ayuda a mejorar el servicio. Sé específico.", 
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = reportText,
+                        onValueChange = { reportText = it },
+                        placeholder = { Text("Ej: Exceso de velocidad, mal trato...") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 3
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (reportText.isNotBlank()) {
+                            onReportClick(reportText)
+                            showReportDialog = false
+                            reportText = ""
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Rose500)
+                ) {
+                    Text("Enviar Reporte")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showReportDialog = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
     }
 }
 
@@ -555,7 +698,8 @@ fun InfoItem(
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold
             )
             if (alignment == Alignment.End) {
                 Spacer(modifier = Modifier.width(4.dp))
@@ -588,7 +732,7 @@ private fun RoutePolylineLegend(
         shape = RoundedCornerShape(10.dp)
     ) {
         Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            routes.take(6).forEachIndexed { i, route ->  // Máximo 6 en leyenda
+            routes.take(6).forEachIndexed { i, route ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier

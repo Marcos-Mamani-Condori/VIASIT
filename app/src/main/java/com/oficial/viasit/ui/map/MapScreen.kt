@@ -32,6 +32,7 @@ import com.oficial.viasit.domain.model.UserRole
 import com.oficial.viasit.ui.routes.GeocodingService
 import com.oficial.viasit.ui.routes.SearchResult
 import com.oficial.viasit.viewmodels.AuthViewModel
+import com.oficial.viasit.viewmodels.PassengerViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.maplibre.android.camera.CameraUpdateFactory
@@ -44,18 +45,23 @@ import org.maplibre.android.maps.Style
 @Composable
 fun MainMapScreen(
     authViewModel: AuthViewModel,
+    lineaId: String? = null,
     onLogout: () -> Unit,
     onBackToDashboard: (() -> Unit)? = null
 ) {
     val context      = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val autosViewModel: AutosViewModel = viewModel(factory = AutosViewModel.Factory)
+    val passengerViewModel: PassengerViewModel = viewModel(factory = PassengerViewModel.Factory)
     val autos        by autosViewModel.autosUiState.collectAsState()
     val authState    by authViewModel.authState.collectAsState()
+    val rutas        by passengerViewModel.rutas.collectAsState()
+    val lineas       by passengerViewModel.lineas.collectAsState()
     val scope        = rememberCoroutineScope()
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
 
     var mapInstance  by remember { mutableStateOf<MapLibreMap?>(null) }
+    var mapStyle     by remember { mutableStateOf<Style?>(null) }
     var selectedCar  by remember { mutableStateOf<Auto?>(null) }
 
     val geocodingService                         = remember { GeocodingService() }
@@ -73,6 +79,22 @@ fun MainMapScreen(
         autos.find { it.userId.contains(currentUser?.id ?: "") }
     } else null
 
+    val routePolylines: List<RoutePolyline> = remember(rutas, lineas, lineaId) {
+        if (lineaId == null) return@remember emptyList()
+        val linea = lineas.find { it.id == lineaId } ?: return@remember emptyList()
+        val ruta = rutas[linea.rutaId] ?: return@remember emptyList()
+        if (ruta.startPoint.isBlank() || ruta.endPoint.isBlank()) return@remember emptyList()
+        listOf(
+            RoutePolyline(
+                id         = ruta.id,
+                lineaName  = linea.name,
+                startPoint = ruta.startPoint,
+                endPoint   = ruta.endPoint,
+                waypoints  = ruta.waypoints
+            )
+        )
+    }
+
     val mapView = remember {
         MapView(context).apply {
             getMapAsync { map ->
@@ -80,9 +102,11 @@ fun MainMapScreen(
                 map.setStyle(Style.Builder().fromUri("https://tiles.openfreemap.org/styles/bright")) { style ->
                     addCarIconToStyle(style, context)
                     addCarsLayer(style)
+                    addRoutesLayer(style)
                     val activeAutos = autos.filter { it.isActive() }
                     updateCarsSource(style, activeAutos)
                     enableLocationComponent(style, map, context)
+                    mapStyle = style
                 }
                 map.addOnMapClickListener { latLng ->
                     val screenPoint = map.projection.toScreenLocation(latLng)
@@ -112,9 +136,29 @@ fun MainMapScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    LaunchedEffect(autos, mapInstance) {
+    LaunchedEffect(autos, mapStyle) {
         val activeAutos = autos.filter { it.isActive() }
-        mapInstance?.getStyle { style -> updateCarsSource(style, activeAutos) }
+        mapStyle?.let { style -> updateCarsSource(style, activeAutos) }
+    }
+
+    LaunchedEffect(routePolylines, mapStyle) {
+        val style = mapStyle ?: return@LaunchedEffect
+        if (routePolylines.isNotEmpty()) {
+            updateRoutesSource(style, routePolylines)
+            val firstRoute = routePolylines.first()
+            val parts = firstRoute.startPoint.split(",")
+            if (parts.size >= 2) {
+                val lat = parts[0].trim().toDoubleOrNull()
+                val lng = parts[1].trim().toDoubleOrNull()
+                if (lat != null && lng != null) {
+                    mapInstance?.animateCamera(
+                        CameraUpdateFactory.newLatLngZoom(LatLng(lat, lng), 14.0)
+                    )
+                }
+            }
+        } else {
+            clearRoutesSource(style)
+        }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {

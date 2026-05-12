@@ -6,11 +6,11 @@ import androidx.lifecycle.viewModelScope
 import com.oficial.viasit.AutosAplicacion
 import com.oficial.viasit.domain.model.LogEntry
 import com.oficial.viasit.domain.usecases.GetLogsUseCase
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.FlowPreview
 
+@OptIn(FlowPreview::class)
 class LogsViewModel(
     private val getLogsUseCase: GetLogsUseCase
 ) : ViewModel() {
@@ -24,34 +24,47 @@ class LogsViewModel(
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
-    private val _timeFilter = MutableStateFlow("todos") // todos, hoy, ayer, semana, mes
+    private val _timeFilter = MutableStateFlow("todos") // todos, hoy, semana, mes
     val timeFilter: StateFlow<String> = _timeFilter.asStateFlow()
+
+    init {
+        // Debounce search queries to avoid excessive API calls
+        viewModelScope.launch {
+            combine(_searchQuery, _timeFilter) { query, filter ->
+                Pair(query, filter)
+            }
+            .debounce(500)
+            .collect { (query, filter) ->
+                performLoadLogs(query, filter)
+            }
+        }
+    }
 
     fun setSearchQuery(query: String) {
         _searchQuery.value = query
-        loadLogs()
     }
 
     fun setTimeFilter(filter: String) {
         _timeFilter.value = filter
-        loadLogs()
     }
 
     fun loadLogs() {
         viewModelScope.launch {
-            _isLoading.value = true
-            
-            val filter = if (_timeFilter.value != "todos") _timeFilter.value else _searchQuery.value
-            // Nota: El repositorio actual usa un solo campo de 'filter' para ambos. 
-            // Si hay búsqueda y filtro de tiempo, priorizamos el de tiempo según la implementación actual del repo.
-            // Idealmente el repo debería soportar ambos.
-            
-            getLogsUseCase(filter = filter).fold(
-                onSuccess = { _logs.value = it },
-                onFailure = { _logs.value = emptyList() }
-            )
-            _isLoading.value = false
+            performLoadLogs(_searchQuery.value, _timeFilter.value)
         }
+    }
+
+    private suspend fun performLoadLogs(query: String, timeFilter: String) {
+        _isLoading.value = true
+        
+        // Solo enviamos filtro de texto si el usuario realmente escribió algo
+        val textFilter = if (query.isNotBlank()) query else ""
+        
+        getLogsUseCase(filter = textFilter, timeFilter = timeFilter).fold(
+            onSuccess = { _logs.value = it },
+            onFailure = { _logs.value = emptyList() }
+        )
+        _isLoading.value = false
     }
 
     companion object {

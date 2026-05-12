@@ -8,6 +8,7 @@ import com.oficial.viasit.data.repository.AutoRepository
 import com.oficial.viasit.data.repository.AuthRepository
 import com.oficial.viasit.data.repository.ReportesRepository
 import com.oficial.viasit.domain.repository.IAdminRepository
+import com.oficial.viasit.domain.repository.ILogsRepository
 import com.oficial.viasit.domain.usecases.*
 
 class AutosAplicacion : Application() {
@@ -73,8 +74,8 @@ class AutosAplicacion : Application() {
     val assignRutaToLineaUseCase by lazy { AssignRutaToLineaUseCase(adminRepository) }
 
     // UseCases de Admin - Logs
-    val getLogsUseCase by lazy { GetLogsUseCase(adminRepository) }
-    val createLogUseCase by lazy { CreateLogUseCase(adminRepository) }
+    val getLogsUseCase by lazy { GetLogsUseCase(adminRepository as ILogsRepository) }
+    val createLogUseCase by lazy { CreateLogUseCase(adminRepository as ILogsRepository) }
 
     // UseCases de Admin - Users
     val getUsersByLineaUseCase by lazy { GetUsersByLineaUseCase(adminRepository) }

@@ -20,7 +20,7 @@ import com.oficial.viasit.viewmodels.AuthViewModel
 
 sealed class Screen {
     data object Auth                     : Screen()
-    data object Map                      : Screen()
+    data class Map(val lineaId: String? = null) : Screen()
     data object PassengerDashboard       : Screen()   // ← nuevo: pasajeros / invitados
     data object DriverDashboard          : Screen()
     data object DriverVehicleRegistration: Screen()
@@ -60,9 +60,11 @@ fun VIASITApp() {
             )
         }
 
-        Screen.Map -> {
+        is Screen.Map -> {
+            val screen = currentScreen as Screen.Map
             MainMapScreen(
                 authViewModel = authViewModel,
+                lineaId = screen.lineaId,
                 onLogout = { authViewModel.logout(); currentScreen = Screen.Auth },
                 onBackToDashboard = if (authState is AuthState.Authenticated &&
                     (authState as AuthState.Authenticated).user.userRole == UserRole.conductor) {
@@ -87,7 +89,8 @@ fun VIASITApp() {
         Screen.DriverDashboard -> {
             DriverDashboardHandler(
                 authViewModel = authViewModel,
-                onNavigateToMap               = { currentScreen = Screen.Map },
+                onNavigateToMap               = { currentScreen = Screen.Map() },
+                onNavigateToMyRoute           = { lineaId -> currentScreen = Screen.Map(lineaId) },
                 onNavigateToRegisterVehicle   = { currentScreen = Screen.DriverVehicleRegistration },
                 onLogout                      = { authViewModel.logout(); currentScreen = Screen.Auth },
                 onVehicleNotFound             = { currentScreen = Screen.DriverVehicleRegistration }
@@ -113,7 +116,7 @@ fun VIASITApp() {
                     }
                 )
             } else {
-                currentScreen = Screen.Map
+                currentScreen = Screen.Map()
             }
         }
 

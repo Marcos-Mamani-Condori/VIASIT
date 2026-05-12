@@ -29,6 +29,20 @@ class PocketBaseHttpClient(private val okHttpClient: OkHttpClient) {
 
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
+    private fun handleError(code: Int, body: String?): Result<Nothing> {
+        if (body.isNullOrBlank()) return Result.failure(Exception("Error $code: No body"))
+        return try {
+            val errorJson = json.parseToJsonElement(body)
+            val message = errorJson.asJsonObject()["message"]?.toString()?.removeSurrounding("\"")
+                ?: "Error $code"
+            Result.failure(Exception(message))
+        } catch (e: Exception) {
+            Result.failure(Exception("Error $code: $body"))
+        }
+    }
+
+    private fun kotlinx.serialization.json.JsonElement.asJsonObject() = this as? kotlinx.serialization.json.JsonObject ?: kotlinx.serialization.json.JsonObject(emptyMap())
+
     suspend fun createRecord(collection: String, data: Map<String, Any>, authToken: String? = null): Result<String> {
         return withContext(Dispatchers.IO) {
             try {
@@ -39,8 +53,9 @@ class PocketBaseHttpClient(private val okHttpClient: OkHttpClient) {
                     .applyAuth(authToken)
                     .build()
                 val res = okHttpClient.newCall(req).execute()
-                if (res.isSuccessful) Result.success(res.body?.string() ?: "{}")
-                else Result.failure(Exception("Error ${res.code}: ${res.body?.string()}"))
+                val resBody = res.body?.string()
+                if (res.isSuccessful) Result.success(resBody ?: "{}")
+                else handleError(res.code, resBody)
             } catch (e: Exception) { Log.e(TAG, "createRecord", e); Result.failure(e) }
         }
     }
@@ -55,8 +70,9 @@ class PocketBaseHttpClient(private val okHttpClient: OkHttpClient) {
                     .applyAuth(authToken)
                     .build()
                 val res = okHttpClient.newCall(req).execute()
-                if (res.isSuccessful) Result.success(res.body?.string() ?: "{}")
-                else Result.failure(Exception("Error ${res.code}: ${res.body?.string()}"))
+                val resBody = res.body?.string()
+                if (res.isSuccessful) Result.success(resBody ?: "{}")
+                else handleError(res.code, resBody)
             } catch (e: Exception) { Log.e(TAG, "updateRecord", e); Result.failure(e) }
         }
     }
@@ -71,7 +87,7 @@ class PocketBaseHttpClient(private val okHttpClient: OkHttpClient) {
                     .build()
                 val res = okHttpClient.newCall(req).execute()
                 if (res.isSuccessful) Result.success(Unit)
-                else Result.failure(Exception("Error ${res.code}: ${res.body?.string()}"))
+                else handleError(res.code, res.body?.string())
             } catch (e: Exception) { Log.e(TAG, "deleteRecord", e); Result.failure(e) }
         }
     }
@@ -85,8 +101,9 @@ class PocketBaseHttpClient(private val okHttpClient: OkHttpClient) {
                     .applyAuth(authToken)
                     .build()
                 val res = okHttpClient.newCall(req).execute()
-                if (res.isSuccessful) Result.success(res.body?.string() ?: "{}")
-                else Result.failure(Exception("Error ${res.code}: ${res.body?.string()}"))
+                val resBody = res.body?.string()
+                if (res.isSuccessful) Result.success(resBody ?: "{}")
+                else handleError(res.code, resBody)
             } catch (e: Exception) { Log.e(TAG, "getRecord", e); Result.failure(e) }
         }
     }
@@ -97,6 +114,7 @@ class PocketBaseHttpClient(private val okHttpClient: OkHttpClient) {
         perPage: Int = 30,
         filter: String = "",
         sort: String = "",
+        expand: String = "",
         authToken: String? = null
     ): Result<String> {
         return withContext(Dispatchers.IO) {
@@ -104,10 +122,12 @@ class PocketBaseHttpClient(private val okHttpClient: OkHttpClient) {
                 var url = "$BASE_URL/api/collections/$collection/records?page=$page&perPage=$perPage"
                 if (filter.isNotEmpty()) url += "&filter=${java.net.URLEncoder.encode(filter, "UTF-8")}"
                 if (sort.isNotEmpty())   url += "&sort=${java.net.URLEncoder.encode(sort, "UTF-8")}"
+                if (expand.isNotEmpty()) url += "&expand=${java.net.URLEncoder.encode(expand, "UTF-8")}"
                 val req = Request.Builder().url(url).get().applyAuth(authToken).build()
                 val res = okHttpClient.newCall(req).execute()
-                if (res.isSuccessful) Result.success(res.body?.string() ?: "{}")
-                else Result.failure(Exception("Error ${res.code}: ${res.body?.string()}"))
+                val resBody = res.body?.string()
+                if (res.isSuccessful) Result.success(resBody ?: "{}")
+                else handleError(res.code, resBody)
             } catch (e: Exception) { Log.e(TAG, "getList", e); Result.failure(e) }
         }
     }

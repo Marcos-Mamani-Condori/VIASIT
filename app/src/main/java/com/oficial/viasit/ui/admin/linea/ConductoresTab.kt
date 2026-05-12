@@ -108,7 +108,19 @@ fun ConductorItem(
                 )
                 if (auto != null) {
                     Text(
+                        "Vehículo: ${auto.placa}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Brand400,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
                         "Última vez: ${auto.getLastUpdateText()}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Slate500
+                    )
+                } else {
+                    Text(
+                        "Sin vehículo asignado",
                         style = MaterialTheme.typography.labelSmall,
                         color = Slate500
                     )

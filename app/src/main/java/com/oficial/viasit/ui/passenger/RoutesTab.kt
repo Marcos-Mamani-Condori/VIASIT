@@ -143,6 +143,9 @@ fun RoutesTab(
                                     viewModel.selectLinea(linea.id)
                                     onViewOnMap(linea.id)
                                 }
+                            },
+                            onReportRoute = { descripcion ->
+                                viewModel.reportarProblemaRuta(linea.name, descripcion)
                             }
                         )
                     }
@@ -158,7 +161,8 @@ private fun LineaCard(
     linea: Linea,
     ruta: Ruta?,
     isSelected: Boolean,
-    onViewOnMap: () -> Unit
+    onViewOnMap: () -> Unit,
+    onReportRoute: (String) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
 
@@ -348,6 +352,22 @@ private fun LineaCard(
                                         modifier = Modifier.widthIn(max = 130.dp)
                                     )
                                 }
+                            }
+                        }
+
+                        HorizontalDivider(color = Slate800, thickness = 1.dp)
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            TextButton(
+                                onClick = { onReportRoute("Falla reportada en la ruta de ${linea.name}") },
+                                colors = ButtonDefaults.textButtonColors(contentColor = Rose500)
+                            ) {
+                                Icon(Icons.Default.ReportProblem, null, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Reportar falla en ruta", style = MaterialTheme.typography.labelSmall)
                             }
                         }
                     }

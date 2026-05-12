@@ -8,10 +8,9 @@ import androidx.lifecycle.viewModelScope
 import com.oficial.viasit.AutosAplicacion
 import com.oficial.viasit.domain.model.Auto
 import com.oficial.viasit.domain.model.Linea
+import com.oficial.viasit.domain.model.Reporte
 import com.oficial.viasit.domain.model.Ruta
-import com.oficial.viasit.domain.usecases.GetLineasUseCase
-import com.oficial.viasit.domain.usecases.GetRutasUseCase
-import com.oficial.viasit.domain.usecases.SearchLineasByDestinationUseCase
+import com.oficial.viasit.domain.usecases.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,7 +20,10 @@ class PassengerViewModel(
     application: Application,
     private val getLineasUseCase: GetLineasUseCase,
     private val getRutasUseCase: GetRutasUseCase,
-    private val searchLineasByDestinationUseCase: SearchLineasByDestinationUseCase
+    private val searchLineasByDestinationUseCase: SearchLineasByDestinationUseCase,
+    private val submitReporteUseCase: SubmitReporteUseCase,
+    private val getReportesUseCase: GetReportesUseCase,
+    private val authRepository: com.oficial.viasit.domain.repository.IAuthRepository
 ) : AndroidViewModel(application) {
 
     companion object {
@@ -35,8 +37,66 @@ class PassengerViewModel(
                     app,
                     app.getLineasUseCase,
                     app.getRutasUseCase,
-                    app.searchLineasByDestinationUseCase
+                    app.searchLineasByDestinationUseCase,
+                    app.submitReporteUseCase,
+                    app.getReportesUseCase,
+                    app.authRepository
                 ) as T
+            }
+        }
+    }
+
+    private val _reportSuccess = MutableStateFlow(false)
+    val reportSuccess: StateFlow<Boolean> = _reportSuccess.asStateFlow()
+
+    private val _selectedVehicleReportes = MutableStateFlow<List<Reporte>>(emptyList())
+    val selectedVehicleReportes: StateFlow<List<Reporte>> = _selectedVehicleReportes.asStateFlow()
+
+    fun loadReportesForVehicle(placa: String) {
+        viewModelScope.launch {
+            getReportesUseCase(placa).onSuccess {
+                _selectedVehicleReportes.value = it
+            }.onFailure {
+                _selectedVehicleReportes.value = emptyList()
+            }
+        }
+    }
+
+    fun reportarProblemaRuta(lineaName: String, descripcion: String) {
+        viewModelScope.launch {
+            val user = authRepository.getCurrentUser()
+            submitReporteUseCase(
+                descripcion = "[RUTA $lineaName] $descripcion",
+                reporterId = user?.id ?: "invitado",
+                reporterName = user?.name ?: "Pasajero Anónimo",
+                driverId = "", // No es contra un conductor específico
+                category = "rutas"
+            ).onSuccess {
+                _reportSuccess.value = true
+                kotlinx.coroutines.delay(3000)
+                _reportSuccess.value = false
+            }.onFailure {
+                _error.value = "No se pudo enviar el reporte de ruta"
+            }
+        }
+    }
+
+    fun reportarMalServicio(placa: String, driverId: String, descripcion: String) {
+        viewModelScope.launch {
+            val user = authRepository.getCurrentUser()
+            submitReporteUseCase(
+                descripcion = "[Unidad: $placa] $descripcion",
+                reporterId = user?.id ?: "invitado",
+                reporterName = user?.name ?: "Pasajero Anónimo",
+                driverId = driverId,
+                category = "servicio"
+            ).onSuccess {
+                _reportSuccess.value = true
+                loadReportesForVehicle(placa) // Recargar reportes
+                kotlinx.coroutines.delay(3000)
+                _reportSuccess.value = false
+            }.onFailure {
+                _error.value = "No se pudo enviar el reporte del vehículo"
             }
         }
     }

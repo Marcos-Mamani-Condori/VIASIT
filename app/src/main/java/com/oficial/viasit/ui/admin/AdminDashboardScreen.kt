@@ -131,7 +131,11 @@ fun AdminDashboardScreen(
                                 viewModel.deleteRuta(rutaId, rutaName, lineaId, currentUser.id)
                             }
                         )
-                        3 -> ReportesTabContent(reportes = uiState.reportes, isLoading = uiState.isLoading)
+                        3 -> ReportesTabContent(
+                            reportes = uiState.reportes, 
+                            isLoading = uiState.isLoading,
+                            onResponder = { id, resp -> viewModel.responderReporte(id, resp, currentUser.id) }
+                        )
                         4 -> ApelacionesTabContent(
                             appeals = uiState.appeals,
                             isLoading = uiState.isLoading,

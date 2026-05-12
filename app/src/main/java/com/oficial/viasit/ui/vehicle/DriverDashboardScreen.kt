@@ -47,6 +47,7 @@ fun DriverDashboardScreen(
     onSelectVehicle: (Auto) -> Unit,
     onNavigateToRegisterVehicle: () -> Unit,
     onNavigateToMap: () -> Unit,
+    onNavigateToMyRoute: () -> Unit,
     onNavigateToManageVehicle: () -> Unit,
     onLogout: () -> Unit,
     autosViewModel: AutosViewModel = viewModel(factory = AutosViewModel.Factory),
@@ -129,7 +130,7 @@ fun DriverDashboardScreen(
                     vehicles = vehicles,
                     selectedVehicle = selectedVehicle,
                     lineaId = currentUser?.lineaId,
-                    onShowSelector = { showVehicleSelector = true }
+                    onShowSelector = { /* Restricted to one vehicle, selector disabled */ }
                 )
             }
 
@@ -157,10 +158,11 @@ fun DriverDashboardScreen(
 
             DashboardMenuItem(
                 icon = Icons.Default.DirectionsCar,
-                title = if (vehicles.isEmpty()) "Registrar vehículo" else "Gestionar vehículos",
-                subtitle = if (vehicles.isEmpty()) "Ingresa los datos de tu unidad" else "${vehicles.size} vehículo(s) registrado(s)",
-                iconColor = Brand500,
-                onClick = onNavigateToRegisterVehicle
+                title = if (vehicles.isEmpty()) "Registrar vehículo" else "Vehículo Vinculado",
+                subtitle = if (vehicles.isEmpty()) "Ingresa los datos de tu unidad" else "Ya registraste una unidad. Para cambios, contacta al encargado.",
+                iconColor = if (vehicles.isEmpty()) Brand500 else Slate500,
+                onClick = { /* Acción informativa */ },
+                enabled = vehicles.isEmpty()
             )
 
             DashboardMenuItem(
@@ -169,6 +171,15 @@ fun DriverDashboardScreen(
                 subtitle = "Monitorea las unidades en tiempo real",
                 iconColor = Emerald400,
                 onClick = onNavigateToMap
+            )
+
+            DashboardMenuItem(
+                icon = Icons.Default.Route,
+                title = "Ver mi ruta oficial",
+                subtitle = "Visualiza el trayecto de tu línea",
+                iconColor = Brand500,
+                onClick = onNavigateToMyRoute,
+                enabled = currentUser?.lineaId?.isNotBlank() == true
             )
 
             DashboardMenuItem(
@@ -237,19 +248,36 @@ fun DriverDashboardScreen(
         if (showLogsDialog) {
             val logs by logsViewModel.logs.collectAsState()
             val isLoadingLogs by logsViewModel.isLoading.collectAsState()
+            val searchQuery by logsViewModel.searchQuery.collectAsState()
+            val timeFilter by logsViewModel.timeFilter.collectAsState()
+
             AlertDialog(
                 onDismissRequest = { showLogsDialog = false },
                 containerColor = Slate950,
-                modifier = Modifier.fillMaxWidth(0.95f),
-                title = { Text("Muro de la Verdad", color = Color.White) },
-                text = {
-                    Box(modifier = Modifier.height(500.dp)) {
-                        AuditoriaTabContent(logs = logs, isLoading = isLoadingLogs)
+                modifier = Modifier.fillMaxWidth(0.98f).fillMaxHeight(0.85f),
+                title = { 
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Muro de la Verdad", color = Color.White)
+                        IconButton(onClick = { showLogsDialog = false }) {
+                            Icon(Icons.Default.Close, null, tint = Slate400)
+                        }
                     }
                 },
-                confirmButton = {
-                    TextButton(onClick = { showLogsDialog = false }) { Text("Cerrar", color = Brand500) }
-                }
+                text = {
+                    AuditoriaTabContent(
+                        logs = logs, 
+                        isLoading = isLoadingLogs,
+                        searchQuery = searchQuery,
+                        onSearchChange = { logsViewModel.setSearchQuery(it) },
+                        selectedFilter = timeFilter,
+                        onFilterChange = { logsViewModel.setTimeFilter(it) }
+                    )
+                },
+                confirmButton = {}
             )
         }
 
@@ -257,66 +285,97 @@ fun DriverDashboardScreen(
             AlertDialog(
                 onDismissRequest = { showReportesDialog = false },
                 containerColor = Slate900,
-                title = { Text("Mis reportes", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White) },
+                modifier = Modifier.fillMaxWidth(0.95f).fillMaxHeight(0.7f),
+                title = { 
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Text("Mis reportes", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.White)
+                        IconButton(onClick = { showReportesDialog = false }) {
+                            Icon(Icons.Default.Close, null, tint = Slate400)
+                        }
+                    }
+                },
                 text = {
-                    Column(modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         when {
-                            reportesLoading -> Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                                CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Brand500, strokeWidth = 2.dp)
+                            reportesLoading -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator(color = Brand500)
                             }
-                            reportesList.isEmpty() -> Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Slate800).padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Icon(Icons.Default.CheckCircle, null, tint = Emerald400, modifier = Modifier.size(16.dp))
-                                Text("No tienes reportes. ¡Buen trabajo!", style = MaterialTheme.typography.bodySmall, color = Slate400)
+                            reportesList.isEmpty() -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Icon(Icons.Default.CheckCircle, null, tint = Emerald400, modifier = Modifier.size(48.dp))
+                                    Text("No tienes reportes pendientes", color = Slate400)
+                                }
                             }
-                            else -> LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            else -> LazyColumn(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                                 items(reportesList) { rep ->
-                                    val texto = rep.descripcion.replace(Regex("""^\[Bus: [^\]]+\]\s*"""), "")
-                                    Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Slate800).padding(12.dp)) {
-                                        Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                            Icon(Icons.Default.ChatBubbleOutline, null, tint = Slate500, modifier = Modifier.size(14.dp).padding(top = 2.dp))
-                                            Text(texto, style = MaterialTheme.typography.bodySmall, color = Slate300)
-                                        }
-                                        if (rep.respuesta.isNotBlank()) {
-                                            Spacer(modifier = Modifier.height(6.dp))
-                                            Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(start = 16.dp)) {
-                                                Icon(Icons.Default.SubdirectoryArrowRight, null, tint = Brand500, modifier = Modifier.size(14.dp).padding(top = 2.dp))
-                                                Text(rep.respuesta, style = MaterialTheme.typography.bodySmall, color = Brand400)
-                                            }
-                                        } else {
-                                            var replyText by remember { mutableStateOf("") }
-                                            var isReplying by remember { mutableStateOf(false) }
-                                            Spacer(modifier = Modifier.height(8.dp))
-                                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                                OutlinedTextField(
-                                                    value = replyText,
-                                                    onValueChange = { replyText = it },
-                                                    modifier = Modifier.weight(1f).height(46.dp),
-                                                    placeholder = { Text("Responder...", color = Slate600, fontSize = 12.sp) },
-                                                    colors = OutlinedTextFieldDefaults.colors(
-                                                        focusedBorderColor = Brand500, unfocusedBorderColor = Slate700,
-                                                        focusedTextColor = Color.White, unfocusedTextColor = Color.White
-                                                    ),
-                                                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp),
-                                                    shape = RoundedCornerShape(8.dp)
+                                    val texto = rep.descripcion.replace(Regex("""^\[Unidad: [^\]]+\]\s*"""), "")
+                                    Card(
+                                        colors = CardDefaults.cardColors(containerColor = Slate800),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                                Icon(Icons.Default.Person, null, tint = Brand400, modifier = Modifier.size(16.dp))
+                                                Text(
+                                                    text = "Reportado por: ${rep.reporterName.ifBlank { "Pasajero" }}",
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    color = Brand400,
+                                                    fontWeight = FontWeight.Bold
                                                 )
-                                                IconButton(
-                                                    onClick = {
-                                                        if (replyText.isNotBlank()) {
-                                                            isReplying = true
-                                                            autosViewModel.responderReporte(rep.id, replyText) { ok ->
-                                                                isReplying = false
-                                                                if (ok) {
-                                                                    autosViewModel.fetchReportes(selectedVehicle?.placa ?: "") { lista -> reportesList = lista }
+                                                Spacer(modifier = Modifier.weight(1f))
+                                                Text(rep.created.take(10), style = MaterialTheme.typography.labelSmall, color = Slate500)
+                                            }
+                                            
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            
+                                            Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                                Icon(Icons.Default.ChatBubbleOutline, null, tint = Slate400, modifier = Modifier.size(20.dp))
+                                                Text(texto, style = MaterialTheme.typography.bodyLarge, color = Color.White)
+                                            }
+                                            
+                                            if (rep.respuesta.isNotBlank()) {
+                                                Spacer(modifier = Modifier.height(12.dp))
+                                                Box(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Slate700).padding(12.dp)) {
+                                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                        Icon(Icons.Default.Reply, null, tint = Emerald400, modifier = Modifier.size(16.dp))
+                                                        Text("Tu respuesta: ${rep.respuesta}", style = MaterialTheme.typography.bodyMedium, color = Emerald400)
+                                                    }
+                                                }
+                                            } else {
+                                                var replyText by remember { mutableStateOf("") }
+                                                var isReplying by remember { mutableStateOf(false) }
+                                                Spacer(modifier = Modifier.height(16.dp))
+                                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                    OutlinedTextField(
+                                                        value = replyText,
+                                                        onValueChange = { replyText = it },
+                                                        modifier = Modifier.weight(1f),
+                                                        placeholder = { Text("Escribe una respuesta...", color = Slate500) },
+                                                        colors = OutlinedTextFieldDefaults.colors(
+                                                            focusedBorderColor = Brand500, unfocusedBorderColor = Slate600,
+                                                            focusedTextColor = Color.White, unfocusedTextColor = Color.White
+                                                        ),
+                                                        shape = RoundedCornerShape(12.dp)
+                                                    )
+                                                    FilledIconButton(
+                                                        onClick = {
+                                                            if (replyText.isNotBlank()) {
+                                                                isReplying = true
+                                                                autosViewModel.responderReporte(rep.id, replyText) { ok ->
+                                                                    isReplying = false
+                                                                    if (ok) {
+                                                                        autosViewModel.fetchReportes(selectedVehicle?.placa ?: "") { lista -> reportesList = lista }
+                                                                    }
                                                                 }
                                                             }
-                                                        }
-                                                    },
-                                                    enabled = replyText.isNotBlank() && !isReplying,
-                                                    modifier = Modifier.size(36.dp).background(Brand500, CircleShape)
-                                                ) {
-                                                    if (isReplying) CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
-                                                    else Icon(Icons.AutoMirrored.Filled.Send, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                                        },
+                                                        enabled = replyText.isNotBlank() && !isReplying,
+                                                        colors = IconButtonDefaults.filledIconButtonColors(containerColor = Brand500),
+                                                        modifier = Modifier.size(48.dp)
+                                                    ) {
+                                                        if (isReplying) CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
+                                                        else Icon(Icons.AutoMirrored.Filled.Send, null, tint = Color.White)
+                                                    }
                                                 }
                                             }
                                         }
@@ -327,7 +386,9 @@ fun DriverDashboardScreen(
                     }
                 },
                 confirmButton = {
-                    TextButton(onClick = { showReportesDialog = false }) { Text("Cerrar", color = Brand400) }
+                    Button(onClick = { showReportesDialog = false }, colors = ButtonDefaults.buttonColors(containerColor = Slate700)) {
+                        Text("Cerrar")
+                    }
                 }
             )
         }

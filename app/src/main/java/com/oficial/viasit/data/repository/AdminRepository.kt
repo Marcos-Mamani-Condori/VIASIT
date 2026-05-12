@@ -59,13 +59,18 @@ class AdminRepository(
         if (linea.rutaId.isBlank()) Result.success(null) else rutas.getById(linea.rutaId).map { it }
     override suspend fun deleteRuta(rutaId: String): Result<Unit>                                                        = rutas.delete(rutaId)
 
-    override suspend fun createLog(userId: String, description: String, type: String): Result<Unit> =
+    override suspend fun create(userId: String, description: String, type: String): Result<Unit> =
         logs.create(userId, description, type)
-    override suspend fun getLogs(limit: Int, filter: String): Result<List<LogEntry>>                                     = logs.getAll(limit, filter)
-    override suspend fun getLogsByUser(userId: String): Result<List<LogEntry>>                                           = logs.getByUser(userId)
+    override suspend fun getAll(limit: Int, filter: String, timeFilter: String): Result<List<LogEntry>> =
+        logs.getAll(limit, filter, timeFilter)
+
+    override suspend fun getByUser(userId: String): Result<List<LogEntry>> =
+        logs.getByUser(userId)
 
     override suspend fun getUsersByLinea(lineaId: String): Result<List<com.oficial.viasit.domain.model.User>> = try {
-        client.getList("users", filter = "lineId='$lineaId'", authToken = getAuthToken())
+        // Buscamos usuarios cuyo lineId sea el ID de la linea o el código de la linea (por si acaso)
+        // También aseguramos que traiga el rol 'driver'
+        client.getList("users", filter = "(lineId='$lineaId' || lineaId='$lineaId')", authToken = getAuthToken())
             .map { AdminJsonParsers.parseUsersFromJson(it) }
     } catch (e: Exception) { Result.failure(e) }
 
@@ -95,8 +100,6 @@ class AdminRepository(
         if (accept) {
             setUserActiveStatus(userId, true).getOrThrow()
         }
-        val desc = "Apelación $status para usuario ID: $userId"
-        createLog(userId, desc, if (accept) "info" else "danger").getOrThrow()
         Result.success(Unit)
     } catch (e: Exception) { Result.failure(e) }
 

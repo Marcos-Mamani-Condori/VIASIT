@@ -29,6 +29,11 @@ internal class RutasRepository(
         client.getRecord("routes", rutaId, shared.authToken()).map { parseRutaFromJson(it) }
     } catch (e: Exception) { Result.failure(e) }
 
+    override suspend fun getByLinea(lineaId: String): Result<List<Ruta>> = try {
+        client.getList("routes", filter = "lineId='$lineaId'", sort = "name", authToken = shared.authToken())
+            .map { json -> extractItemBlocks(json).map { parseRutaFromJson(it) }.filter { it.id.isNotEmpty() } }
+    } catch (e: Exception) { Result.failure(e) }
+
     override suspend fun getAll(): Result<List<Ruta>> = try {
         client.getList("routes", perPage = 100, sort = "name", authToken = shared.authToken())
             .map { json -> extractItemBlocks(json).map { parseRutaFromJson(it) }.filter { it.id.isNotEmpty() } }

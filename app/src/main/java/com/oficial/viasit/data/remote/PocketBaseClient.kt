@@ -198,6 +198,6 @@ class PocketBaseRealtimeClient(private val autoDao: AutoData? = null) {
         http.deleteRecord(collection, recordId, authToken)
     suspend fun getRecord(collection: String, recordId: String, authToken: String? = null) =
         http.getRecord(collection, recordId, authToken)
-    suspend fun getList(collection: String, page: Int = 1, perPage: Int = 30, filter: String = "", sort: String = "", authToken: String? = null) =
-        http.getList(collection, page, perPage, filter, sort, authToken)
+    suspend fun getList(collection: String, page: Int = 1, perPage: Int = 30, filter: String = "", sort: String = "", expand: String = "", authToken: String? = null) =
+        http.getList(collection, page, perPage, filter, sort, expand, authToken)
 }
