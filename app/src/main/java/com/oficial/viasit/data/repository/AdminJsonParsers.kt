@@ -57,6 +57,7 @@ internal object AdminJsonParsers {
             LogEntry(
                 id = extractStringField(block, "id"),
                 userId = extractStringField(block, "userid"),
+                userName = extractStringField(block, "userName"),
                 description = extractStringField(block, "description"),
                 type = extractStringField(block, "type").ifEmpty { "info" },
                 created = extractStringField(block, "created")

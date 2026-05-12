@@ -206,7 +206,7 @@ fun LogEntryItem(log: LogEntry) {
                 ) {
                     Icon(Icons.Default.Person, null, modifier = Modifier.size(12.dp), tint = Slate500)
                     Text(
-                        "Responsable: ${log.userId.take(12)}...",
+                        "Responsable: ${log.userName.ifEmpty { log.userId.take(12) + "..." }}",
                         style = MaterialTheme.typography.labelSmall,
                         color = Slate500
                     )

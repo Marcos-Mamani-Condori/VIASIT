@@ -12,11 +12,14 @@ data class LogEntry(
     @SerialName("userid")
     val userId: String = "",
 
+    @SerialName("userName")
+    val userName: String = "",
+
     @SerialName("description")
     val description: String = "",
 
     @SerialName("type")
-    val type: String = "info", // info (verde), warning (amarillo), danger (rojo)
+    val type: String = "info",
 
     @SerialName("created")
     val created: String = "",
