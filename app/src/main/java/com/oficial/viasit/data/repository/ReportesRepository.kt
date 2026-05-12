@@ -15,10 +15,15 @@ class ReportesRepository(
 
     private val jsonParser = Json { ignoreUnknownKeys = true; isLenient = true }
 
-    override suspend fun submitReporte(descripcion: String, userId: String): Result<Unit> =
+    override suspend fun submitReporte(descripcion: String, reporterId: String, reporterName: String, driverId: String): Result<Unit> =
         client.createRecord(
             "reports",
-            mapOf("description" to descripcion, "users" to listOf(userId)),
+            mapOf(
+                "description" to descripcion,
+                "userid" to driverId,
+                "reporterName" to reporterName,
+                "users" to listOf(reporterId)
+            ),
             null
         ).map { }
 

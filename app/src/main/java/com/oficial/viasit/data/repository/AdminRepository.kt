@@ -59,9 +59,46 @@ class AdminRepository(
         if (linea.rutaId.isBlank()) Result.success(null) else rutas.getById(linea.rutaId).map { it }
     override suspend fun deleteRuta(rutaId: String): Result<Unit>                                                        = rutas.delete(rutaId)
 
-    override suspend fun createLog(userId: String, description: String): Result<Unit>                                    = logs.create(userId, description)
-    override suspend fun getLogs(limit: Int): Result<List<LogEntry>>                                                     = logs.getAll(limit)
+    override suspend fun createLog(userId: String, description: String, type: String): Result<Unit> =
+        logs.create(userId, description, type)
+    override suspend fun getLogs(limit: Int, filter: String): Result<List<LogEntry>>                                     = logs.getAll(limit, filter)
     override suspend fun getLogsByUser(userId: String): Result<List<LogEntry>>                                           = logs.getByUser(userId)
+
+    override suspend fun getUsersByLinea(lineaId: String): Result<List<com.oficial.viasit.domain.model.User>> = try {
+        client.getList("users", filter = "lineId='$lineaId'", authToken = getAuthToken())
+            .map { AdminJsonParsers.parseUsersFromJson(it) }
+    } catch (e: Exception) { Result.failure(e) }
+
+    override suspend fun setUserActiveStatus(userId: String, active: Boolean): Result<Unit> =
+        client.updateRecord("users", userId, mapOf("active" to active), getAuthToken()).map { }
+
+    override suspend fun deleteUser(userId: String): Result<Unit> =
+        client.deleteRecord("users", userId, getAuthToken()).map { }
+
+    override suspend fun createAppeal(userId: String, name: String, reason: String, lineaId: String): Result<Unit> =
+        client.createRecord("appeals", mapOf(
+            "userId" to userId,
+            "userName" to name,
+            "reason" to reason,
+            "lineId" to lineaId,
+            "status" to "pending"
+        ), null).map { }
+
+    override suspend fun getAppeals(): Result<List<LogEntry>> = try {
+        client.getList("appeals", sort = "-created", authToken = getAuthToken())
+            .map { AdminJsonParsers.parseAppealsAsLogs(it) }
+    } catch (e: Exception) { Result.failure(e) }
+
+    override suspend fun resolveAppeal(appealId: String, userId: String, accept: Boolean): Result<Unit> = try {
+        val status = if (accept) "accepted" else "rejected"
+        client.updateRecord("appeals", appealId, mapOf("status" to status), getAuthToken()).getOrThrow()
+        if (accept) {
+            setUserActiveStatus(userId, true).getOrThrow()
+        }
+        val desc = "Apelación $status para usuario ID: $userId"
+        createLog(userId, desc, if (accept) "info" else "danger").getOrThrow()
+        Result.success(Unit)
+    } catch (e: Exception) { Result.failure(e) }
 
     override suspend fun generateVehicleInvitationCode(lineaId: String, creadoPor: String, expiresInHours: Int): Result<VehicleInvitationCode> =
         vehicleCodes.generate(lineaId, creadoPor, expiresInHours)

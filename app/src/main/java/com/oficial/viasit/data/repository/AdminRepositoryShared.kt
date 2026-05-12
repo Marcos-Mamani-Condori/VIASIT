@@ -19,6 +19,18 @@ internal class AdminRepositoryShared(
     fun formatNow(): String =
         LocalDateTime.now(ZoneId.of("UTC")).format(formatter)
 
+    fun getStartDateForFilter(period: String): String {
+        val now = LocalDateTime.now(ZoneId.of("UTC"))
+        val date = when (period.lowercase()) {
+            "today" -> now.withHour(0).withMinute(0).withSecond(0)
+            "yesterday" -> now.minusDays(1).withHour(0).withMinute(0).withSecond(0)
+            "last_week" -> now.minusWeeks(1)
+            "last_month" -> now.minusMonths(1)
+            else -> return ""
+        }
+        return date.format(formatter)
+    }
+
     fun generateSecureCode(): String {
         val chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
         return (1..8).map { chars[SecureRandom().nextInt(chars.length)] }.joinToString("")

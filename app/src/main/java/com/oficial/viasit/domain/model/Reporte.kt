@@ -17,6 +17,12 @@ data class Reporte(
     @SerialName("users")
     val users: List<String> = emptyList(),
 
+    @SerialName("userid")
+    val userid: String = "",
+
+    @SerialName("reporterName")
+    val reporterName: String = "",
+
     @SerialName("created")
     val created: String = "",
 

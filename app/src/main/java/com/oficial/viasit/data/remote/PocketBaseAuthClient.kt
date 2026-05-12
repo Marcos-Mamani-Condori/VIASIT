@@ -47,7 +47,8 @@ class PocketBaseAuthClient {
         val phone: String,
         val role: List<String>,
         @SerialName("lineId")
-        val lineaId: String? = null
+        val lineaId: String? = null,
+        val active: Boolean = true
     )
 
 
@@ -175,6 +176,7 @@ data class UserResponse(
     val role: List<String> = listOf("usuario"),
     @SerialName("lineId")
     val lineaId: String? = null,
+    val active: Boolean = true,
     val created: String = "",
     val updated: String = ""
 ) {
@@ -185,6 +187,7 @@ data class UserResponse(
         phone = phone,
         role = role,
         lineaId = lineaId ?: "",
-        token = token ?: ""
+        token = token ?: "",
+        active = active
     )
 }

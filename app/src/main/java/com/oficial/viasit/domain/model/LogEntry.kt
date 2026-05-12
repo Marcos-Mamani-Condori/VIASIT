@@ -15,6 +15,9 @@ data class LogEntry(
     @SerialName("description")
     val description: String = "",
 
+    @SerialName("type")
+    val type: String = "info", // info (verde), warning (amarillo), danger (rojo)
+
     @SerialName("created")
     val created: String = "",
 

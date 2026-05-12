@@ -33,7 +33,10 @@ data class User(
     
     @SerialName("token")
     val token: String = "",
-    
+
+    @SerialName("active")
+    val active: Boolean = true,
+
     @SerialName("created")
     val created: String = "",
     

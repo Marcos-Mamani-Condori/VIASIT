@@ -37,9 +37,14 @@ class AuthRepository(context: Context) : IAuthRepository {
             val result = pocketBaseAuth.login(email, password)
             result.fold(
                 onSuccess = { user ->
-                    saveUser(user, isGuest = false)
-                    _authState.value = AuthState.Authenticated(user)
-                    Result.success(user)
+                    if (!user.active) {
+                        _authState.value = AuthState.Error("Tu cuenta ha sido deshabilitada por administración.")
+                        Result.failure(Exception("Cuenta inactiva"))
+                    } else {
+                        saveUser(user, isGuest = false)
+                        _authState.value = AuthState.Authenticated(user)
+                        Result.success(user)
+                    }
                 },
                 onFailure = { error ->
                     _authState.value = AuthState.Error(error.message ?: "Error login")

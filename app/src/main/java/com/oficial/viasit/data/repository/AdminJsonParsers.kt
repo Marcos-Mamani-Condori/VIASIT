@@ -6,13 +6,10 @@ import com.oficial.viasit.domain.model.LogEntry
 import com.oficial.viasit.domain.model.Ruta
 import com.oficial.viasit.domain.model.VehicleInvitationCode
 
-
 internal object AdminJsonParsers {
-
 
     fun extractStringField(json: String, field: String): String =
         Regex(""""$field"\s*:\s*"([^"]*)"""").find(json)?.groupValues?.get(1) ?: ""
-
 
     fun extractItemBlocks(json: String): List<String> {
         val arrayStart = json.indexOf('[', json.indexOf("\"items\":"))
@@ -32,8 +29,6 @@ internal object AdminJsonParsers {
         return blocks
     }
 
-
-
     fun parseInvitationCodesFromJson(json: String): List<InvitationCode> =
         extractItemBlocks(json).map { block ->
             InvitationCode(
@@ -47,21 +42,26 @@ internal object AdminJsonParsers {
         }.filter { it.id.isNotEmpty() }
 
     fun parseLineasFromJson(json: String): List<Linea> {
-        val regex = Regex("""\{[^}]*"id"\s*:\s*"([^"]*)"[^}]*"name"\s*:\s*"([^"]*)"[^}]*\}""")
-        return regex.findAll(json).map { match ->
-            val block = match.value
-            Linea(id = extractStringField(block, "id"), name = extractStringField(block, "name"),
-                code = extractStringField(block, "code"), rutaId = extractStringField(block, "routeId"))
-        }.toList()
+        return extractItemBlocks(json).map { block ->
+            Linea(
+                id = extractStringField(block, "id"),
+                name = extractStringField(block, "name"),
+                code = extractStringField(block, "code"),
+                rutaId = extractStringField(block, "routeId")
+            )
+        }.filter { it.id.isNotEmpty() }
     }
 
     fun parseLogsFromJson(json: String): List<LogEntry> {
-        val regex = Regex("""\{[^}]*"id"\s*:\s*"([^"]*)"[^}]*\}""")
-        return regex.findAll(json).map { match ->
-            val block = match.value
-            LogEntry(id = extractStringField(block, "id"), userId = extractStringField(block, "userid"),
-                description = extractStringField(block, "description"), created = extractStringField(block, "created"))
-        }.toList()
+        return extractItemBlocks(json).map { block ->
+            LogEntry(
+                id = extractStringField(block, "id"),
+                userId = extractStringField(block, "userid"),
+                description = extractStringField(block, "description"),
+                type = extractStringField(block, "type").ifEmpty { "info" },
+                created = extractStringField(block, "created")
+            )
+        }.filter { it.id.isNotEmpty() }
     }
 
     fun parseRutaFromJson(json: String): Ruta = Ruta(
@@ -82,6 +82,30 @@ internal object AdminJsonParsers {
                 createdBy = extractStringField(block, "createdBy"),
                 usedBy    = extractStringField(block, "usedBy"),
                 expiresAt = extractStringField(block, "expiresAt")
+            )
+        }.filter { it.id.isNotEmpty() }
+
+    fun parseUsersFromJson(json: String): List<com.oficial.viasit.domain.model.User> =
+        extractItemBlocks(json).map { block ->
+            com.oficial.viasit.domain.model.User(
+                id = extractStringField(block, "id"),
+                email = extractStringField(block, "email"),
+                name = extractStringField(block, "name"),
+                role = listOf(extractStringField(block, "role").replace("[", "").replace("]", "").replace("\"", "")),
+                phone = extractStringField(block, "phone"),
+                lineaId = extractStringField(block, "lineId"),
+                created = extractStringField(block, "created")
+            )
+        }.filter { it.id.isNotEmpty() }
+
+    fun parseAppealsAsLogs(json: String): List<LogEntry> =
+        extractItemBlocks(json).map { block ->
+            LogEntry(
+                id = extractStringField(block, "id"),
+                userId = extractStringField(block, "userId"),
+                description = "APELACIÓN de ${extractStringField(block, "userName")}: ${extractStringField(block, "reason")}",
+                type = "warning",
+                created = extractStringField(block, "created")
             )
         }.filter { it.id.isNotEmpty() }
 }

@@ -27,9 +27,19 @@ interface IAdminRepository {
     suspend fun getRutaByLinea(linea: Linea): Result<Ruta?>
     suspend fun deleteRuta(rutaId: String): Result<Unit>
 
-    suspend fun createLog(userId: String, description: String): Result<Unit>
-    suspend fun getLogs(limit: Int = 50): Result<List<LogEntry>>
+    suspend fun createLog(userId: String, description: String, type: String = "info"): Result<Unit>
+    suspend fun getLogs(limit: Int = 50, filter: String = ""): Result<List<LogEntry>>
     suspend fun getLogsByUser(userId: String): Result<List<LogEntry>>
+
+    // --- Gestión de Usuarios (NUEVO) ---
+    suspend fun getUsersByLinea(lineaId: String): Result<List<com.oficial.viasit.domain.model.User>>
+    suspend fun setUserActiveStatus(userId: String, active: Boolean): Result<Unit>
+    suspend fun deleteUser(userId: String): Result<Unit>
+
+    // --- Sistema de Apelación (NUEVO) ---
+    suspend fun createAppeal(userId: String, name: String, reason: String, lineaId: String): Result<Unit>
+    suspend fun getAppeals(): Result<List<com.oficial.viasit.domain.model.LogEntry>>
+    suspend fun resolveAppeal(appealId: String, userId: String, accept: Boolean): Result<Unit>
 
     suspend fun generateVehicleInvitationCode(lineaId: String, creadoPor: String, expiresInHours: Int = 72): Result<VehicleInvitationCode>
     suspend fun getVehicleInvitationCodesByLinea(lineaId: String): Result<List<VehicleInvitationCode>>

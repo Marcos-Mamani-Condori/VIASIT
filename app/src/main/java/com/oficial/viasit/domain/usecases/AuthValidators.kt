@@ -18,14 +18,14 @@ object AuthValidators {
 
     fun validateRegister(form: RegisterFormState): RegisterFormState {
         return when {
-            form.email.isBlank() -> form.copy(emailError = "Email requerido", passwordError = null, confirmPasswordError = null, nameError = null, error = null)
-            !emailRegex.matches(form.email) -> form.copy(emailError = "Email invalido", passwordError = null, confirmPasswordError = null, nameError = null, error = null)
-            form.password.isBlank() -> form.copy(emailError = null, passwordError = "Contrasena requerida", confirmPasswordError = null, nameError = null, error = null)
-            form.password.length < 8 -> form.copy(emailError = null, passwordError = "Minimo 8 caracteres", confirmPasswordError = null, nameError = null, error = null)
-            form.confirmPassword != form.password -> form.copy(emailError = null, passwordError = null, confirmPasswordError = "No coinciden", nameError = null, error = null)
-            form.name.isBlank() -> form.copy(emailError = null, passwordError = null, confirmPasswordError = null, nameError = "Nombre requerido", error = null)
-            form.role == "conductor" && form.invitationCode.isBlank() -> form.copy(emailError = null, passwordError = null, confirmPasswordError = null, nameError = null, error = "Ingresa tu código de invitación para continuar")
-            form.role == "conductor" && form.invitationCode.length < 8 -> form.copy(emailError = null, passwordError = null, confirmPasswordError = null, nameError = null, error = "Código de invitación inválido")
+            form.name.isBlank() -> form.copy(nameError = "Tu nombre es necesario para la transparencia", emailError = null)
+            form.name.length < 3 -> form.copy(nameError = "Nombre muy corto", emailError = null)
+            form.email.isBlank() -> form.copy(emailError = "Email requerido", nameError = null)
+            !emailRegex.matches(form.email) -> form.copy(emailError = "Email invalido", nameError = null)
+            form.password.isBlank() -> form.copy(passwordError = "Contrasena requerida", emailError = null)
+            form.password.length < 8 -> form.copy(passwordError = "Minimo 8 caracteres para tu seguridad", emailError = null)
+            form.confirmPassword != form.password -> form.copy(confirmPasswordError = "Las contrasenas no coinciden")
+            form.role == "conductor" && form.invitationCode.isBlank() -> form.copy(error = "El codigo de invitacion es obligatorio para conductores")
             else -> form.copy(emailError = null, passwordError = null, confirmPasswordError = null, nameError = null, error = null)
         }
     }
