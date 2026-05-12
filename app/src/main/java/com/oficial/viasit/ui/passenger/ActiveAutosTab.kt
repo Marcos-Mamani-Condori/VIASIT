@@ -404,7 +404,15 @@ fun ActiveAutosTab(
                             if (reportText.isNotBlank()) {
                                 isLoading = true
                                 val desc = if (auto != null && auto.placa.isNotBlank()) "[Bus: ${auto.placa}] $reportText" else reportText
-                                autosViewModel.submitReporte(desc, currentUser.id) { ok -> isLoading = false; if (ok) enviado = true }
+                                autosViewModel.submitReporte(
+                                    descripcion = desc,
+                                    reporterId = currentUser.id,
+                                    reporterName = currentUser.name,
+                                    driverId = auto?.userId ?: ""
+                                ) { ok -> 
+                                    isLoading = false
+                                    if (ok) enviado = true 
+                                }
                             }
                         },
                         enabled = reportText.isNotBlank() && !isLoading,

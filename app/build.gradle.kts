@@ -36,7 +36,8 @@ android {
             dimension = "environment"
             applicationIdSuffix = ".dev"
             versionNameSuffix = "-dev"
-            buildConfigField("String", "POCKETBASE_URL", "\"http://192.168.1.19:8090\"")
+            val serverIp = project.findProperty("SERVER_IP") ?: "192.168.1.19"
+            buildConfigField("String", "POCKETBASE_URL", "\"http://$serverIp:8090\"")
         }
         create("prod") {
             dimension = "environment"
