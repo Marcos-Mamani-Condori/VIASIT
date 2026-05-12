@@ -128,9 +128,15 @@ class AutosViewModel(
         stopRealtimeAutosUseCase()
     }
 
-    fun submitReporte(descripcion: String, userId: String, onResult: (Boolean) -> Unit) {
+    fun submitReporte(
+        descripcion: String,
+        reporterId: String,
+        reporterName: String,
+        driverId: String,
+        onResult: (Boolean) -> Unit
+    ) {
         viewModelScope.launch {
-            submitReporteUseCase(descripcion, userId).fold(
+            submitReporteUseCase(descripcion, reporterId, reporterName, driverId).fold(
                 onSuccess = { onResult(true) },
                 onFailure = { onResult(false) }
             )
