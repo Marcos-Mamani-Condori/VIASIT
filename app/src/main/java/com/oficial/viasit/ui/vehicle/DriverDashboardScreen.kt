@@ -33,6 +33,9 @@ import com.oficial.viasit.viewmodels.AutosViewModel
 import com.oficial.viasit.ui.theme.*
 import com.oficial.viasit.viewmodels.AuthViewModel
 
+import com.oficial.viasit.ui.admin.AuditoriaTabContent
+import com.oficial.viasit.viewmodels.LogsViewModel
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DriverDashboardScreen(
@@ -46,15 +49,23 @@ fun DriverDashboardScreen(
     onNavigateToMap: () -> Unit,
     onNavigateToManageVehicle: () -> Unit,
     onLogout: () -> Unit,
-    autosViewModel: AutosViewModel = viewModel(factory = AutosViewModel.Factory)
+    autosViewModel: AutosViewModel = viewModel(factory = AutosViewModel.Factory),
+    logsViewModel: LogsViewModel = viewModel(factory = LogsViewModel.Factory)
 ) {
     val authState by authViewModel.authState.collectAsState()
     val currentUser = (authState as? com.oficial.viasit.domain.model.AuthState.Authenticated)?.user
     var showVehicleSelector by remember { mutableStateOf(false) }
     var showReportesDialog by remember { mutableStateOf(false) }
+    var showLogsDialog by remember { mutableStateOf(false) }
     var reportesList by remember { mutableStateOf<List<com.oficial.viasit.domain.model.Reporte>>(emptyList()) }
     var reportesLoading by remember { mutableStateOf(false) }
     val selectedVehicle = vehicles.find { it.id == selectedVehicleId }
+
+    LaunchedEffect(showLogsDialog) {
+        if (showLogsDialog) {
+            logsViewModel.loadLogs()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -160,6 +171,14 @@ fun DriverDashboardScreen(
                 onClick = onNavigateToMap
             )
 
+            DashboardMenuItem(
+                icon = Icons.Default.History,
+                title = "Muro de la Verdad",
+                subtitle = "Historial de acciones del sistema",
+                iconColor = Rose500,
+                onClick = { showLogsDialog = true }
+            )
+
             if (selectedVehicle != null) {
                 DashboardMenuItem(
                     icon = Icons.Default.ChatBubbleOutline,
@@ -212,6 +231,25 @@ fun DriverDashboardScreen(
                     showVehicleSelector = false
                 },
                 onDismiss = { showVehicleSelector = false }
+            )
+        }
+
+        if (showLogsDialog) {
+            val logs by logsViewModel.logs.collectAsState()
+            val isLoadingLogs by logsViewModel.isLoading.collectAsState()
+            AlertDialog(
+                onDismissRequest = { showLogsDialog = false },
+                containerColor = Slate950,
+                modifier = Modifier.fillMaxWidth(0.95f),
+                title = { Text("Muro de la Verdad", color = Color.White) },
+                text = {
+                    Box(modifier = Modifier.height(500.dp)) {
+                        AuditoriaTabContent(logs = logs, isLoading = isLoadingLogs)
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showLogsDialog = false }) { Text("Cerrar", color = Brand500) }
+                }
             )
         }
 

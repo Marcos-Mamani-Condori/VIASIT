@@ -19,14 +19,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.oficial.viasit.domain.model.User
+import com.oficial.viasit.ui.admin.linea.ConductoresTabContent
 import com.oficial.viasit.ui.admin.linea.MiLineaTabContent
-import com.oficial.viasit.ui.admin.principal.InvitacionesTabContent
-import com.oficial.viasit.ui.admin.principal.LineasTabContent
-import com.oficial.viasit.ui.admin.principal.RutasTabContent
+import com.oficial.viasit.ui.admin.principal.*
 import com.oficial.viasit.ui.passenger.PassengerMapScreen
 import com.oficial.viasit.ui.theme.*
 import com.oficial.viasit.viewmodels.AdminViewModel
 import com.oficial.viasit.viewmodels.PassengerViewModel
+import com.oficial.viasit.viewmodels.LogsViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -35,7 +35,8 @@ fun AdminDashboardScreen(
     onLogout: () -> Unit,
     onNavigateToRoutePicker: ((String, String) -> Unit)? = null,
     viewModel: AdminViewModel = viewModel(factory = AdminViewModel.Factory),
-    passengerViewModel: PassengerViewModel = viewModel(factory = PassengerViewModel.Factory)
+    passengerViewModel: PassengerViewModel = viewModel(factory = PassengerViewModel.Factory),
+    logsViewModel: LogsViewModel = viewModel(factory = LogsViewModel.Factory)
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
 
@@ -44,6 +45,8 @@ fun AdminDashboardScreen(
             "Mapa" to Icons.Default.Map,
             "Líneas" to Icons.Default.DirectionsBus,
             "Rutas" to Icons.Default.Route,
+            "Reportes" to Icons.Default.Warning,
+            "Apelaciones" to Icons.Default.Gavel,
             "Invitaciones" to Icons.Default.Key,
             "Logs" to Icons.Default.History
         )
@@ -51,6 +54,7 @@ fun AdminDashboardScreen(
         listOf(
             "Mapa" to Icons.Default.Map,
             "Mi Línea" to Icons.Default.Route,
+            "Conductores" to Icons.Default.People,
             "Logs" to Icons.Default.History
         )
     }
@@ -60,14 +64,18 @@ fun AdminDashboardScreen(
             viewModel.loadLineas()
             viewModel.loadRutas()
             viewModel.loadInvitationCodes()
+            viewModel.loadAllReportes()
+            viewModel.loadAppeals()
         } else {
             viewModel.loadLineas()
             viewModel.loadRutas()
+            viewModel.loadUsers(currentUser.lineaId)
         }
-        viewModel.loadLogs()
+        logsViewModel.loadLogs()
     }
 
     val uiState by viewModel.uiState.collectAsState()
+    val autos by viewModel.autosUiState.collectAsState(initial = emptyList())
 
     Scaffold(
         topBar         = { AdminTopBar(currentUser = currentUser, onLogout = onLogout) },
@@ -77,9 +85,12 @@ fun AdminDashboardScreen(
 
             AdminUserBanner(currentUser = currentUser)
 
-            TabRow(
+            ScrollableTabRow(
                 selectedTabIndex = selectedTab,
-                containerColor   = Slate900, contentColor = Brand400,
+                containerColor   = Slate900, 
+                contentColor     = Brand400,
+                edgePadding      = 16.dp,
+                divider          = {},
                 indicator = { tabPositions ->
                     TabRowDefaults.SecondaryIndicator(
                         modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
@@ -100,55 +111,111 @@ fun AdminDashboardScreen(
                 }
             }
 
-            if (currentUser.isAdminPrincipal) {
-                when (selectedTab) {
-                    0 -> PassengerMapScreen(passengerViewModel = passengerViewModel)
-                    1 -> LineasTabContent(
-                        lineas        = uiState.lineas, isLoading = uiState.isLoading,
-                        onCreateLinea = { n, c, r -> viewModel.createLinea(n, c, r, currentUser.id) },
-                        onDeleteLinea = { viewModel.deleteLinea(it, currentUser.id) }
-                    )
-                    2 -> RutasTabContent(
-                        rutas     = uiState.rutas,
-                        lineas    = uiState.lineas,
-                        isLoading = uiState.isLoading,
-                        onDeleteRuta = { rutaId, rutaName, lineaId ->
-                            viewModel.deleteRuta(rutaId, rutaName, lineaId, currentUser.id)
+            Box(modifier = Modifier.weight(1f)) {
+                if (currentUser.isAdminPrincipal) {
+                    when (selectedTab) {
+                        0 -> PassengerMapScreen(
+                            passengerViewModel = passengerViewModel,
+                            showTailsButton = true
+                        )
+                        1 -> LineasTabContent(
+                            lineas        = uiState.lineas, isLoading = uiState.isLoading,
+                            onCreateLinea = { n, c, r -> viewModel.createLinea(n, c, r, currentUser.id) },
+                            onDeleteLinea = { viewModel.deleteLinea(it, currentUser.id) }
+                        )
+                        2 -> RutasTabContent(
+                            rutas     = uiState.rutas,
+                            lineas    = uiState.lineas,
+                            isLoading = uiState.isLoading,
+                            onDeleteRuta = { rutaId, rutaName, lineaId ->
+                                viewModel.deleteRuta(rutaId, rutaName, lineaId, currentUser.id)
+                            }
+                        )
+                        3 -> ReportesTabContent(reportes = uiState.reportes, isLoading = uiState.isLoading)
+                        4 -> ApelacionesTabContent(
+                            appeals = uiState.appeals,
+                            isLoading = uiState.isLoading,
+                            onResolve = { appealId, targetUserId, accept ->
+                                viewModel.resolveAppeal(appealId, targetUserId, accept, currentUser.id)
+                            }
+                        )
+                        5 -> InvitacionesTabContent(
+                            invitationCodes = uiState.invitationCodes, lineas = uiState.lineas,
+                            isLoading       = uiState.isLoading, generatedCode = uiState.generatedCode,
+                            onGenerateCode  = { role, lineaId ->
+                                viewModel.generateInvitationCode(role, lineaId, 24, currentUser.id)
+                            },
+                            onDeleteCode = { viewModel.deleteInvitationCode(it, currentUser.id) }
+                        )
+                        6 -> {
+                            val logs by logsViewModel.logs.collectAsState()
+                            val isLoadingLogs by logsViewModel.isLoading.collectAsState()
+                            val searchQuery by logsViewModel.searchQuery.collectAsState()
+                            val timeFilter by logsViewModel.timeFilter.collectAsState()
+                            
+                            AuditoriaTabContent(
+                                logs = logs,
+                                isLoading = isLoadingLogs,
+                                searchQuery = searchQuery,
+                                onSearchChange = { logsViewModel.setSearchQuery(it) },
+                                selectedFilter = timeFilter,
+                                onFilterChange = { logsViewModel.setTimeFilter(it) }
+                            )
                         }
-                    )
-                    3 -> InvitacionesTabContent(
-                        invitationCodes = uiState.invitationCodes, lineas = uiState.lineas,
-                        isLoading       = uiState.isLoading, generatedCode = uiState.generatedCode,
-                        onGenerateCode  = { role, lineaId ->
-                            viewModel.generateInvitationCode(role, lineaId, 24, currentUser.id)
-                        },
-                        onDeleteCode = { viewModel.deleteInvitationCode(it, currentUser.id) }
-                    )
-                    4 -> AuditoriaTabContent(logs = uiState.logs, isLoading = uiState.isLoading)
-                }
-            } else {
-                when (selectedTab) {
-                    0 -> {
-                        LaunchedEffect(Unit) {
-                            passengerViewModel.selectLinea(currentUser.lineaId)
-                        }
-                        PassengerMapScreen(passengerViewModel = passengerViewModel)
                     }
-                    1 -> MiLineaTabContent(
-                        lineaId   = currentUser.lineaId,
-                        lineas    = uiState.lineas,
-                        rutas     = uiState.rutas,
-                        isLoading = uiState.isLoading,
-                        userEmail = currentUser.email,
-                        onCreateRuta = { name, desc, start, end, lineaId ->
-                            viewModel.createRuta(name, desc, start, end, lineaId, currentUser.id)
-                        },
-                        onAssignRuta = { rutaId, rutaName ->
-                            viewModel.assignRutaToLinea(currentUser.lineaId, rutaId, rutaName, currentUser.id)
-                        },
-                        onNavigateToRoutePicker = onNavigateToRoutePicker
-                    )
-                    2 -> AuditoriaTabContent(logs = uiState.logs, isLoading = uiState.isLoading)
+                } else {
+                    when (selectedTab) {
+                        0 -> {
+                            LaunchedEffect(Unit) {
+                                passengerViewModel.selectLinea(currentUser.lineaId)
+                            }
+                            PassengerMapScreen(
+                                passengerViewModel = passengerViewModel,
+                                showTailsButton = true
+                            )
+                        }
+                        1 -> MiLineaTabContent(
+                            lineaId   = currentUser.lineaId,
+                            lineas    = uiState.lineas,
+                            rutas     = uiState.rutas,
+                            isLoading = uiState.isLoading,
+                            userEmail = currentUser.email,
+                            onCreateRuta = { name, desc, start, end, lineaId ->
+                                viewModel.createRuta(name, desc, start, end, lineaId, currentUser.id)
+                            },
+                            onAssignRuta = { rutaId, rutaName ->
+                                viewModel.assignRutaToLinea(currentUser.lineaId, rutaId, rutaName, currentUser.id)
+                            },
+                            onNavigateToRoutePicker = onNavigateToRoutePicker
+                        )
+                        2 -> ConductoresTabContent(
+                            users = uiState.users,
+                            autos = autos,
+                            isLoading = uiState.isLoading,
+                            onToggleActive = { targetUserId, active ->
+                                viewModel.setUserActiveStatus(targetUserId, active, currentUser.id)
+                            },
+                            onShowLocation = { lat, lng ->
+                                passengerViewModel.onShowLocation(lat, lng)
+                                selectedTab = 0
+                            }
+                        )
+                        3 -> {
+                            val logs by logsViewModel.logs.collectAsState()
+                            val isLoadingLogs by logsViewModel.isLoading.collectAsState()
+                            val searchQuery by logsViewModel.searchQuery.collectAsState()
+                            val timeFilter by logsViewModel.timeFilter.collectAsState()
+
+                            AuditoriaTabContent(
+                                logs = logs,
+                                isLoading = isLoadingLogs,
+                                searchQuery = searchQuery,
+                                onSearchChange = { logsViewModel.setSearchQuery(it) },
+                                selectedFilter = timeFilter,
+                                onFilterChange = { logsViewModel.setTimeFilter(it) }
+                            )
+                        }
+                    }
                 }
             }
 

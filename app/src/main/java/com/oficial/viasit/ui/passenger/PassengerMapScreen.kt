@@ -50,7 +50,10 @@ import org.maplibre.android.maps.Style
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PassengerMapScreen(passengerViewModel: PassengerViewModel) {
+fun PassengerMapScreen(
+    passengerViewModel: PassengerViewModel,
+    showTailsButton: Boolean = true
+) {
     val context        = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val autosViewModel: AutosViewModel = viewModel(factory = AutosViewModel.Factory)
@@ -228,20 +231,20 @@ fun PassengerMapScreen(passengerViewModel: PassengerViewModel) {
                 Spacer(modifier = Modifier.width(8.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        "Mapa en vivo",
+                        "Transporte en vivo",
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     if (selectedLineaId != null && routePolylines.isNotEmpty()) {
                         Text(
-                            "Ruta: ${routePolylines.first().lineaName} · ${autos.count { it.isActive() }} bus(es)",
+                            "Ruta: ${routePolylines.first().lineaName} · ${autos.count { it.isActive() }} minibús(es)",
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                         )
                     } else {
                         Text(
-                            "${autos.count { it.isActive() }} bus(es) activo(s) · Selecciona una ruta",
+                            "${autos.count { it.isActive() }} unidades activas · Selecciona una ruta",
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                         )
@@ -411,16 +414,18 @@ fun PassengerMapScreen(passengerViewModel: PassengerViewModel) {
             }
         }
 
-        FloatingActionButton(
-            onClick = { showTails = !showTails },
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = 16.dp, bottom = 128.dp)
-                .size(40.dp),
-            containerColor = if (showTails) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
-            contentColor = if (showTails) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary
-        ) {
-            Icon(Icons.Default.Timeline, "Ver rastro", modifier = Modifier.size(20.dp))
+        if (showTailsButton) {
+            FloatingActionButton(
+                onClick = { showTails = !showTails },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 16.dp, bottom = 128.dp)
+                    .size(40.dp),
+                containerColor = if (showTails) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                contentColor = if (showTails) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary
+            ) {
+                Icon(Icons.Default.Route, "Ver recorrido", modifier = Modifier.size(20.dp))
+            }
         }
 
         FloatingActionButton(

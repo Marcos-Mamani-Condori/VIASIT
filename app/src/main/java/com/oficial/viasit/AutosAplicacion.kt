@@ -76,6 +76,16 @@ class AutosAplicacion : Application() {
     val getLogsUseCase by lazy { GetLogsUseCase(adminRepository) }
     val createLogUseCase by lazy { CreateLogUseCase(adminRepository) }
 
+    // UseCases de Admin - Users
+    val getUsersByLineaUseCase by lazy { GetUsersByLineaUseCase(adminRepository) }
+    val setUserActiveStatusUseCase by lazy { SetUserActiveStatusUseCase(adminRepository) }
+    val deleteUserUseCase by lazy { DeleteUserUseCase(adminRepository) }
+
+    // UseCases de Admin - Extra (Appeals & All Reports)
+    val getAppealsUseCase by lazy { GetAppealsUseCase(adminRepository) }
+    val resolveAppealUseCase by lazy { ResolveAppealUseCase(adminRepository) }
+    val getAllReportesUseCase by lazy { GetAllReportesUseCase(reportesRepository) }
+
     // UseCases de Admin - Vehicle Codes
     val getVehicleInvitationCodesUseCase by lazy { GetVehicleInvitationCodesUseCase(adminRepository) }
     val generateVehicleInvitationCodeUseCase by lazy { GenerateVehicleInvitationCodeUseCase(adminRepository) }

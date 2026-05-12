@@ -7,9 +7,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DirectionsBus
-import androidx.compose.material.icons.filled.Map
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -23,10 +21,13 @@ import com.oficial.viasit.ui.theme.Slate950
 import com.oficial.viasit.viewmodels.AuthViewModel
 import com.oficial.viasit.viewmodels.PassengerViewModel
 
+import com.oficial.viasit.ui.admin.AuditoriaTabContent
+import com.oficial.viasit.viewmodels.LogsViewModel
+
 private enum class PassengerTab(val label: String, val icon: ImageVector) {
     MAPA("Mapa",  Icons.Default.Map),
-    AUTOS("Buses", Icons.Default.DirectionsBus),
-    RUTAS("Rutas", Icons.Default.DirectionsBus),
+    UNIDADES("Unidades", Icons.Default.DirectionsBus),
+    LOGS("Muro de Verdad", Icons.Default.History),
     PERFIL("Perfil", Icons.Default.Person)
 }
 
@@ -40,7 +41,14 @@ fun PassengerDashboardScreen(
 ) {
     val passengerViewModel: PassengerViewModel = viewModel(factory = PassengerViewModel.Factory)
     val autosViewModel: AutosViewModel         = viewModel(factory = AutosViewModel.Factory)
+    val logsViewModel: LogsViewModel           = viewModel(factory = LogsViewModel.Factory)
     var selectedTab by remember { mutableStateOf(PassengerTab.MAPA) }
+
+    LaunchedEffect(selectedTab) {
+        if (selectedTab == PassengerTab.LOGS) {
+            logsViewModel.loadLogs()
+        }
+    }
 
     Scaffold(
 
@@ -78,16 +86,27 @@ fun PassengerDashboardScreen(
                 PassengerTab.MAPA   -> PassengerMapScreen(
                     passengerViewModel = passengerViewModel
                 )
-                PassengerTab.AUTOS  -> ActiveAutosTab(
+                PassengerTab.UNIDADES  -> ActiveAutosTab(
                     autosViewModel     = autosViewModel,
                     passengerViewModel = passengerViewModel,
                     currentUser        = currentUser,
                     onNavigateToMap    = { selectedTab = PassengerTab.MAPA }
                 )
-                PassengerTab.RUTAS  -> RoutesTab(
-                    viewModel   = passengerViewModel,
-                    onViewOnMap = { selectedTab = PassengerTab.MAPA }
-                )
+                PassengerTab.LOGS -> {
+                    val logs by logsViewModel.logs.collectAsState()
+                    val isLoading by logsViewModel.isLoading.collectAsState()
+                    val searchQuery by logsViewModel.searchQuery.collectAsState()
+                    val timeFilter by logsViewModel.timeFilter.collectAsState()
+                    
+                    AuditoriaTabContent(
+                        logs = logs,
+                        isLoading = isLoading,
+                        searchQuery = searchQuery,
+                        onSearchChange = { logsViewModel.setSearchQuery(it) },
+                        selectedFilter = timeFilter,
+                        onFilterChange = { logsViewModel.setTimeFilter(it) }
+                    )
+                }
                 PassengerTab.PERFIL -> ProfileTab(
                     user     = currentUser,
                     onLogout = onLogout

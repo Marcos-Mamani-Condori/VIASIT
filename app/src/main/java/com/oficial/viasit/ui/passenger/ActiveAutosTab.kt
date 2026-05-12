@@ -99,8 +99,8 @@ fun ActiveAutosTab(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Column {
-                Text("Buses en servicio", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black, color = Color.White)
-                Text("${autosActivos.size} activo(s)", style = MaterialTheme.typography.bodySmall, color = Slate400)
+                Text("Unidades en servicio", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black, color = Color.White)
+                Text("${autosActivos.size} activa(s)", style = MaterialTheme.typography.bodySmall, color = Slate400)
             }
             IconButton(onClick = { autosViewModel.refresh() }) {
                 Icon(Icons.Default.Refresh, "Actualizar", tint = Slate400)
@@ -210,7 +210,7 @@ fun ActiveAutosTab(
         OutlinedTextField(
             value         = query,
             onValueChange = { query = it },
-            modifier      = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+            modifier      = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
             placeholder   = { Text("Buscar por placa…", color = Slate500) },
             leadingIcon   = { Icon(Icons.Default.Search, null, tint = Slate500) },
             trailingIcon  = if (query.isNotBlank()) { { IconButton(onClick = { query = "" }) { Icon(Icons.Default.Close, null, tint = Slate500) } } } else null,
@@ -222,12 +222,52 @@ fun ActiveAutosTab(
             shape = RoundedCornerShape(12.dp)
         )
 
-        if (filtrados.isEmpty()) {
+        // Filtro por Línea
+        val todasLasLineas by passengerViewModel.lineas.collectAsState()
+        val selectedLineaId by passengerViewModel.selectedLineaId.collectAsState()
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            FilterChip(
+                selected = selectedLineaId == null,
+                onClick = { passengerViewModel.clearSelectedLinea() },
+                label = { Text("Todas") },
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = Brand500.copy(0.2f),
+                    selectedLabelColor = Brand400,
+                    labelColor = Slate400
+                )
+            )
+            todasLasLineas.forEach { linea ->
+                FilterChip(
+                    selected = selectedLineaId == linea.id,
+                    onClick = { passengerViewModel.selectLinea(linea.id) },
+                    label = { Text(linea.name) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = Brand500.copy(0.2f),
+                        selectedLabelColor = Brand400,
+                        labelColor = Slate400
+                    )
+                )
+            }
+        }
+
+        val autosFiltradosPorLinea = remember(filtradosOrdenados, selectedLineaId) {
+            if (selectedLineaId == null) filtradosOrdenados
+            else filtradosOrdenados.filter { it.lineaId == selectedLineaId }
+        }
+
+        if (autosFiltradosPorLinea.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(32.dp)) {
                     Icon(Icons.Default.DirectionsBus, null, tint = Slate700, modifier = Modifier.size(64.dp))
                     Spacer(modifier = Modifier.height(16.dp))
-                    Text(if (query.isBlank()) "Sin buses activos" else "Sin resultados para \"$query\"",
+                    Text(if (query.isBlank()) "Sin unidades activas" else "Sin resultados para \"$query\"",
                         style = MaterialTheme.typography.titleMedium, color = Slate400, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(if (query.isBlank()) "No hay conductores en servicio ahora." else "Prueba con otra placa.",
@@ -252,11 +292,11 @@ fun ActiveAutosTab(
                     item {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 4.dp)) {
                             Icon(Icons.Default.TravelExplore, null, tint = Brand500, modifier = Modifier.size(14.dp))
-                            Text("Buses ordenados por cercanía — toca un chip para ver la ruta", style = MaterialTheme.typography.labelSmall, color = Brand400)
+                            Text("Unidades ordenadas por cercanía — toca para ver la ruta", style = MaterialTheme.typography.labelSmall, color = Brand400)
                         }
                     }
                 }
-                items(filtradosOrdenados, key = { it.id }) { auto ->
+                items(autosFiltradosPorLinea, key = { it.id }) { auto ->
                     AutoBusCard(auto = auto, userLocation = userLocation, onClick = { selectedAuto = auto })
                 }
                 item { Spacer(modifier = Modifier.height(16.dp)) }
@@ -286,7 +326,7 @@ fun ActiveAutosTab(
                 HorizontalDivider(color = Slate800)
                 Spacer(modifier = Modifier.height(4.dp))
 
-                BottomSheetOpcion(icon = Icons.Default.MyLocation, tint = Brand500, titulo = "Ver en mapa", subtitulo = "Centrar el mapa en este bus") {
+                BottomSheetOpcion(icon = Icons.Default.MyLocation, tint = Brand500, titulo = "Ver en mapa", subtitulo = "Centrar el mapa en esta unidad") {
                     passengerViewModel.selectAuto(auto); selectedAuto = null; onNavigateToMap()
                 }
                 HorizontalDivider(color = Slate800)
@@ -303,7 +343,7 @@ fun ActiveAutosTab(
 
                 if (puedeReportar) {
                     HorizontalDivider(color = Slate800)
-                    BottomSheetOpcion(icon = Icons.Default.Flag, tint = Rose500, titulo = "Reportar conductor", subtitulo = "Anónimo — nadie verá tu nombre") {
+                    BottomSheetOpcion(icon = Icons.Default.Flag, tint = Rose500, titulo = "Reportar conductor", subtitulo = "Vinculado a tu identidad para mayor transparencia") {
                         showReportDialog = true
                     }
                 }
@@ -324,7 +364,7 @@ fun ActiveAutosTab(
                         Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Slate800).padding(10.dp),
                             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Icon(Icons.Default.DirectionsBus, null, tint = Slate400, modifier = Modifier.size(16.dp))
-                            Text("Bus: ${auto.placa.ifBlank { "Sin placa" }}", style = MaterialTheme.typography.bodySmall, color = Slate400)
+                            Text("Unidad: ${auto.placa.ifBlank { "Sin placa" }}", style = MaterialTheme.typography.bodySmall, color = Slate400)
                         }
                     }
                     when {
@@ -334,7 +374,7 @@ fun ActiveAutosTab(
                         reportesList.isEmpty() -> Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Slate800).padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Icon(Icons.Default.ChatBubbleOutline, null, tint = Slate500, modifier = Modifier.size(16.dp))
-                            Text("Aún no hay comentarios para este bus.", style = MaterialTheme.typography.bodySmall, color = Slate400)
+                            Text("Aún no hay comentarios para esta unidad.", style = MaterialTheme.typography.bodySmall, color = Slate400)
                         }
                         else -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             reportesList.forEach { rep ->
@@ -371,7 +411,7 @@ fun ActiveAutosTab(
                         Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Slate800).padding(10.dp),
                             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Icon(Icons.Default.DirectionsBus, null, tint = Slate400, modifier = Modifier.size(16.dp))
-                            Text("Bus: ${auto.placa.ifBlank { "Sin placa" }}", style = MaterialTheme.typography.bodySmall, color = Slate400)
+                            Text("Unidad: ${auto.placa.ifBlank { "Sin placa" }}", style = MaterialTheme.typography.bodySmall, color = Slate400)
                         }
                     }
                     if (enviado) {
@@ -403,7 +443,7 @@ fun ActiveAutosTab(
                         onClick = {
                             if (reportText.isNotBlank()) {
                                 isLoading = true
-                                val desc = if (auto != null && auto.placa.isNotBlank()) "[Bus: ${auto.placa}] $reportText" else reportText
+                                val desc = if (auto != null && auto.placa.isNotBlank()) "[Unidad: ${auto.placa}] $reportText" else reportText
                                 autosViewModel.submitReporte(
                                     descripcion = desc,
                                     reporterId = currentUser.id,

@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -36,7 +38,16 @@ android {
             dimension = "environment"
             applicationIdSuffix = ".dev"
             versionNameSuffix = "-dev"
-            val serverIp = project.findProperty("SERVER_IP") ?: "192.168.1.19"
+            
+            val localProps = Properties()
+            val localFile = rootProject.file("local.properties")
+            if (localFile.exists()) {
+                val input: java.io.InputStream = localFile.inputStream()
+                localProps.load(input)
+                input.close()
+            }
+            val serverIp = localProps.getProperty("SERVER_IP") ?: "192.168.1.19"
+
             buildConfigField("String", "POCKETBASE_URL", "\"http://$serverIp:8090\"")
         }
         create("prod") {
@@ -49,8 +60,8 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-       kotlinOptions {
-        jvmTarget = "17"
+    kotlinOptions {
+        (this as org.jetbrains.kotlin.gradle.dsl.KotlinJvmOptions).jvmTarget = "17"
     }
     buildFeatures {
         compose = true
@@ -69,18 +80,14 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation(libs.androidx.material.icons.extended)
 
-    // STACK MINIBUSES
     implementation(libs.maplibre.android)
     implementation(libs.play.services.location)
     
-    // Serialización JSON
     implementation(libs.kotlinx.serialization.json)
     
-    // OkHttp para SSE (Server-Sent Events) - Realtime eficiente
     implementation(libs.okhttp)
     implementation(libs.okhttp.sse)
 
-    // ROOM + KSP
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)

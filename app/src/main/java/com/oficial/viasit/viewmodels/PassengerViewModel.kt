@@ -124,4 +124,8 @@ class PassengerViewModel(
     fun setDestinoQuery(q: String) {
         _destinoQuery.value = q
     }
+
+    fun onShowLocation(lat: Double, lng: Double) {
+        _selectedAuto.value = Auto(lat = lat, lng = lng)
+    }
 }

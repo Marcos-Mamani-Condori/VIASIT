@@ -6,8 +6,32 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.oficial.viasit.AutosAplicacion
 import com.oficial.viasit.domain.usecases.*
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
+
+internal class LogsHandler(
+    private val scope: CoroutineScope,
+    private val getLogsUseCase: GetLogsUseCase,
+    private val createLogUseCase: CreateLogUseCase
+) {
+    fun loadLogs(state: MutableStateFlow<AdminUiState>) {
+        scope.launch {
+            state.value = state.value.copy(isLoading = true, error = null)
+            getLogsUseCase().fold(
+                onSuccess = { logs -> state.value = state.value.copy(isLoading = false, logs = logs) },
+                onFailure = { error -> state.value = state.value.copy(isLoading = false, error = error.message ?: "Error al cargar logs") }
+            )
+        }
+    }
+
+    fun createLog(userId: String, description: String) {
+        scope.launch {
+            createLogUseCase(userId, description)
+        }
+    }
+}
 
 class AdminViewModel(
     application: Application,
@@ -26,7 +50,14 @@ class AdminViewModel(
     private val createLogUseCase: CreateLogUseCase,
     private val getVehicleInvitationCodesUseCase: GetVehicleInvitationCodesUseCase,
     private val generateVehicleInvitationCodeUseCase: GenerateVehicleInvitationCodeUseCase,
-    private val deleteVehicleInvitationCodeUseCase: DeleteVehicleInvitationCodeUseCase
+    private val deleteVehicleInvitationCodeUseCase: DeleteVehicleInvitationCodeUseCase,
+    private val getUsersByLineaUseCase: GetUsersByLineaUseCase,
+    private val setUserActiveStatusUseCase: SetUserActiveStatusUseCase,
+    private val deleteUserUseCase: DeleteUserUseCase,
+    private val getAllReportesUseCase: GetAllReportesUseCase,
+    private val getAppealsUseCase: GetAppealsUseCase,
+    private val resolveAppealUseCase: ResolveAppealUseCase,
+    private val getAutosUseCase: GetAutosUseCase
 ) : AndroidViewModel(application) {
 
     companion object {
@@ -40,7 +71,10 @@ class AdminViewModel(
                     app.getInvitationCodesUseCase, app.generateInvitationCodeUseCase, app.deleteInvitationCodeUseCase,
                     app.getRutasUseCase, app.createRutaUseCase, app.deleteRutaUseCase, app.assignRutaToLineaUseCase,
                     app.getLogsUseCase, app.createLogUseCase,
-                    app.getVehicleInvitationCodesUseCase, app.generateVehicleInvitationCodeUseCase, app.deleteVehicleInvitationCodeUseCase
+                    app.getVehicleInvitationCodesUseCase, app.generateVehicleInvitationCodeUseCase, app.deleteVehicleInvitationCodeUseCase,
+                    app.getUsersByLineaUseCase, app.setUserActiveStatusUseCase, app.deleteUserUseCase,
+                    app.getAllReportesUseCase, app.getAppealsUseCase, app.resolveAppealUseCase,
+                    app.getAutosUseCase
                 ) as T
             }
         }
@@ -49,11 +83,14 @@ class AdminViewModel(
     private val _uiState = MutableStateFlow(AdminUiState())
     val uiState: StateFlow<AdminUiState> = _uiState
 
+    val autosUiState = getAutosUseCase()
+
     private val lineasHandler       = LineasHandler(viewModelScope, getLineasUseCase, createLineaUseCase, updateLineaUseCase, deleteLineaUseCase)
     private val invitacionesHandler = InvitacionesHandler(viewModelScope, getInvitationCodesUseCase, generateInvitationCodeUseCase, deleteInvitationCodeUseCase)
     private val logsHandler         = LogsHandler(viewModelScope, getLogsUseCase, createLogUseCase)
     private val rutasHandler        = RutasHandler(viewModelScope, getRutasUseCase, createRutaUseCase, deleteRutaUseCase, assignRutaToLineaUseCase, getLineasUseCase)
     private val vehicleCodesHandler = VehicleCodesHandler(viewModelScope, getVehicleInvitationCodesUseCase, generateVehicleInvitationCodeUseCase, deleteVehicleInvitationCodeUseCase)
+    private val usersHandler        = AdminUsersHandler(viewModelScope, getUsersByLineaUseCase, setUserActiveStatusUseCase, deleteUserUseCase, getAllReportesUseCase, getAppealsUseCase, resolveAppealUseCase)
 
     private val logAction: (String, String) -> Unit = { userId, desc -> logsHandler.createLog(userId, desc) }
 
@@ -87,6 +124,15 @@ class AdminViewModel(
     fun deleteVehicleInvitationCode(id: String, lineaId: String, userId: String) =
         vehicleCodesHandler.deleteVehicleInvitationCode(id, lineaId, userId, _uiState, logAction)
     fun clearVehicleCode() { _uiState.value = _uiState.value.copy(generatedVehicleCode = null) }
+
+    // Admin Users, Reports & Appeals
+    fun loadUsers(lineaId: String) = usersHandler.loadUsers(lineaId, _uiState)
+    fun setUserActiveStatus(targetUserId: String, active: Boolean, adminId: String) = 
+        usersHandler.setUserActiveStatus(targetUserId, active, adminId, _uiState, logAction)
+    fun loadAllReportes() = usersHandler.loadAllReportes(_uiState)
+    fun loadAppeals() = usersHandler.loadAppeals(_uiState)
+    fun resolveAppeal(appealId: String, targetUserId: String, accept: Boolean, adminId: String) =
+        usersHandler.resolveAppeal(appealId, targetUserId, accept, adminId, _uiState, logAction)
 
     fun clearMessages() { _uiState.value = _uiState.value.copy(error = null, successMessage = null, generatedCode = null) }
 }
