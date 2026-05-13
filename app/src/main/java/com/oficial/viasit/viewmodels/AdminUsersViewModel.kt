@@ -29,14 +29,14 @@ internal class AdminUsersHandler(
         }
     }
 
-    fun setUserActiveStatus(userId: String, active: Boolean, currentUserId: String, state: MutableStateFlow<AdminUiState>, onLog: (String, String) -> Unit) {
+    fun setUserActiveStatus(userId: String, active: Boolean, currentUserId: String, adminName: String, state: MutableStateFlow<AdminUiState>, onLog: (String, String, String) -> Unit) {
         scope.launch {
             state.value = state.value.copy(isLoading = true, error = null)
             setUserActiveStatusUseCase(userId, active).fold(
                 onSuccess = {
                     val action = if (active) "reactivado" else "suspendido"
                     state.value = state.value.copy(isLoading = false, successMessage = "Usuario $action correctamente")
-                    onLog(currentUserId, "Cambió estado de usuario $userId a active=$active")
+                    onLog(currentUserId, adminName, "Cambió estado de usuario $userId a active=$active")
                 },
                 onFailure = { error -> state.value = state.value.copy(isLoading = false, error = error.message ?: "Error al cambiar estado") }
             )
@@ -63,13 +63,13 @@ internal class AdminUsersHandler(
         }
     }
 
-    fun resolveAppeal(appealId: String, userId: String, accept: Boolean, currentUserId: String, state: MutableStateFlow<AdminUiState>, onLog: (String, String) -> Unit) {
+    fun resolveAppeal(appealId: String, userId: String, accept: Boolean, currentUserId: String, adminName: String, state: MutableStateFlow<AdminUiState>, onLog: (String, String, String) -> Unit) {
         scope.launch {
             state.value = state.value.copy(isLoading = true, error = null)
             resolveAppealUseCase(appealId, userId, accept).fold(
                 onSuccess = {
                     state.value = state.value.copy(isLoading = false, successMessage = "Apelación resuelta")
-                    onLog(currentUserId, "Resolvió apelación $appealId para usuario $userId (aceptada: $accept)")
+                    onLog(currentUserId, adminName, "Resolvió apelación $appealId para usuario $userId (aceptada: $accept)")
                     loadAppeals(state)
                 },
                 onFailure = { error -> state.value = state.value.copy(isLoading = false, error = error.message ?: "Error al resolver apelación") }
@@ -77,13 +77,13 @@ internal class AdminUsersHandler(
         }
     }
 
-    fun responderReporte(reporteId: String, respuesta: String, currentUserId: String, state: MutableStateFlow<AdminUiState>, onLog: (String, String) -> Unit) {
+    fun responderReporte(reporteId: String, respuesta: String, currentUserId: String, adminName: String, state: MutableStateFlow<AdminUiState>, onLog: (String, String, String) -> Unit) {
         scope.launch {
             state.value = state.value.copy(isLoading = true, error = null)
             responderReporteUseCase(reporteId, respuesta).fold(
                 onSuccess = {
                     state.value = state.value.copy(isLoading = false, successMessage = "Reporte respondido")
-                    onLog(currentUserId, "Respondió reporte $reporteId")
+                    onLog(currentUserId, adminName, "Respondió reporte $reporteId")
                     loadAllReportes(state)
                 },
                 onFailure = { error -> state.value = state.value.copy(isLoading = false, error = error.message ?: "Error al responder reporte") }

@@ -13,6 +13,7 @@ class RegisterUseCase(
         if (request.password != request.passwordConfirm) {
             return Result.failure(Exception("Las contraseñas no coinciden"))
         }
+        var finalRequest = request
         if (request.role == "conductor" && request.invitationCode.isNotBlank()) {
             val validationResult = adminRepository.validateInvitationCode(request.invitationCode)
             if (validationResult.isFailure) {
@@ -27,7 +28,16 @@ class RegisterUseCase(
             if (code.isExpired()) {
                 return Result.failure(Exception("El código de invitación ha expirado"))
             }
+            finalRequest = request.copy(lineaId = code.lineaId)
         }
-        return authRepository.register(request)
+        val result = authRepository.register(finalRequest)
+        if (result.isSuccess && request.role == "conductor" && request.invitationCode.isNotBlank()) {
+            val validationResult = adminRepository.validateInvitationCode(request.invitationCode)
+            val code = validationResult.getOrNull()
+            if (code != null) {
+                adminRepository.useInvitationCode(code.id, result.getOrNull()?.id ?: "")
+            }
+        }
+        return result
     }
 }

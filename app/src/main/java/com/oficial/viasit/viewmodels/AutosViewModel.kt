@@ -25,7 +25,7 @@ class AutosViewModel(
     private val syncAutosUseCase: SyncAutosUseCase,
     private val submitReporteUseCase: SubmitReporteUseCase,
     private val getReportesUseCase: GetReportesUseCase,
-    private val responderReporteUseCase: ResponderReporteUseCase
+    private val responderReporteConductorUseCase: ResponderReporteConductorUseCase
 ) : ViewModel() {
 
     val autosUiState: StateFlow<List<Auto>> = getAutosUseCase()
@@ -133,10 +133,11 @@ class AutosViewModel(
         reporterId: String,
         reporterName: String,
         driverId: String,
+        targetName: String,
         onResult: (Boolean) -> Unit
     ) {
         viewModelScope.launch {
-            submitReporteUseCase(descripcion, reporterId, reporterName, driverId).fold(
+            submitReporteUseCase(descripcion, reporterId, reporterName, driverId, targetName).fold(
                 onSuccess = { onResult(true) },
                 onFailure = { onResult(false) }
             )
@@ -154,7 +155,7 @@ class AutosViewModel(
 
     fun responderReporte(reporteId: String, respuesta: String, onResult: (Boolean) -> Unit) {
         viewModelScope.launch {
-            responderReporteUseCase(reporteId, respuesta).fold(
+            responderReporteConductorUseCase(reporteId, respuesta).fold(
                 onSuccess = { onResult(true) },
                 onFailure = { onResult(false) }
             )
@@ -180,7 +181,7 @@ class AutosViewModel(
                     app.syncAutosUseCase,
                     app.submitReporteUseCase,
                     app.getReportesUseCase,
-                    app.responderReporteUseCase
+                    app.responderReporteConductorUseCase
                 )
             }
         }

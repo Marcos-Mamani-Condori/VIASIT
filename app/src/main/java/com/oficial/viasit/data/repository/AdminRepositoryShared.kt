@@ -10,6 +10,7 @@ internal class AdminRepositoryShared(
     private val getToken: () -> String?
 ) {
     fun authToken(): String? = getToken()
+    fun getCurrentUserName(): String? = authRepository?.getCurrentUser()?.name
 
     private val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS'Z'")
 

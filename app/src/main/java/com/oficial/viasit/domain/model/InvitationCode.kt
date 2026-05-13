@@ -30,6 +30,9 @@ data class InvitationCode(
     @SerialName("createdBy")
     val createdBy: String = "",
 
+    @SerialName("adminName")
+    val adminName: String = "",
+
     @SerialName("created")
     val created: String = "",
 

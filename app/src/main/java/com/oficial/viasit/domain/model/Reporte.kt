@@ -12,11 +12,11 @@ data class Reporte(
     @SerialName("description")
     val description: String = "",
 
-    @SerialName("response")
-    val adminResponse: String = "", // Respuesta oficial de la administración
+    @SerialName("adminResponse")
+    val adminResponse: String = "",
 
-    @SerialName("driver_response")
-    val driverResponse: String = "", // Respuesta directa del conductor implicado
+    @SerialName("driverResponse")
+    val driverResponse: String = "",
 
     @SerialName("users")
     val users: List<String> = emptyList(), // ID del Pasajero
@@ -30,14 +30,30 @@ data class Reporte(
     @SerialName("created")
     val created: String = "",
 
+    @SerialName("reporterName")
+    val reporterNameFromDb: String = "",
+
+    @SerialName("targetName")
+    val targetNameFromDb: String = "",
+
     @SerialName("expand")
     val expand: JsonObject? = null
 ) {
     val driverName: String
-        get() = getNameFromExpand("userid") ?: "Conductor ($userid)"
+        get() {
+            val nameFromExpand = getNameFromExpand("userid")
+            return if (!nameFromExpand.isNullOrBlank()) nameFromExpand
+            else if (targetNameFromDb.isNotBlank()) targetNameFromDb
+            else "Conductor ($userid)"
+        }
 
     val reporterName: String
-        get() = getNameFromExpand("users") ?: "Pasajero"
+        get() {
+            val nameFromExpand = getNameFromExpand("users")
+            return if (!nameFromExpand.isNullOrBlank()) nameFromExpand
+            else if (reporterNameFromDb.isNotBlank()) reporterNameFromDb
+            else "Pasajero"
+        }
 
     private fun getNameFromExpand(key: String): String? {
         return try {

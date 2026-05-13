@@ -61,25 +61,25 @@ data class User(
         }
     
     val isDriver: Boolean
-        get() = userRole == UserRole.conductor
+        get() = role.contains(UserRole.conductor.name)
     
     val isGuest: Boolean
-        get() = userRole == UserRole.invitado
+        get() = role.contains(UserRole.invitado.name)
     
     val canSendLocation: Boolean
-        get() = userRole == UserRole.usuario || userRole == UserRole.conductor
+        get() = role.contains(UserRole.usuario.name) || role.contains(UserRole.conductor.name)
     
     val canToggleService: Boolean
-        get() = userRole == UserRole.conductor
+        get() = role.contains(UserRole.conductor.name)
     
     val isAdmin: Boolean
-        get() = userRole == UserRole.ADMIN_LINEA || userRole == UserRole.ADMIN_PRINCIPAL
+        get() = role.contains(UserRole.ADMIN_LINEA.name) || role.contains(UserRole.ADMIN_PRINCIPAL.name)
     
     val isAdminPrincipal: Boolean
-        get() = userRole == UserRole.ADMIN_PRINCIPAL
+        get() = role.contains(UserRole.ADMIN_PRINCIPAL.name)
     
     val canManageLines: Boolean
-        get() = userRole == UserRole.ADMIN_PRINCIPAL
+        get() = role.contains(UserRole.ADMIN_PRINCIPAL.name)
 }
 
 @Serializable

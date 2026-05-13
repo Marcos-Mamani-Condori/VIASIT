@@ -5,7 +5,6 @@ import com.oficial.viasit.domain.model.InvitationCode
 import com.oficial.viasit.domain.model.Linea
 import com.oficial.viasit.domain.model.LogEntry
 import com.oficial.viasit.domain.model.Ruta
-import com.oficial.viasit.domain.model.VehicleInvitationCode
 import com.oficial.viasit.domain.repository.IAdminRepository
 import kotlinx.serialization.Serializable
 
@@ -35,10 +34,9 @@ class AdminRepository(
     private val lineas         = LineasRepository(client, shared)
     private val rutas          = RutasRepository(client, shared)
     private val logs           = LogsRepository(client, shared)
-    private val vehicleCodes   = VehicleCodesRepository(client, shared)
 
-    override suspend fun generateInvitationCode(role: String, lineaId: String, expiresInHours: Int): Result<InvitationCode> =
-        invitaciones.generate(role, lineaId, expiresInHours)
+    override suspend fun generateInvitationCode(role: String, lineaId: String, expiresInHours: Int, adminName: String): Result<InvitationCode> =
+        invitaciones.generate(role, lineaId, expiresInHours, adminName)
     override suspend fun getInvitationCodes(): Result<List<InvitationCode>>                    = invitaciones.getAll()
     override suspend fun validateInvitationCode(code: String): Result<InvitationCode>          = invitaciones.validate(code)
     override suspend fun deleteInvitationCode(codeId: String): Result<Unit>                    = invitaciones.delete(codeId)
@@ -59,10 +57,10 @@ class AdminRepository(
         if (linea.rutaId.isBlank()) Result.success(null) else rutas.getById(linea.rutaId).map { it }
     override suspend fun deleteRuta(rutaId: String): Result<Unit>                                                        = rutas.delete(rutaId)
 
-    override suspend fun create(userId: String, description: String, type: String): Result<Unit> =
-        logs.create(userId, description, type)
-    override suspend fun getAll(limit: Int, filter: String, timeFilter: String): Result<List<LogEntry>> =
-        logs.getAll(limit, filter, timeFilter)
+    override suspend fun create(userId: String, userName: String, description: String, type: String): Result<Unit> =
+        logs.create(userId, userName, description, type)
+    override suspend fun getAll(limit: Int, filter: String, timeFilter: String, lineId: String): Result<List<LogEntry>> =
+        logs.getAll(limit, filter, timeFilter, lineId)
 
     override suspend fun getByUser(userId: String): Result<List<LogEntry>> =
         logs.getByUser(userId)
@@ -102,11 +100,4 @@ class AdminRepository(
         }
         Result.success(Unit)
     } catch (e: Exception) { Result.failure(e) }
-
-    override suspend fun generateVehicleInvitationCode(lineaId: String, creadoPor: String, expiresInHours: Int): Result<VehicleInvitationCode> =
-        vehicleCodes.generate(lineaId, creadoPor, expiresInHours)
-    override suspend fun getVehicleInvitationCodesByLinea(lineaId: String): Result<List<VehicleInvitationCode>>          = vehicleCodes.getByLinea(lineaId)
-    override suspend fun validateVehicleInvitationCode(code: String): Result<VehicleInvitationCode>                      = vehicleCodes.validate(code)
-    override suspend fun useVehicleInvitationCode(codeId: String, usadoPor: String): Result<Unit>                        = vehicleCodes.markUsed(codeId, usadoPor)
-    override suspend fun deleteVehicleInvitationCode(codeId: String): Result<Unit>                                       = vehicleCodes.delete(codeId)
 }

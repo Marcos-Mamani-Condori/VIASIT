@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
@@ -55,6 +56,8 @@ fun AdminDashboardScreen(
             "Mapa" to Icons.Default.Map,
             "Mi Línea" to Icons.Default.Route,
             "Conductores" to Icons.Default.People,
+            "Invitaciones" to Icons.Default.Key,
+            "Reportes" to Icons.Default.Warning,
             "Logs" to Icons.Default.History
         )
     }
@@ -70,6 +73,9 @@ fun AdminDashboardScreen(
             viewModel.loadLineas()
             viewModel.loadRutas()
             viewModel.loadUsers(currentUser.lineaId)
+            viewModel.loadVehicleInvitationCodes(currentUser.lineaId)
+            viewModel.loadAllReportes() // Deberíamos filtrar por línea en el ViewModel
+            logsViewModel.setLineId(currentUser.lineaId)
         }
         logsViewModel.loadLogs()
     }
@@ -116,40 +122,41 @@ fun AdminDashboardScreen(
                     when (selectedTab) {
                         0 -> PassengerMapScreen(
                             passengerViewModel = passengerViewModel,
-                            showTailsButton = true
+                            showTailsButton = true,
+                            currentUser = currentUser
                         )
                         1 -> LineasTabContent(
                             lineas        = uiState.lineas, isLoading = uiState.isLoading,
-                            onCreateLinea = { n, c, r -> viewModel.createLinea(n, c, r, currentUser.id) },
-                            onDeleteLinea = { viewModel.deleteLinea(it, currentUser.id) }
+                            onCreateLinea = { n, c, r -> viewModel.createLinea(n, c, r, currentUser.id, currentUser.name) },
+                            onDeleteLinea = { viewModel.deleteLinea(it, currentUser.id, currentUser.name) }
                         )
                         2 -> RutasTabContent(
                             rutas     = uiState.rutas,
                             lineas    = uiState.lineas,
                             isLoading = uiState.isLoading,
                             onDeleteRuta = { rutaId, rutaName, lineaId ->
-                                viewModel.deleteRuta(rutaId, rutaName, lineaId, currentUser.id)
+                                viewModel.deleteRuta(rutaId, rutaName, lineaId, currentUser.id, currentUser.name)
                             }
                         )
                         3 -> ReportesTabContent(
                             reportes = uiState.reportes, 
                             isLoading = uiState.isLoading,
-                            onResponder = { id, resp -> viewModel.responderReporte(id, resp, currentUser.id) }
+                            onResponder = { id, resp -> viewModel.responderReporte(id, resp, currentUser.id, currentUser.name) }
                         )
                         4 -> ApelacionesTabContent(
                             appeals = uiState.appeals,
                             isLoading = uiState.isLoading,
                             onResolve = { appealId, targetUserId, accept ->
-                                viewModel.resolveAppeal(appealId, targetUserId, accept, currentUser.id)
+                                viewModel.resolveAppeal(appealId, targetUserId, accept, currentUser.id, currentUser.name)
                             }
                         )
                         5 -> InvitacionesTabContent(
                             invitationCodes = uiState.invitationCodes, lineas = uiState.lineas,
                             isLoading       = uiState.isLoading, generatedCode = uiState.generatedCode,
                             onGenerateCode  = { role, lineaId ->
-                                viewModel.generateInvitationCode(role, lineaId, 24, currentUser.id)
+                                viewModel.generateInvitationCode(role, lineaId, 24, currentUser.id, currentUser.name)
                             },
-                            onDeleteCode = { viewModel.deleteInvitationCode(it, currentUser.id) }
+                            onDeleteCode = { viewModel.deleteInvitationCode(it, currentUser.id, currentUser.name) }
                         )
                         6 -> {
                             val logs by logsViewModel.logs.collectAsState()
@@ -175,7 +182,8 @@ fun AdminDashboardScreen(
                             }
                             PassengerMapScreen(
                                 passengerViewModel = passengerViewModel,
-                                showTailsButton = true
+                                showTailsButton = true,
+                                currentUser = currentUser
                             )
                         }
                         1 -> MiLineaTabContent(
@@ -185,10 +193,10 @@ fun AdminDashboardScreen(
                             isLoading = uiState.isLoading,
                             userEmail = currentUser.email,
                             onCreateRuta = { name, desc, start, end, lineaId ->
-                                viewModel.createRuta(name, desc, start, end, lineaId, currentUser.id)
+                                viewModel.createRuta(name, desc, start, end, lineaId, currentUser.id, currentUser.name)
                             },
                             onAssignRuta = { rutaId, rutaName ->
-                                viewModel.assignRutaToLinea(currentUser.lineaId, rutaId, rutaName, currentUser.id)
+                                viewModel.assignRutaToLinea(currentUser.lineaId, rutaId, rutaName, currentUser.id, currentUser.name)
                             },
                             onNavigateToRoutePicker = onNavigateToRoutePicker
                         )
@@ -197,7 +205,7 @@ fun AdminDashboardScreen(
                             autos = autos,
                             isLoading = uiState.isLoading,
                             onToggleActive = { targetUserId, active ->
-                                viewModel.setUserActiveStatus(targetUserId, active, currentUser.id)
+                                viewModel.setUserActiveStatus(targetUserId, active, currentUser.id, currentUser.name)
                             },
                             onShowLocation = { lat, lng ->
                                 passengerViewModel.onShowLocation(lat, lng)
@@ -205,6 +213,35 @@ fun AdminDashboardScreen(
                             }
                         )
                         3 -> {
+                            val vCodes = uiState.invitationCodes.filter { it.role == "DRIVER" }
+                            com.oficial.viasit.ui.admin.linea.VehicleCodesTabContent(
+                                lineaId = currentUser.lineaId,
+                                vehicleCodes = vCodes,
+                                isLoading = uiState.isLoading,
+                                generatedCode = uiState.generatedCode,
+                                onGenerateCode = {
+                                    viewModel.generateVehicleInvitationCode(currentUser.lineaId, currentUser.name, 72, currentUser.id)
+                                },
+                                onDeleteCode = { viewModel.deleteVehicleInvitationCode(it, currentUser.lineaId, currentUser.id, currentUser.name) }
+                            )
+                        }
+                        4 -> {
+                            val miLinea = uiState.lineas.find { it.id == currentUser.lineaId }
+                            val lineName = miLinea?.name ?: ""
+                            
+                            // Filtrar reportes por lineaId si el conductor pertenece a la línea del admin
+                            val lineReportes = uiState.reportes.filter { reporte ->
+                                val autoOfDriver = autos.find { it.userId == reporte.userid }
+                                autoOfDriver?.lineaId == currentUser.lineaId
+                            }
+
+                            ReportesTabContent(
+                                reportes = lineReportes,
+                                isLoading = uiState.isLoading,
+                                onResponder = { id, resp -> viewModel.responderReporte(id, resp, currentUser.id, currentUser.name) }
+                            )
+                        }
+                        5 -> {
                             val logs by logsViewModel.logs.collectAsState()
                             val isLoadingLogs by logsViewModel.isLoading.collectAsState()
                             val searchQuery by logsViewModel.searchQuery.collectAsState()
@@ -261,7 +298,7 @@ private fun AdminTopBar(currentUser: User, onLogout: () -> Unit) {
         },
         actions = {
             IconButton(onClick = onLogout) {
-                Icon(Icons.Default.Logout, "Cerrar sesión", tint = Slate400)
+                Icon(Icons.AutoMirrored.Filled.Logout, "Cerrar sesión", tint = Slate400)
             }
         },
         colors = TopAppBarDefaults.topAppBarColors(containerColor = Slate950)

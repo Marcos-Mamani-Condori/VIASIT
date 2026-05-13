@@ -53,6 +53,7 @@ class AutosAplicacion : Application() {
     val submitReporteUseCase by lazy { SubmitReporteUseCase(reportesRepository) }
     val getReportesUseCase by lazy { GetReportesUseCase(reportesRepository) }
     val responderReporteUseCase by lazy { ResponderReporteUseCase(reportesRepository) }
+    val responderReporteConductorUseCase by lazy { ResponderReporteConductorUseCase(reportesRepository) }
 
     // UseCases de Admin - Lineas
     val getLineasUseCase by lazy { GetLineasUseCase(adminRepository) }
@@ -86,11 +87,6 @@ class AutosAplicacion : Application() {
     val getAppealsUseCase by lazy { GetAppealsUseCase(adminRepository) }
     val resolveAppealUseCase by lazy { ResolveAppealUseCase(adminRepository) }
     val getAllReportesUseCase by lazy { GetAllReportesUseCase(reportesRepository) }
-
-    // UseCases de Admin - Vehicle Codes
-    val getVehicleInvitationCodesUseCase by lazy { GetVehicleInvitationCodesUseCase(adminRepository) }
-    val generateVehicleInvitationCodeUseCase by lazy { GenerateVehicleInvitationCodeUseCase(adminRepository) }
-    val deleteVehicleInvitationCodeUseCase by lazy { DeleteVehicleInvitationCodeUseCase(adminRepository) }
 
     // UseCases de Pasajero
     val searchLineasByDestinationUseCase by lazy { SearchLineasByDestinationUseCase() }

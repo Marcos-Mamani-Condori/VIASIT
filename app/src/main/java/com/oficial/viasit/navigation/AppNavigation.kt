@@ -145,6 +145,7 @@ fun VIASITApp() {
                         eLng      = routeData.endPoint?.lng  ?: 0.0,
                         lineaId   = screen.lineaId,
                         userId    = currentUser?.id ?: "",
+                        adminName = currentUser?.name ?: "",
                         waypoints = routeData.waypoints.map { Pair(it.lat, it.lng) }
                     )
                     currentScreen = Screen.AdminDashboard

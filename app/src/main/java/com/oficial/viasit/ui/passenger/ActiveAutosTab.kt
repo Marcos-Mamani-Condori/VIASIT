@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -44,6 +45,7 @@ fun ActiveAutosTab(
     val context       = LocalContext.current
     val scope         = rememberCoroutineScope()
     val todosLosAutos by autosViewModel.autosUiState.collectAsState()
+    val todasLasLineas by passengerViewModel.lineas.collectAsState()
     val autosActivos  = todosLosAutos.filter { it.isActive() }
     val destinoLineas by passengerViewModel.destinoLineas.collectAsState()
     val destinoNombre by passengerViewModel.destinoNombre.collectAsState()
@@ -55,9 +57,16 @@ fun ActiveAutosTab(
     val puedeReportar = (userRoleStr.equals("usuario", ignoreCase = true) || userRoleStr.equals("pasajero", ignoreCase = true)) && !currentUser.isGuest
 
     var query by remember { mutableStateOf("") }
-    val filtrados = remember(autosActivos, query) {
-        if (query.isBlank()) autosActivos
-        else autosActivos.filter { it.placa.contains(query.trim(), ignoreCase = true) }
+    var selectedLineaFilter by remember { mutableStateOf<String?>(null) } // null = todas
+
+    val filtrados = remember(autosActivos, query, selectedLineaFilter) {
+        var list = if (query.isBlank()) autosActivos
+                   else autosActivos.filter { it.placa.contains(query.trim(), ignoreCase = true) }
+        
+        if (selectedLineaFilter != null) {
+            list = list.filter { it.lineaId == selectedLineaFilter }
+        }
+        list
     }
 
     var userLocation by remember { mutableStateOf<Location?>(null) }
@@ -100,12 +109,191 @@ fun ActiveAutosTab(
             }
         }
 
-        // Search Bar
-        Box(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+        // --- BUSCADOR DE DESTINO (RESTURADO) ---
+        Card(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            colors = CardDefaults.cardColors(containerColor = Slate900),
+            shape = RoundedCornerShape(16.dp),
+            border = androidx.compose.foundation.BorderStroke(1.dp, if (destinoNombre != null) Brand500 else Slate800)
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Icon(Icons.Default.LocationOn, null, tint = if (destinoNombre != null) Brand500 else Slate500)
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (destinoNombre != null) "¿Cómo llegar a $destinoNombre?" else "¿A dónde quieres ir hoy?",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = if (destinoNombre != null) Brand400 else Slate400
+                        )
+                        OutlinedTextField(
+                            value = destinoQuery,
+                            onValueChange = { 
+                                passengerViewModel.setDestinoQuery(it)
+                                destinoJob?.cancel()
+                                if (it.length > 3) {
+                                    destinoJob = scope.launch {
+                                        kotlinx.coroutines.delay(500)
+                                        destinoBuscando = true
+                                        geocodingService.search(it).onSuccess { results ->
+                                            destinoResults = results
+                                            destinoBuscando = false
+                                        }
+                                    }
+                                } else {
+                                    destinoResults = emptyList()
+                                }
+                            },
+                            placeholder = { Text("Ej: Plaza Murillo, San Miguel...", color = Slate600, fontSize = 14.sp) },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Color.Transparent,
+                                unfocusedBorderColor = Color.Transparent,
+                                focusedTextColor = Color.White
+                            ),
+                            trailingIcon = {
+                                if (destinoNombre != null) {
+                                    IconButton(onClick = { passengerViewModel.limpiarDestino() }) {
+                                        Icon(Icons.Default.Close, null, tint = Rose500)
+                                    }
+                                }
+                            }
+                        )
+                    }
+                }
+
+                if (destinoResults.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    destinoResults.forEach { res ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().clickable {
+                                passengerViewModel.buscarLineasPorDestino(res.lat, res.lon, res.name)
+                                destinoResults = emptyList()
+                                passengerViewModel.setDestinoQuery("")
+                            }.padding(vertical = 8.dp, horizontal = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(Icons.Default.History, null, tint = Slate600, modifier = Modifier.size(16.dp))
+                            Text(res.displayName, style = MaterialTheme.typography.bodySmall, color = Slate300, maxLines = 1)
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- LÍNEAS RECOMENDADAS (RESTAURADO) ---
+        if (destinoLineas.isNotEmpty()) {
+            Text(
+                "Líneas que te llevan a tu destino",
+                style = MaterialTheme.typography.labelLarge,
+                color = Brand400,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                fontWeight = FontWeight.Bold
+            )
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.padding(bottom = 16.dp)
+            ) {
+                items(destinoLineas) { linea ->
+                    Card(
+                        modifier = Modifier.width(140.dp).clickable { passengerViewModel.selectLinea(linea.id); onNavigateToMap() },
+                        colors = CardDefaults.cardColors(containerColor = Brand500.copy(alpha = 0.15f)),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Brand500.copy(alpha = 0.5f))
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Icon(Icons.Default.DirectionsBus, null, tint = Brand500)
+                            Text(linea.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text("Ver ruta", style = MaterialTheme.typography.labelSmall, color = Brand400)
+                        }
+                    }
+                }
+            }
+        }
+
+    // --- EXPLORAR TODAS LAS LÍNEAS (NUEVO) ---
+    if (destinoLineas.isEmpty() && query.isBlank()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                "Filtrar por Línea",
+                style = MaterialTheme.typography.labelLarge,
+                color = Slate400,
+                fontWeight = FontWeight.Bold
+            )
+            if (selectedLineaFilter != null) {
+                Text(
+                    "Ver Ruta Oficial",
+                    modifier = Modifier.clickable { 
+                        passengerViewModel.selectLinea(selectedLineaFilter!!)
+                        onNavigateToMap()
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Brand400,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.padding(bottom = 16.dp)
+        ) {
+                item {
+                    FilterChip(
+                        selected = selectedLineaFilter == null,
+                        onClick = { selectedLineaFilter = null },
+                        label = { Text("Todas") },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = Brand500,
+                            selectedLabelColor = Color.White,
+                            containerColor = Slate900,
+                            labelColor = Slate400
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            borderColor = Slate800,
+                            selectedBorderColor = Brand500,
+                            enabled = true,
+                            selected = selectedLineaFilter == null
+                        )
+                    )
+                }
+                items(todasLasLineas) { linea ->
+                    val isSelected = selectedLineaFilter == linea.id
+                    FilterChip(
+                        selected = isSelected,
+                        onClick = { 
+                            selectedLineaFilter = if (isSelected) null else linea.id 
+                        },
+                        label = { Text(linea.name) },
+                        leadingIcon = {
+                            if (isSelected) Icon(Icons.Default.Check, null, modifier = Modifier.size(16.dp))
+                        },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = Brand500,
+                            selectedLabelColor = Color.White,
+                            containerColor = Slate900,
+                            labelColor = Slate400
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            borderColor = Slate800,
+                            selectedBorderColor = Brand500,
+                            enabled = true,
+                            selected = isSelected
+                        )
+                    )
+                }
+            }
+        }
+
+        // Search Bar (Placa)
+        Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
             OutlinedTextField(
                 value = query, onValueChange = { query = it },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Buscar placa...", color = Slate500) },
+                placeholder = { Text("Buscar unidad por placa...", color = Slate500) },
                 leadingIcon = { Icon(Icons.Default.Search, null, tint = Slate500) },
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedContainerColor = Slate900, unfocusedContainerColor = Slate900,
@@ -208,7 +396,7 @@ fun ActiveAutosTab(
                         }
                         else -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             reportesList.forEach { rep ->
-                                val texto = rep.descripcion.replace(Regex("""^\[Unidad: [^\]]+\]\s*"""), "")
+                                val texto = rep.description.replace(Regex("""^\[Unidad: [^\]]+\]\s*"""), "")
                                 Card(
                                     colors = CardDefaults.cardColors(containerColor = Slate800),
                                     modifier = Modifier.fillMaxWidth()
@@ -222,16 +410,16 @@ fun ActiveAutosTab(
                                         Spacer(modifier = Modifier.height(4.dp))
                                         Text(texto, style = MaterialTheme.typography.bodySmall, color = Slate300)
                                         
-                                        if (rep.respuestaConductor.isNotBlank()) {
+                                        if (rep.driverResponse.isNotBlank()) {
                                             Spacer(modifier = Modifier.height(8.dp))
                                             Text("Respuesta del Conductor:", style = MaterialTheme.typography.labelSmall, color = Emerald400, fontWeight = FontWeight.Bold)
-                                            Text(rep.respuestaConductor, style = MaterialTheme.typography.bodySmall, color = Emerald400.copy(alpha = 0.8f))
+                                            Text(rep.driverResponse, style = MaterialTheme.typography.bodySmall, color = Emerald400.copy(alpha = 0.8f))
                                         }
 
-                                        if (rep.respuesta.isNotBlank()) {
+                                        if (rep.adminResponse.isNotBlank()) {
                                             Spacer(modifier = Modifier.height(8.dp))
                                             Text("Respuesta de Administración:", style = MaterialTheme.typography.labelSmall, color = Brand400, fontWeight = FontWeight.Bold)
-                                            Text(rep.respuesta, style = MaterialTheme.typography.bodySmall, color = Slate400)
+                                            Text(rep.adminResponse, style = MaterialTheme.typography.bodySmall, color = Slate400)
                                         }
                                     }
                                 }
@@ -292,7 +480,7 @@ fun ActiveAutosTab(
                             if (reportText.isNotBlank() && auto != null) {
                                 isLoading = true
                                 val finalMsg = "[Unidad: ${auto.placa}] $reportText"
-                                autosViewModel.submitReporte(finalMsg, currentUser.id, currentUser.name, auto.userId) { success ->
+                                autosViewModel.submitReporte(finalMsg, currentUser.id, currentUser.name, auto.userId, auto.driverName) { success ->
                                     isLoading = false
                                     if (success) enviado = true
                                 }

@@ -8,8 +8,8 @@ class GetInvitationCodesUseCase(private val repository: IAdminRepository) {
 }
 
 class GenerateInvitationCodeUseCase(private val repository: IAdminRepository) {
-    suspend operator fun invoke(role: String, lineaId: String, hours: Int): Result<InvitationCode> =
-        repository.generateInvitationCode(role, lineaId, hours)
+    suspend operator fun invoke(role: String, lineaId: String, hours: Int, adminName: String): Result<InvitationCode> =
+        repository.generateInvitationCode(role, lineaId, hours, adminName)
 }
 
 class DeleteInvitationCodeUseCase(private val repository: IAdminRepository) {

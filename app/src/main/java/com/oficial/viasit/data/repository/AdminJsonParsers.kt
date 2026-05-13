@@ -4,13 +4,12 @@ import com.oficial.viasit.domain.model.InvitationCode
 import com.oficial.viasit.domain.model.Linea
 import com.oficial.viasit.domain.model.LogEntry
 import com.oficial.viasit.domain.model.Ruta
-import com.oficial.viasit.domain.model.VehicleInvitationCode
 
 internal object AdminJsonParsers {
 
     fun extractStringField(json: String, field: String): String =
-        Regex(""""$field"\s*:\s*"([^"]*)"|"$field"\s*:\s*(\w+)""").find(json)?.let { 
-            it.groupValues[1].ifEmpty { it.groupValues[2] }
+        Regex(""""$field"\s*:\s*"([^"]*)"|"$field"\s*:\s*(\w+)|"$field"\s*:\s*\[([^\]]*)\]""").find(json)?.let { 
+            it.groupValues[1].ifEmpty { it.groupValues[2] }.ifEmpty { it.groupValues[3].replace("\"", "").trim() }
         } ?: ""
 
     fun extractItemBlocks(json: String): List<String> {
@@ -90,10 +89,11 @@ internal object AdminJsonParsers {
                     ?: ""
             }
 
+            val explicitUserName = extractStringField(block, "userName")
             LogEntry(
                 id = extractStringField(block, "id"),
                 userId = extractStringField(block, "userid").ifEmpty { extractStringField(block, "userId") }.ifEmpty { extractStringField(block, "users") },
-                userName = displayName.ifEmpty { "Sistema" },
+                userName = explicitUserName.ifEmpty { displayName }.ifEmpty { "Sistema" },
                 description = extractStringField(block, "description"),
                 type = extractStringField(block, "type").ifEmpty { "info" },
                 created = extractStringField(block, "created")
@@ -109,18 +109,6 @@ internal object AdminJsonParsers {
         endPoint    = extractStringField(json, "endPoint"),
         waypoints   = extractStringField(json, "waypoints")
     )
-
-    fun parseVehicleCodesFromJson(json: String): List<VehicleInvitationCode> =
-        extractItemBlocks(json).map { block ->
-            VehicleInvitationCode(
-                id        = extractStringField(block, "id"),
-                code      = extractStringField(block, "code"),
-                lineaId   = extractStringField(block, "lineId"),
-                createdBy = extractStringField(block, "createdBy"),
-                usedBy    = extractStringField(block, "usedBy"),
-                expiresAt = extractStringField(block, "expiresAt")
-            )
-        }.filter { it.id.isNotEmpty() }
 
     fun parseUsersFromJson(json: String): List<com.oficial.viasit.domain.model.User> =
         extractItemBlocks(json).map { block ->

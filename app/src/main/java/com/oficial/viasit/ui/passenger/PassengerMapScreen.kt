@@ -17,7 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -26,7 +26,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.oficial.viasit.domain.model.Auto
-import com.oficial.viasit.domain.model.Linea
+import com.oficial.viasit.domain.model.UserRole
 import com.oficial.viasit.viewmodels.AutosViewModel
 import com.oficial.viasit.ui.map.RoutePolyline
 import com.oficial.viasit.ui.map.addCarsLayer
@@ -54,7 +54,8 @@ import org.maplibre.android.maps.Style
 @Composable
 fun PassengerMapScreen(
     passengerViewModel: PassengerViewModel,
-    showTailsButton: Boolean = true
+    showTailsButton: Boolean = true,
+    currentUser: com.oficial.viasit.domain.model.User? = null
 ) {
     val context        = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -86,6 +87,11 @@ fun PassengerMapScreen(
     var searchJob          by remember { mutableStateOf<Job?>(null) }
 
     val selectedLineaId by passengerViewModel.selectedLineaId.collectAsState()
+    val userRoleStr = currentUser?.role?.firstOrNull() ?: ""
+    val isLineAdmin = userRoleStr.equals(UserRole.ADMIN_LINEA.name, ignoreCase = true)
+    val isPrincipalAdmin = userRoleStr.equals(UserRole.ADMIN_PRINCIPAL.name, ignoreCase = true)
+
+    val puedeReportar = currentUser != null && !currentUser.isGuest
 
     val routePolylines: List<RoutePolyline> = remember(rutas, lineas, selectedLineaId) {
         if (selectedLineaId == null) return@remember emptyList()
@@ -266,155 +272,240 @@ fun PassengerMapScreen(
                     )
                 }
                 if (selectedLineaId != null) {
-                    IconButton(onClick = { passengerViewModel.clearSelectedLinea() }) {
+                    IconButton(onClick = { 
+                        passengerViewModel.clearSelectedLinea()
+                        searchQuery = ""
+                        searchResults = emptyList()
+                        showSearchResults = false
+                    }) {
                         Icon(
                             Icons.Default.Close, "Quitar ruta",
-                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                            tint = Rose500, // Cambiado a rojo para mejor visibilidad
                             modifier = Modifier.size(18.dp)
                         )
                     }
                 }
             }
 
-            // Search Bar
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 4.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
-                ),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        Icons.Default.Search,
-                        contentDescription = "Buscar",
-                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                        modifier = Modifier.padding(start = 12.dp)
-                    )
-                    TextField(
-                        value = searchQuery,
-                        onValueChange = { query ->
-                            searchQuery = query
-                            searchJob?.cancel()
-                            if (query.length >= 3) {
-                                searchJob = scope.launch {
-                                    kotlinx.coroutines.delay(400)
-                                    isSearching = true
-                                    showSearchResults = true
-                                    geocodingService.search(query).fold(
-                                        onSuccess = { results ->
-                                            searchResults = results
-                                            isSearching = false
-                                        },
-                                        onFailure = {
-                                            searchResults = emptyList()
-                                            isSearching = false
-                                        }
-                                    )
-                                }
-                            } else {
-                                searchResults = emptyList()
-                                showSearchResults = false
-                            }
-                        },
-                        placeholder = {
-                            Text(
-                                "Buscar en La Paz...",
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
-                            )
-                        },
-                        singleLine  = true,
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor   = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent,
-                            focusedIndicatorColor   = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent
-                        ),
-                        modifier = Modifier.weight(1f)
-                    )
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = {
-                            searchQuery = ""
-                            searchResults = emptyList()
-                            showSearchResults = false
-                            focusManager.clearFocus()
-                        }) {
-                            Icon(Icons.Default.Clear, "Limpiar",
-                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
-                        }
-                    }
-                    if (isSearching) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(24.dp).padding(end = 8.dp),
-                            color = MaterialTheme.colorScheme.primary,
-                            strokeWidth = 2.dp
-                        )
-                    }
-                }
-            }
-
-            if (showSearchResults && searchResults.isNotEmpty()) {
+            // Search Bar & Filter Chips (Enabled for everyone except simple guests if needed, but definitely for admins)
+            if (true) {
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp)
-                        .heightIn(max = 200.dp),
+                        .padding(horizontal = 12.dp, vertical = 4.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.97f)
+                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
                     ),
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    LazyColumn {
-                        items(searchResults) { result ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        mapInstance?.animateCamera(
-                                            CameraUpdateFactory.newLatLngZoom(
-                                                LatLng(result.lat, result.lon), 16.0
-                                            )
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.Search,
+                            contentDescription = "Buscar",
+                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                            modifier = Modifier.padding(start = 12.dp)
+                        )
+                        TextField(
+                            value = searchQuery,
+                            onValueChange = { query ->
+                                searchQuery = query
+                                searchJob?.cancel()
+                                if (query.length >= 3) {
+                                    searchJob = scope.launch {
+                                        kotlinx.coroutines.delay(400)
+                                        isSearching = true
+                                        showSearchResults = true
+                                        geocodingService.search(query).fold(
+                                            onSuccess = { results ->
+                                                searchResults = results
+                                                isSearching = false
+                                            },
+                                            onFailure = {
+                                                searchResults = emptyList()
+                                                isSearching = false
+                                            }
                                         )
-                                        showSearchResults = false
-                                        searchQuery = ""
-                                        focusManager.clearFocus()
                                     }
-                                    .padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    Icons.Default.LocationOn,
-                                    null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(20.dp)
+                                } else {
+                                    searchResults = emptyList()
+                                    showSearchResults = false
+                                }
+                            },
+                            placeholder = {
+                                Text(
+                                    "Buscar en La Paz...",
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
                                 )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Column {
-                                    Text(
-                                        result.name,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                        maxLines = 1
+                            },
+                            singleLine  = true,
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor   = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                focusedIndicatorColor   = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent
+                            ),
+                            modifier = Modifier.weight(1f)
+                        )
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = {
+                                searchQuery = ""
+                                searchResults = emptyList()
+                                showSearchResults = false
+                                focusManager.clearFocus()
+                            }) {
+                                Icon(Icons.Default.Clear, "Limpiar",
+                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
+                            }
+                        }
+                        if (isSearching) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp).padding(end = 8.dp),
+                                color = MaterialTheme.colorScheme.primary,
+                                strokeWidth = 2.dp
+                            )
+                        }
+                    }
+                }
+
+                if (showSearchResults && searchResults.isNotEmpty()) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp)
+                            .heightIn(max = 200.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.97f)
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        LazyColumn {
+                            items(searchResults) { result ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            mapInstance?.animateCamera(
+                                                CameraUpdateFactory.newLatLngZoom(
+                                                    LatLng(result.lat, result.lon), 16.0
+                                                )
+                                            )
+                                            showSearchResults = false
+                                            searchQuery = ""
+                                            focusManager.clearFocus()
+                                        }
+                                        .padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Default.LocationOn,
+                                        null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(20.dp)
                                     )
-                                    Text(
-                                        result.displayName.split(",").take(3).joinToString(","),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                                        maxLines = 1
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column {
+                                        Text(
+                                            result.name,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                            maxLines = 1
+                                        )
+                                        Text(
+                                            result.displayName.split(",").take(3).joinToString(","),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                                            maxLines = 1
+                                        )
+                                    }
+                                }
+                                if (searchResults.last() != result) {
+                                    HorizontalDivider(
+                                        modifier = Modifier.padding(horizontal = 12.dp),
+                                        thickness = 0.5.dp
                                     )
                                 }
                             }
-                            if (searchResults.last() != result) {
-                                HorizontalDivider(
-                                    modifier = Modifier.padding(horizontal = 12.dp),
-                                    thickness = 0.5.dp
-                                )
-                            }
+                        }
+                    }
+                }
+
+                // Line Filter Chips (Visible to everyone)
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    androidx.compose.foundation.lazy.LazyRow(
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(end = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        item {
+                            FilterChip(
+                                selected = selectedLineaId == null,
+                                onClick = { passengerViewModel.clearSelectedLinea() },
+                                label = { Text("Todas") }
+                            )
+                        }
+                        items(lineas) { linea ->
+                            FilterChip(
+                                selected = selectedLineaId == linea.id,
+                                onClick = { passengerViewModel.selectLinea(linea.id) },
+                                label = { Text(linea.name) }
+                            )
+                        }
+                    }
+
+                    if (selectedLineaId != null && puedeReportar) {
+                        var showRouteReportDialog by remember { mutableStateOf(false) }
+                        var routeReportText by remember { mutableStateOf("") }
+                        val linea = lineas.find { it.id == selectedLineaId }
+
+                        IconButton(
+                            onClick = { showRouteReportDialog = true },
+                            modifier = Modifier
+                                .size(32.dp)
+                                .background(Rose500.copy(alpha = 0.1f), CircleShape)
+                        ) {
+                            Icon(
+                                Icons.Default.ReportProblem,
+                                "Reportar Ruta",
+                                tint = Rose500,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+
+                        if (showRouteReportDialog) {
+                            AlertDialog(
+                                onDismissRequest = { showRouteReportDialog = false },
+                                title = { Text("Reportar Ruta ${linea?.name}") },
+                                text = {
+                                    OutlinedTextField(
+                                        value = routeReportText,
+                                        onValueChange = { routeReportText = it },
+                                        placeholder = { Text("Ej: No está pasando, cambió de ruta...") },
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                },
+                                confirmButton = {
+                                    Button(
+                                        onClick = {
+                                            if (routeReportText.isNotBlank()) {
+                                                passengerViewModel.reportarProblemaRuta(linea?.name ?: "", routeReportText)
+                                                showRouteReportDialog = false
+                                                routeReportText = ""
+                                            }
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Rose500)
+                                    ) { Text("Enviar") }
+                                },
+                                dismissButton = {
+                                    TextButton(onClick = { showRouteReportDialog = false }) { Text("Cancelar") }
+                                }
+                            )
                         }
                     }
                 }
@@ -481,6 +572,7 @@ fun PassengerMapScreen(
                     auto = auto,
                     lineaName = linea?.name ?: "Desconocida",
                     reportes = reportes,
+                    puedeReportar = puedeReportar,
                     onReportClick = { desc ->
                         passengerViewModel.reportarMalServicio(auto.placa, auto.userId, desc)
                     }
@@ -495,6 +587,7 @@ fun VehicleInfoContent(
     auto: Auto,
     lineaName: String,
     reportes: List<com.oficial.viasit.domain.model.Reporte>,
+    puedeReportar: Boolean = false,
     onReportClick: (String) -> Unit
 ) {
     var showReportDialog by remember { mutableStateOf(false) }
@@ -608,7 +701,7 @@ fun VehicleInfoContent(
                     ) {
                         Column(modifier = Modifier.padding(12.dp)) {
                             Text(
-                                reporte.descripcion.replace("[Unidad: ${auto.placa}]", "").trim(),
+                                reporte.description.replace("[Unidad: ${auto.placa}]", "").trim(),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
@@ -619,6 +712,14 @@ fun VehicleInfoContent(
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                                 fontSize = 9.sp
                             )
+                            if (reporte.driverResponse.isNotBlank()) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text("Respuesta Conductor: ${reporte.driverResponse}", style = MaterialTheme.typography.labelSmall, color = Color(0xFF10B981))
+                            }
+                            if (reporte.adminResponse.isNotBlank()) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text("Respuesta Admin: ${reporte.adminResponse}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                            }
                         }
                     }
                 }
@@ -626,17 +727,19 @@ fun VehicleInfoContent(
             Spacer(modifier = Modifier.height(24.dp))
         }
 
-        // Action Button
-        Button(
-            onClick = { showReportDialog = true },
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = Rose500),
-            shape = RoundedCornerShape(12.dp),
-            contentPadding = PaddingValues(16.dp)
-        ) {
-            Icon(Icons.Default.ReportProblem, null)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Reportar Incidente o Mal Trato", fontWeight = FontWeight.Bold)
+        if (puedeReportar) {
+            // Action Button
+            Button(
+                onClick = { showReportDialog = true },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = Rose500),
+                shape = RoundedCornerShape(12.dp),
+                contentPadding = PaddingValues(16.dp)
+            ) {
+                Icon(Icons.Default.ReportProblem, null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Reportar Incidente o Mal Trato", fontWeight = FontWeight.Bold)
+            }
         }
     }
 
@@ -680,6 +783,32 @@ fun VehicleInfoContent(
             }
         )
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun FilterChip(
+    selected: Boolean,
+    onClick: () -> Unit,
+    label: @Composable () -> Unit
+) {
+    androidx.compose.material3.FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = label,
+        colors = FilterChipDefaults.filterChipColors(
+            selectedContainerColor = MaterialTheme.colorScheme.primary.copy(0.15f),
+            selectedLabelColor = MaterialTheme.colorScheme.primary,
+            labelColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
+        ),
+        border = FilterChipDefaults.filterChipBorder(
+            borderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+            selectedBorderColor = MaterialTheme.colorScheme.primary,
+            enabled = true,
+            selected = selected
+        )
+    )
 }
 
 @Composable

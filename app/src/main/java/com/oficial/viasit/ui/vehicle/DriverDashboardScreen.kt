@@ -308,7 +308,7 @@ fun DriverDashboardScreen(
                             }
                             else -> LazyColumn(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                                 items(reportesList) { rep ->
-                                    val texto = rep.descripcion.replace(Regex("""^\[Unidad: [^\]]+\]\s*"""), "")
+                                    val texto = rep.description.replace(Regex("""^\[Unidad: [^\]]+\]\s*"""), "")
                                     Card(
                                         colors = CardDefaults.cardColors(containerColor = Slate800),
                                         shape = RoundedCornerShape(12.dp)
@@ -333,12 +333,12 @@ fun DriverDashboardScreen(
                                                 Text(texto, style = MaterialTheme.typography.bodyLarge, color = Color.White)
                                             }
                                             
-                                            if (rep.respuesta.isNotBlank()) {
+                                            if (rep.driverResponse.isNotBlank()) {
                                                 Spacer(modifier = Modifier.height(12.dp))
                                                 Box(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Slate700).padding(12.dp)) {
                                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                                         Icon(Icons.Default.Reply, null, tint = Emerald400, modifier = Modifier.size(16.dp))
-                                                        Text("Tu respuesta: ${rep.respuesta}", style = MaterialTheme.typography.bodyMedium, color = Emerald400)
+                                                        Text("Tu respuesta: ${rep.driverResponse}", style = MaterialTheme.typography.bodyMedium, color = Emerald400)
                                                     }
                                                 }
                                             } else {

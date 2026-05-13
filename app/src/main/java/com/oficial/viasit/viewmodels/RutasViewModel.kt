@@ -26,9 +26,9 @@ internal class RutasHandler(
     fun createRutaWithCoords(
         name: String, description: String,
         startLat: Double, startLng: Double, endLat: Double, endLng: Double,
-        lineaId: String, currentUserId: String = "",
+        lineaId: String, currentUserId: String = "", adminName: String = "",
         waypoints: List<Pair<Double, Double>> = emptyList(),
-        state: MutableStateFlow<AdminUiState>, onLog: (String, String) -> Unit
+        state: MutableStateFlow<AdminUiState>, onLog: (String, String, String) -> Unit
     ) {
         scope.launch {
             state.value = state.value.copy(isLoading = true, error = null)
@@ -51,7 +51,7 @@ internal class RutasHandler(
                         lineas = updatedLineas, rutas = updatedRutas
                     )
                     if (currentUserId.isNotEmpty())
-                        onLog(currentUserId, "Creó y asignó ruta: $name ($startPoint → $endPoint)$wptInfo")
+                        onLog(currentUserId, adminName, "Creó y asignó ruta: $name ($startPoint → $endPoint)$wptInfo")
                 },
                 onFailure = { state.value = state.value.copy(isLoading = false, error = it.message ?: "Error al crear ruta") }
             )
@@ -61,8 +61,8 @@ internal class RutasHandler(
     fun createRuta(
         name: String, description: String,
         startPoint: String = "", endPoint: String = "",
-        lineaId: String = "", currentUserId: String = "",
-        state: MutableStateFlow<AdminUiState>, onLog: (String, String) -> Unit
+        lineaId: String = "", currentUserId: String = "", adminName: String = "",
+        state: MutableStateFlow<AdminUiState>, onLog: (String, String, String) -> Unit
     ) {
         scope.launch {
             state.value = state.value.copy(isLoading = true, error = null)
@@ -76,7 +76,7 @@ internal class RutasHandler(
                     
                     state.value = state.value.copy(isLoading = false, successMessage = "Ruta creada: $name",
                         lineas = updatedLineas, rutas = updatedRutas)
-                    if (currentUserId.isNotEmpty()) onLog(currentUserId, "Creó ruta: $name")
+                    if (currentUserId.isNotEmpty()) onLog(currentUserId, adminName, "Creó ruta: $name")
                 },
                 onFailure = { state.value = state.value.copy(isLoading = false, error = it.message ?: "Error al crear ruta") }
             )
@@ -85,7 +85,7 @@ internal class RutasHandler(
 
     fun assignRutaToLinea(
         lineaId: String, rutaId: String, rutaName: String,
-        currentUserId: String, state: MutableStateFlow<AdminUiState>, onLog: (String, String) -> Unit
+        currentUserId: String, adminName: String, state: MutableStateFlow<AdminUiState>, onLog: (String, String, String) -> Unit
     ) {
         scope.launch {
             state.value = state.value.copy(isLoading = true, error = null)
@@ -97,7 +97,7 @@ internal class RutasHandler(
                         successMessage = "Ruta \"$rutaName\" asignada",
                         lineas = updatedLineas, rutas = updatedRutas)
                     if (currentUserId.isNotEmpty())
-                        onLog(currentUserId, "Asignó ruta \"$rutaName\" a línea $lineaId")
+                        onLog(currentUserId, adminName, "Asignó ruta \"$rutaName\" a línea $lineaId")
                 },
                 onFailure = { state.value = state.value.copy(isLoading = false, error = it.message ?: "Error al asignar ruta") }
             )
@@ -106,7 +106,7 @@ internal class RutasHandler(
 
     fun deleteRuta(
         rutaId: String, rutaName: String, lineaId: String = "",
-        currentUserId: String, state: MutableStateFlow<AdminUiState>, onLog: (String, String) -> Unit
+        currentUserId: String, adminName: String, state: MutableStateFlow<AdminUiState>, onLog: (String, String, String) -> Unit
     ) {
         scope.launch {
             state.value = state.value.copy(isLoading = true, error = null)
@@ -120,7 +120,7 @@ internal class RutasHandler(
                         successMessage = "Ruta \"$rutaName\" eliminada",
                         rutas = updatedRutas, lineas = updatedLineas)
                     if (currentUserId.isNotEmpty())
-                        onLog(currentUserId, "Eliminó ruta: $rutaName")
+                        onLog(currentUserId, adminName, "Eliminó ruta: $rutaName")
                 },
                 onFailure = { state.value = state.value.copy(isLoading = false, error = it.message ?: "Error al eliminar ruta") }
             )

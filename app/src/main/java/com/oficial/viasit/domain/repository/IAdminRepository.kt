@@ -4,11 +4,10 @@ import com.oficial.viasit.domain.model.InvitationCode
 import com.oficial.viasit.domain.model.Linea
 import com.oficial.viasit.domain.model.LogEntry
 import com.oficial.viasit.domain.model.Ruta
-import com.oficial.viasit.domain.model.VehicleInvitationCode
 
 interface IAdminRepository : ILogsRepository {
 
-    suspend fun generateInvitationCode(role: String = "ADMIN_LINEA", lineaId: String = "", expiresInHours: Int = 24): Result<InvitationCode>
+    suspend fun generateInvitationCode(role: String = "ADMIN_LINEA", lineaId: String = "", expiresInHours: Int = 24, adminName: String = ""): Result<InvitationCode>
     suspend fun getInvitationCodes(): Result<List<InvitationCode>>
     suspend fun validateInvitationCode(code: String): Result<InvitationCode>
     suspend fun deleteInvitationCode(codeId: String): Result<Unit>
@@ -38,10 +37,4 @@ interface IAdminRepository : ILogsRepository {
     suspend fun createAppeal(userId: String, name: String, reason: String, lineaId: String): Result<Unit>
     suspend fun getAppeals(): Result<List<com.oficial.viasit.domain.model.LogEntry>>
     suspend fun resolveAppeal(appealId: String, userId: String, accept: Boolean): Result<Unit>
-
-    suspend fun generateVehicleInvitationCode(lineaId: String, creadoPor: String, expiresInHours: Int = 72): Result<VehicleInvitationCode>
-    suspend fun getVehicleInvitationCodesByLinea(lineaId: String): Result<List<VehicleInvitationCode>>
-    suspend fun validateVehicleInvitationCode(code: String): Result<VehicleInvitationCode>
-    suspend fun useVehicleInvitationCode(codeId: String, usadoPor: String): Result<Unit>
-    suspend fun deleteVehicleInvitationCode(codeId: String): Result<Unit>
 }

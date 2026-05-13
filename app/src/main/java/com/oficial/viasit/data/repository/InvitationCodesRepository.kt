@@ -9,12 +9,13 @@ internal class InvitationCodesRepository(
     private val client: PocketBaseRealtimeClient,
     private val shared: AdminRepositoryShared
 ) : IInvitationCodesRepository {
-    override suspend fun generate(role: String, lineaId: String, expiresInHours: Int): Result<InvitationCode> {
+    override suspend fun generate(role: String, lineaId: String, expiresInHours: Int, adminName: String): Result<InvitationCode> {
         return try {
             val code = shared.generateSecureCode()
             val data = mutableMapOf<String, Any>(
                 "code" to code, "role" to role,
-                "expiresAt" to shared.formatNowPlus(expiresInHours), "isUsed" to false
+                "expiresAt" to shared.formatNowPlus(expiresInHours), "isUsed" to false,
+                "adminName" to adminName
             )
             if (lineaId.isNotEmpty()) data["lineId"] = lineaId
             client.createRecord("invitation_codes", data, shared.authToken()).fold(

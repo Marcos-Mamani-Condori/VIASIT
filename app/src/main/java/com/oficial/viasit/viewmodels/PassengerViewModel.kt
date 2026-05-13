@@ -70,6 +70,7 @@ class PassengerViewModel(
                 reporterId = user?.id ?: "invitado",
                 reporterName = user?.name ?: "Pasajero Anónimo",
                 driverId = "", // No es contra un conductor específico
+                targetName = "Ruta $lineaName",
                 category = "rutas"
             ).onSuccess {
                 _reportSuccess.value = true
@@ -89,6 +90,7 @@ class PassengerViewModel(
                 reporterId = user?.id ?: "invitado",
                 reporterName = user?.name ?: "Pasajero Anónimo",
                 driverId = driverId,
+                targetName = "Unidad $placa",
                 category = "servicio"
             ).onSuccess {
                 _reportSuccess.value = true
@@ -133,7 +135,10 @@ class PassengerViewModel(
     }
 
     fun selectLinea(lineaId: String)  { _selectedLineaId.value = lineaId }
-    fun clearSelectedLinea()           { _selectedLineaId.value = null }
+    fun clearSelectedLinea() { 
+        _selectedLineaId.value = null 
+        limpiarDestino() // También limpiamos el destino al quitar la ruta
+    }
     fun selectAuto(auto: Auto?)        { _selectedAuto.value = auto }
     fun clearSelectedAuto()            { _selectedAuto.value = null }
 

@@ -13,14 +13,14 @@ internal class InvitacionesHandler(
 ) {
     fun generateInvitationCode(
         role: String = "ADMIN_LINEA", lineaId: String = "", expiresInHours: Int = 24,
-        currentUserId: String = "", state: MutableStateFlow<AdminUiState>, onLog: (String, String) -> Unit
+        currentUserId: String = "", adminName: String = "", state: MutableStateFlow<AdminUiState>, onLog: (String, String, String) -> Unit
     ) {
         scope.launch {
             state.value = state.value.copy(isLoading = true, error = null, generatedCode = null)
-            generateInvitationCodeUseCase(role, lineaId, expiresInHours).fold(
+            generateInvitationCodeUseCase(role, lineaId, expiresInHours, adminName).fold(
                 onSuccess = { code ->
                     state.value = state.value.copy(isLoading = false, generatedCode = code.code, successMessage = "Código generado: ${code.code}")
-                    if (currentUserId.isNotEmpty()) onLog(currentUserId, "Generó código: ${code.code} (rol: $role)")
+                    if (currentUserId.isNotEmpty()) onLog(currentUserId, adminName, "Generó código: ${code.code} (rol: $role)")
                     loadInvitationCodes(state)
                 },
                 onFailure = { state.value = state.value.copy(isLoading = false, error = it.message ?: "Error al generar código") }
@@ -39,15 +39,15 @@ internal class InvitacionesHandler(
     }
 
     fun deleteInvitationCode(
-        codeId: String, currentUserId: String = "",
-        state: MutableStateFlow<AdminUiState>, onLog: (String, String) -> Unit
+        codeId: String, currentUserId: String = "", adminName: String = "",
+        state: MutableStateFlow<AdminUiState>, onLog: (String, String, String) -> Unit
     ) {
         scope.launch {
             state.value = state.value.copy(isLoading = true, error = null)
             deleteInvitationCodeUseCase(codeId).fold(
                 onSuccess = {
                     state.value = state.value.copy(isLoading = false, successMessage = "Código eliminado")
-                    if (currentUserId.isNotEmpty()) onLog(currentUserId, "Eliminó código: $codeId")
+                    if (currentUserId.isNotEmpty()) onLog(currentUserId, adminName, "Eliminó código: $codeId")
                     loadInvitationCodes(state)
                 },
                 onFailure = { state.value = state.value.copy(isLoading = false, error = it.message ?: "Error al eliminar código") }

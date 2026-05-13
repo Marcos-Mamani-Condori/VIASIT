@@ -27,17 +27,23 @@ class LogsViewModel(
     private val _timeFilter = MutableStateFlow("todos") // todos, hoy, semana, mes
     val timeFilter: StateFlow<String> = _timeFilter.asStateFlow()
 
+    private val _lineId = MutableStateFlow("")
+
     init {
         // Debounce search queries to avoid excessive API calls
         viewModelScope.launch {
-            combine(_searchQuery, _timeFilter) { query, filter ->
-                Pair(query, filter)
+            combine(_searchQuery, _timeFilter, _lineId) { query, filter, line ->
+                Triple(query, filter, line)
             }
             .debounce(500)
-            .collect { (query, filter) ->
-                performLoadLogs(query, filter)
+            .collect { (query, filter, line) ->
+                performLoadLogs(query, filter, line)
             }
         }
+    }
+
+    fun setLineId(lineId: String) {
+        _lineId.value = lineId
     }
 
     fun setSearchQuery(query: String) {
@@ -50,17 +56,17 @@ class LogsViewModel(
 
     fun loadLogs() {
         viewModelScope.launch {
-            performLoadLogs(_searchQuery.value, _timeFilter.value)
+            performLoadLogs(_searchQuery.value, _timeFilter.value, _lineId.value)
         }
     }
 
-    private suspend fun performLoadLogs(query: String, timeFilter: String) {
+    private suspend fun performLoadLogs(query: String, timeFilter: String, lineId: String) {
         _isLoading.value = true
         
         // Solo enviamos filtro de texto si el usuario realmente escribió algo
         val textFilter = if (query.isNotBlank()) query else ""
         
-        getLogsUseCase(filter = textFilter, timeFilter = timeFilter).fold(
+        getLogsUseCase(filter = textFilter, timeFilter = timeFilter, lineId = lineId).fold(
             onSuccess = { _logs.value = it },
             onFailure = { _logs.value = emptyList() }
         )

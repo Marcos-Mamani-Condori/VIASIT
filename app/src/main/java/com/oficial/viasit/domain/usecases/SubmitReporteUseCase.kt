@@ -8,7 +8,8 @@ class SubmitReporteUseCase(private val repository: IReportesRepository) {
         reporterId: String,
         reporterName: String,
         driverId: String,
+        targetName: String,
         category: String = "general"
     ): Result<Unit> =
-        repository.submitReporte(descripcion, reporterId, reporterName, driverId, category)
+        repository.submitReporte(descripcion, reporterId, reporterName, driverId, targetName, category)
 }

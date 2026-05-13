@@ -20,6 +20,7 @@ class ReportesRepository(
         reporterId: String,
         reporterName: String,
         driverId: String,
+        targetName: String,
         category: String
     ): Result<Unit> =
         client.createRecord(
@@ -28,6 +29,7 @@ class ReportesRepository(
                 "description" to descripcion,
                 "userid" to driverId,
                 "reporterName" to reporterName,
+                "targetName" to targetName,
                 "category" to category,
                 "status" to "pendiente",
                 "users" to listOf(reporterId)
@@ -35,25 +37,30 @@ class ReportesRepository(
             null
         ).map { }
 
-    override suspend fun getReportes(placa: String): Result<List<Reporte>> = try {
+    override suspend fun getReportes(query: String): Result<List<Reporte>> = try {
         val token = authRepository.getAuthToken()
-        // Expandimos userid (conductor) y users (reportero) para tener nombres reales
-        client.getList("reports", perPage = 100, sort = "-created", expand = "userid,users", authToken = token)
-            .map { jsonStr ->
-                val jsonObject = jsonParser.decodeFromString<JsonObject>(jsonStr)
-                val items = jsonObject["items"]?.jsonArray ?: return@map emptyList()
-                val reportes = items.map { jsonParser.decodeFromJsonElement<Reporte>(it) }
-                
-                if (placa.isBlank()) {
-                    reportes
-                } else {
-                    val cleanPlaca = placa.trim().lowercase()
-                    reportes.filter { 
-                        it.descripcion.lowercase().contains(cleanPlaca) || 
-                        it.descripcion.lowercase().contains(cleanPlaca.replace("-", ""))
-                    }
-                }
+        
+        val filterQuery = if (query.isNotBlank()) {
+            // Buscamos por ID de usuario O por texto en la descripción (placa)
+            if (query.length > 10) {
+                "userid = '$query' || description ~ '$query'"
+            } else {
+                "description ~ '$query'"
             }
+        } else ""
+
+        client.getList(
+            "reports", 
+            perPage = 100, 
+            sort = "-created", 
+            expand = "userid,users", 
+            filter = filterQuery,
+            authToken = token
+        ).map { jsonStr ->
+            val jsonObject = jsonParser.decodeFromString<JsonObject>(jsonStr)
+            val items = jsonObject["items"]?.jsonArray ?: return@map emptyList()
+            items.map { jsonParser.decodeFromJsonElement<Reporte>(it) }
+        }
     } catch (e: Exception) { 
         android.util.Log.e("ReportesRepo", "Error al obtener reportes: ${e.message}")
         Result.failure(e) 
@@ -64,7 +71,7 @@ class ReportesRepository(
         return client.updateRecord(
             "reports", reporteId,
             mapOf(
-                "response" to respuesta,
+                "adminResponse" to respuesta,
                 "status" to "resuelto"
             ),
             token
@@ -76,7 +83,7 @@ class ReportesRepository(
         return client.updateRecord(
             "reports", reporteId,
             mapOf(
-                "driver_response" to respuesta
+                "driverResponse" to respuesta
             ),
             token
         ).map { }

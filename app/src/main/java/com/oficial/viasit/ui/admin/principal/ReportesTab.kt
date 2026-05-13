@@ -74,7 +74,7 @@ fun ReporteItem(reporte: Reporte, onResponder: (String, String) -> Unit = { _, _
             }
 
             Text(
-                reporte.descripcion,
+                reporte.description,
                 style = MaterialTheme.typography.bodyMedium,
                 color = Color.White
             )
@@ -115,11 +115,11 @@ fun ReporteItem(reporte: Reporte, onResponder: (String, String) -> Unit = { _, _
                 }
             }
 
-            if (reporte.respuesta.isNotBlank()) {
+            if (reporte.adminResponse.isNotBlank()) {
                 Box(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Slate800).padding(12.dp)) {
                     Column {
                         Text("Respuesta de Administración:", style = MaterialTheme.typography.labelSmall, color = Brand400, fontWeight = FontWeight.Bold)
-                        Text(reporte.respuesta, style = MaterialTheme.typography.bodySmall, color = Slate300)
+                        Text(reporte.adminResponse, style = MaterialTheme.typography.bodySmall, color = Slate300)
                     }
                 }
             }
@@ -133,7 +133,7 @@ fun ReporteItem(reporte: Reporte, onResponder: (String, String) -> Unit = { _, _
             title = { Text("Detalle del Reporte", color = Color.White) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(reporte.descripcion, color = Color.White)
+                    Text(reporte.description, color = Color.White)
                     if (reporte.status != "resuelto") {
                         OutlinedTextField(
                             value = respuesta,

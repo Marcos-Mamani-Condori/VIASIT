@@ -84,7 +84,8 @@ fun PassengerDashboardScreen(
         ) {
             when (selectedTab) {
                 PassengerTab.MAPA   -> PassengerMapScreen(
-                    passengerViewModel = passengerViewModel
+                    passengerViewModel = passengerViewModel,
+                    currentUser = currentUser
                 )
                 PassengerTab.UNIDADES  -> ActiveAutosTab(
                     autosViewModel     = autosViewModel,

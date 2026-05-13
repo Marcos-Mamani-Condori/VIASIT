@@ -19,7 +19,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.oficial.viasit.domain.model.VehicleInvitationCode
+import com.oficial.viasit.domain.model.InvitationCode
 import com.oficial.viasit.ui.admin.DeleteConfirmDialog
 import com.oficial.viasit.ui.admin.EmptyState
 import com.oficial.viasit.ui.admin.GeneratedCodeBanner
@@ -29,7 +29,7 @@ import com.oficial.viasit.ui.theme.*
 @Composable
 fun VehicleCodesTabContent(
     lineaId: String,
-    vehicleCodes: List<VehicleInvitationCode>,
+    vehicleCodes: List<InvitationCode>,
     isLoading: Boolean,
     generatedCode: String?,
     onGenerateCode: () -> Unit,
@@ -123,7 +123,7 @@ fun VehicleCodesTabContent(
 
 
 @Composable
-fun VehicleCodeItem(code: VehicleInvitationCode, onCopy: () -> Unit, onDelete: () -> Unit) {
+fun VehicleCodeItem(code: InvitationCode, onCopy: () -> Unit, onDelete: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -137,21 +137,21 @@ fun VehicleCodeItem(code: VehicleInvitationCode, onCopy: () -> Unit, onDelete: (
             modifier = Modifier
                 .size(40.dp)
                 .clip(RoundedCornerShape(10.dp))
-                .background(if (code.usedBy.isNotEmpty()) Slate700.copy(0.4f) else Cyan500.copy(0.12f)),
+                .background(if (code.isUsed) Slate700.copy(0.4f) else Cyan500.copy(0.12f)),
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                if (code.usedBy.isNotEmpty()) Icons.Default.CheckCircle else Icons.Default.DirectionsBus,
+                if (code.isUsed) Icons.Default.CheckCircle else Icons.Default.DirectionsBus,
                 null,
-                tint = if (code.usedBy.isNotEmpty()) Slate500 else Cyan400,
+                tint = if (code.isUsed) Slate500 else Cyan400,
                 modifier = Modifier.size(20.dp)
             )
         }
         Column(modifier = Modifier.weight(1f)) {
             Text(code.code, style = MaterialTheme.typography.titleSmall,
-                color = if (code.usedBy.isNotEmpty()) Slate500 else Color.White,
+                color = if (code.isUsed) Slate500 else Color.White,
                 fontWeight = FontWeight.SemiBold)
-            Text(if (code.usedBy.isNotEmpty()) "Usado por: ${code.usedBy}" else "Disponible",
+            Text(if (code.isUsed) "Usado por: ${code.usedBy.ifEmpty { "Conductor" }}" else "Disponible",
                 style = MaterialTheme.typography.labelSmall, color = Slate600)
         }
         IconButton(onClick = onCopy,   modifier = Modifier.size(36.dp)) {

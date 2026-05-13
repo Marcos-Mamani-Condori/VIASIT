@@ -45,13 +45,15 @@ fun DriverDashboardHandler(
         if (currentUser != null && currentUser.userRole == UserRole.conductor) {
             android.util.Log.d("DriverDashboardHandler", "Buscando vehículo para usuario: ${currentUser.id}")
             autosViewModel.getDriverAuto(currentUser.id) { auto ->
-                android.util.Log.d("DriverDashboardHandler", "Vehículo encontrado: ${auto?.id}, userId=${auto?.userId}")
-                if (auto != null && auto.userId.isNotEmpty()) {
-                    if (vehicles.none { it.id == auto.id }) vehicles = vehicles + auto
-                    if (selectedVehicleId == null) selectedVehicleId = auto.id
+                android.util.Log.d("DriverDashboardHandler", "Vehículo encontrado: ${auto?.id}, userId='${auto?.userId}'")
+                if (auto != null) {
+                    // Si el userId viene vacío por algún error de serialización, lo rellenamos ya que sabemos que le pertenece a este conductor
+                    val fixedAuto = if (auto.userId.isBlank()) auto.copy(userId = currentUser.id) else auto
+                    if (vehicles.none { it.id == fixedAuto.id }) {
+                        vehicles = vehicles + fixedAuto
+                    }
+                    if (selectedVehicleId == null) selectedVehicleId = fixedAuto.id
                 }
-                // Marcamos carga completa; la verificación de "sin vehículo" se hace
-                // en LaunchedEffect(isLoading, vehicles) para evitar race condition
                 isLoading = false
                 hasCheckedVehicle = true
             }
@@ -65,8 +67,11 @@ fun DriverDashboardHandler(
     val autos by autosViewModel.autosUiState.collectAsState()
     LaunchedEffect(autos) {
         if (currentUser != null) {
-            val driverAutos = autos.filter { it.userId.isNotEmpty() && it.userId == currentUser.id }
-            android.util.Log.d("DriverDashboardHandler", "Autos SSE: ${driverAutos.size} para usuario ${currentUser.id}")
+            val driverAutos = autos.filter { 
+                (it.userId.isNotEmpty() && it.userId == currentUser.id) ||
+                (it.id == selectedVehicleId)
+            }
+            android.util.Log.d("DriverDashboardHandler", "Autos SSE filtrados: ${driverAutos.size} para usuario ${currentUser.id}")
             if (driverAutos.isNotEmpty()) {
                 vehicles = driverAutos
                 if (selectedVehicleId == null) selectedVehicleId = driverAutos[0].id
