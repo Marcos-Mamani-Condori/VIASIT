@@ -179,6 +179,8 @@ fun AdminDashboardScreen(
                         4 -> ReportesTabContent(
                             reportes = uiState.reportes, 
                             isLoading = uiState.isLoading,
+                            adminId = currentUser.id,
+                            adminName = currentUser.name,
                             onResponder = { id, resp -> viewModel.responderReporte(id, resp, currentUser.id, currentUser.name) },
                             onSuspendUser = { targetUserId, targetUserName ->
                                 viewModel.setUserActiveStatus(targetUserId, targetUserName, false, currentUser.id, currentUser.name)
@@ -272,13 +274,16 @@ fun AdminDashboardScreen(
                             
                             // Filtrar reportes por lineaId si el conductor pertenece a la línea del admin
                             val lineReportes = uiState.reportes.filter { reporte ->
-                                val autoOfDriver = autos.find { it.userId == reporte.userid }
+                                val targetId = reporte.targetUserId
+                                val autoOfDriver = autos.find { it.userId == targetId }
                                 autoOfDriver?.lineaId == currentUser.lineaId
                             }
 
                             ReportesTabContent(
                                 reportes = lineReportes,
                                 isLoading = uiState.isLoading,
+                                adminId = currentUser.id,
+                                adminName = currentUser.name,
                                 onResponder = { id, resp -> viewModel.responderReporte(id, resp, currentUser.id, currentUser.name) },
                                 onSuspendUser = { targetUserId, targetUserName ->
                                     viewModel.setUserActiveStatus(targetUserId, targetUserName, false, currentUser.id, currentUser.name)

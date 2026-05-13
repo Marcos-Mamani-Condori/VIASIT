@@ -4,6 +4,7 @@ import androidx.compose.ui.graphics.Color
 
 
 val Brand500 = Color(0xFF3D5AFE)   // botones, links activos
+val Brand600 = Color(0xFF2563EB)   // variante intermedia
 val Brand400 = Color(0xFF536DFE)   // hover / pressed
 val Brand300 = Color(0xFF8187FF)   // tint suave
 val Brand700 = Color(0xFF0031CA)   // dark variant
@@ -15,6 +16,7 @@ val Amber200 = Color(0xFFFFE082)
 val Emerald300 = Color(0xFF6EE7B7)
 val Emerald400 = Color(0xFF34D399)
 val Emerald500 = Color(0xFF10B981)
+val Emerald600 = Color(0xFF059669)
 val Emerald900 = Color(0xFF064E3B)
 
 val Cyan400 = Color(0xFF22D3EE)

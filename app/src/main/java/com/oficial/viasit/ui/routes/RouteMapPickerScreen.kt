@@ -356,161 +356,171 @@ fun RouteMapPickerScreen(
             }
         }
 
-        Column(
-            modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp).padding(bottom = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+        // Contenedor inferior con degradado para asegurar visibilidad
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .background(
+                    androidx.compose.ui.graphics.Brush.verticalGradient(
+                        listOf(Color.Transparent, Slate950.copy(alpha = 0.5f), Slate950)
+                    )
+                )
+                .padding(16.dp)
+                .padding(bottom = 24.dp)
         ) {
-            Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = when {
-                        isRouting                              -> Slate900.copy(alpha = 0.98f)
-                        viaMode                               -> Color(0xFF4C1D95).copy(alpha = 0.98f) // Púrpura más oscuro
-                        selectionMode == PointSelectionMode.START -> Brand700.copy(alpha = 0.98f) // Azul más oscuro
-                        else                                  -> Color(0xFF064E3B).copy(alpha = 0.98f) // Verde más oscuro
-                    }
-                ), 
-                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
-                shape = RoundedCornerShape(16.dp)
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    if (isRouting) {
-                        CircularProgressIndicator(modifier = Modifier.size(18.dp),
-                            color = Color.White, strokeWidth = 2.dp)
-                    } else {
-                        Icon(when {
-                            viaMode                               -> Icons.Default.AddLocation
-                            selectionMode == PointSelectionMode.START -> Icons.Default.LocationOn
-                            else                                  -> Icons.Default.Flag
-                        }, null, tint = Color.White, modifier = Modifier.size(22.dp))
-                    }
-                    Text(when {
-                        isRouting                              -> "Calculando ruta por calles..."
-                        viaMode                               -> "Toca para agregar punto de paso"
-                        selectionMode == PointSelectionMode.START -> "Toca el mapa para marcar el INICIO"
-                        else                                  -> "Toca el mapa para marcar el FIN"
-                    }, style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold, color = Color.White)
-                }
-            }
-
-            if (startPoint != null || endPoint != null || viaPoints.isNotEmpty()) {
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = Slate950.copy(alpha = 0.98f)),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
-                    shape  = RoundedCornerShape(12.dp)
+                    colors = CardDefaults.cardColors(
+                        containerColor = when {
+                            isRouting                              -> Slate900
+                            viaMode                               -> Color(0xFF4C1D95) 
+                            selectionMode == PointSelectionMode.START -> Brand700
+                            else                                  -> Color(0xFF064E3B)
+                        }
+                    ), 
+                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+                    shape = RoundedCornerShape(16.dp)
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(modifier = Modifier.size(10.dp).background(Brand500, CircleShape))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                if (startPoint != null) startPoint!!.name.ifEmpty { "Inicio" }.take(12)
-                                else "Inicio",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = if (startPoint != null) Color.White else Slate600
-                            )
+                        if (isRouting) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp),
+                                color = Color.White, strokeWidth = 2.dp)
+                        } else {
+                            Icon(when {
+                                viaMode                               -> Icons.Default.AddLocation
+                                selectionMode == PointSelectionMode.START -> Icons.Default.LocationOn
+                                else                                  -> Icons.Default.Flag
+                            }, null, tint = Color.White, modifier = Modifier.size(22.dp))
                         }
-                        if (viaPoints.isNotEmpty()) {
+                        Text(when {
+                            isRouting                              -> "Calculando ruta por calles..."
+                            viaMode                               -> "Toca para agregar punto de paso"
+                            selectionMode == PointSelectionMode.START -> "Toca el mapa para el INICIO"
+                            else                                  -> "Toca el mapa para el FIN"
+                        }, style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Black, color = Color.White)
+                    }
+                }
+
+                if (startPoint != null || endPoint != null || viaPoints.isNotEmpty()) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Slate900),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                        shape  = RoundedCornerShape(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(modifier = Modifier.size(10.dp).background(Color(0xFF8B5CF6), CircleShape))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("${viaPoints.size} pasos", style = MaterialTheme.typography.labelSmall,
-                                    color = Color(0xFFAD8EF0))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Icon(Icons.Default.Undo, "Quitar último paso",
-                                    tint = Slate500, modifier = Modifier.size(14.dp).clickable {
-                                        viaPoints.removeLastOrNull()
-                                        if (startPoint != null && endPoint != null) recalculateRoute()
-                                    })
+                                Box(modifier = Modifier.size(10.dp).background(Brand500, CircleShape))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    if (startPoint != null) startPoint!!.name.ifEmpty { "Inicio" }.take(12)
+                                    else "Inicio",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (startPoint != null) Color.White else Slate400
+                                )
                             }
-                        }
-                        if (calculatedRoute.isNotEmpty()) {
+                            if (viaPoints.isNotEmpty()) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box(modifier = Modifier.size(10.dp).background(Color(0xFF8B5CF6), CircleShape))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("${viaPoints.size} pasos", style = MaterialTheme.typography.labelSmall,
+                                        color = Color(0xFFAD8EF0), fontWeight = FontWeight.Bold)
+                                }
+                            }
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Route, null, tint = Slate400, modifier = Modifier.size(12.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("${calculatedRoute.size} pts",
-                                    style = MaterialTheme.typography.labelSmall, color = Slate400)
+                                Box(modifier = Modifier.size(10.dp).background(Emerald500, CircleShape))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    if (endPoint != null) endPoint!!.name.ifEmpty { "Fin" }.take(12)
+                                    else "Fin",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (endPoint != null) Color.White else Slate400
+                                )
                             }
-                        }
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(modifier = Modifier.size(10.dp).background(Emerald500, CircleShape))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                if (endPoint != null) endPoint!!.name.ifEmpty { "Fin" }.take(12)
-                                else "Fin",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = if (endPoint != null) Color.White else Slate600
-                            )
-                        }
-                        // Limpiar todo
-                        IconButton(onClick = {
-                            startPoint = null; endPoint = null
-                            viaPoints.clear(); calculatedRoute = emptyList()
-                            viaMode = false; selectionMode = PointSelectionMode.START
-                            mapInstance?.style?.let {
-                                clearMarker(it, "start-marker-source")
-                                clearMarker(it, "end-marker-source")
-                                drawPreviewLine(it, emptyList())
+                            IconButton(onClick = {
+                                startPoint = null; endPoint = null
+                                viaPoints.clear(); calculatedRoute = emptyList()
+                                viaMode = false; selectionMode = PointSelectionMode.START
+                                mapInstance?.style?.let {
+                                    clearMarker(it, "start-marker-source")
+                                    clearMarker(it, "end-marker-source")
+                                    drawPreviewLine(it, emptyList())
+                                }
+                            }, modifier = Modifier.size(28.dp)) {
+                                Icon(Icons.Default.Refresh, "Limpiar", tint = Color.White, modifier = Modifier.size(16.dp))
                             }
-                        }, modifier = Modifier.size(28.dp)) {
-                            Icon(Icons.Default.Refresh, "Limpiar", tint = Slate400, modifier = Modifier.size(16.dp))
                         }
                     }
                 }
-            }
 
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(
-                    onClick = { viaMode = false
-                        selectionMode = if (selectionMode == PointSelectionMode.START)
-                            PointSelectionMode.END else PointSelectionMode.START },
-                    modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp),
-                    colors   = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                    border   = androidx.compose.foundation.BorderStroke(1.dp,
-                        if (!viaMode) Brand500 else Slate600)
-                ) {
-                    Icon(if (selectionMode == PointSelectionMode.START) Icons.Default.Flag else Icons.Default.LocationOn,
-                        null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(if (selectionMode == PointSelectionMode.START) "Marcar Fin" else "Inicio",
-                        fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = { 
+                            viaMode = false
+                            selectionMode = if (selectionMode == PointSelectionMode.START)
+                                PointSelectionMode.END else PointSelectionMode.START 
+                        },
+                        modifier = Modifier.weight(1.3f), 
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (!viaMode) Brand600 else Slate800,
+                            contentColor = Color.White
+                        ),
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
+                    ) {
+                        Icon(
+                            if (selectionMode == PointSelectionMode.START) Icons.Default.Flag else Icons.Default.LocationOn,
+                            null, modifier = Modifier.size(18.dp), tint = Color.White
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            if (selectionMode == PointSelectionMode.START) "Poner Fin" else "Poner Inicio",
+                            fontSize = 13.sp, 
+                            fontWeight = FontWeight.Black
+                        )
+                    }
 
-                OutlinedButton(
-                    onClick  = { viaMode = !viaMode },
-                    modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp),
-                    colors   = ButtonDefaults.outlinedButtonColors(
-                        contentColor   = if (viaMode) Color(0xFFAD8EF0) else Slate400,
-                        containerColor = if (viaMode) Color(0xFF8B5CF6).copy(alpha = 0.15f) else Color.Transparent
-                    ),
-                    border = androidx.compose.foundation.BorderStroke(1.dp,
-                        if (viaMode) Color(0xFF8B5CF6) else Slate600)
-                ) {
-                    Icon(Icons.Default.AddLocation, null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(if (viaMode) "Paso ON" else "+ Paso", fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                }
+                    Button(
+                        onClick  = { viaMode = !viaMode },
+                        modifier = Modifier.weight(1f), 
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (viaMode) Color(0xFF6D28D9) else Slate800,
+                            contentColor = Color.White
+                        ),
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
+                    ) {
+                        Icon(Icons.Default.AddLocation, null, modifier = Modifier.size(18.dp), tint = Color.White)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(if (viaMode) "PASO" else "+Paso", fontSize = 13.sp, fontWeight = FontWeight.Black)
+                    }
 
-                Button(
-                    onClick  = { showSaveDialog = true },
-                    modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp),
-                    colors   = ButtonDefaults.buttonColors(containerColor = Brand500),
-                    enabled  = startPoint != null && endPoint != null && !isRouting
-                ) {
-                    Icon(Icons.Default.Check, null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Guardar", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Button(
+                        onClick  = { showSaveDialog = true },
+                        modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp),
+                        colors   = ButtonDefaults.buttonColors(
+                            containerColor = Emerald600,
+                            disabledContainerColor = Slate800.copy(alpha = 0.6f)
+                        ),
+                        enabled  = startPoint != null && endPoint != null && !isRouting,
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
+                    ) {
+                        Text("LISTO", fontSize = 13.sp, fontWeight = FontWeight.Black, color = Color.White)
+                    }
                 }
             }
         }

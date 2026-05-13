@@ -27,6 +27,8 @@ import com.oficial.viasit.ui.theme.*
 fun ReportesTabContent(
     reportes: List<Reporte>,
     isLoading: Boolean,
+    adminId: String,
+    adminName: String,
     onResponder: (String, String) -> Unit = { _, _ -> },
     onSuspendUser: (String, String) -> Unit = { _, _ -> }
 ) {
@@ -82,6 +84,8 @@ fun ReportesTabContent(
                     ReporteItem(
                         reporte = reporte, 
                         totalUserReports = totalReports,
+                        adminId = adminId,
+                        adminName = adminName,
                         onResponder = onResponder,
                         onSuspendUser = onSuspendUser
                     )
@@ -95,6 +99,8 @@ fun ReportesTabContent(
 fun ReporteItem(
     reporte: Reporte, 
     totalUserReports: Int,
+    adminId: String,
+    adminName: String,
     onResponder: (String, String) -> Unit,
     onSuspendUser: (String, String) -> Unit
 ) {
@@ -235,3 +241,4 @@ fun ReporteItem(
         )
     }
 }
+
