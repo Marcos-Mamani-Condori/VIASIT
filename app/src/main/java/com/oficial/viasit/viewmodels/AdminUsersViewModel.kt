@@ -15,14 +15,17 @@ internal class AdminUsersHandler(
     private val resolveAppealUseCase: ResolveAppealUseCase,
     private val responderReporteUseCase: ResponderReporteUseCase
 ) {
-    fun loadUsers(lineaId: String, state: MutableStateFlow<AdminUiState>) {
+    fun loadUsers(lineaId: String, isAdminPrincipal: Boolean, state: MutableStateFlow<AdminUiState>) {
         scope.launch {
             state.value = state.value.copy(isLoading = true, error = null)
             getUsersByLineaUseCase(lineaId).fold(
                 onSuccess = { users -> 
-                    // Filtramos para mostrar SOLO conductores en esta pestaña
-                    val onlyDrivers = users.filter { it.isDriver }
-                    state.value = state.value.copy(isLoading = false, users = onlyDrivers) 
+                    val filteredUsers = if (isAdminPrincipal) {
+                        users.filter { !it.isAdminPrincipal }
+                    } else {
+                        users.filter { it.isDriver }
+                    }
+                    state.value = state.value.copy(isLoading = false, users = filteredUsers)
                 },
                 onFailure = { error -> state.value = state.value.copy(isLoading = false, error = error.message ?: "Error al cargar usuarios") }
             )

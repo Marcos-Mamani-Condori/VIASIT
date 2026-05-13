@@ -29,7 +29,8 @@ fun ConductoresTabContent(
     autos: List<Auto> = emptyList(),
     isLoading: Boolean,
     onToggleActive: (String, Boolean) -> Unit,
-    onShowLocation: (Double, Double) -> Unit
+    onShowLocation: (Double, Double) -> Unit,
+    showLocationOnlyForDrivers: Boolean = false
 ) {
     if (isLoading) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -37,7 +38,7 @@ fun ConductoresTabContent(
         }
     } else if (users.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("No hay conductores registrados", color = Slate500)
+            Text("No hay usuarios registrados", color = Slate500)
         }
     } else {
         LazyColumn(
@@ -51,7 +52,8 @@ fun ConductoresTabContent(
                     user = user,
                     auto = userAuto,
                     onToggleActive = onToggleActive,
-                    onShowLocation = onShowLocation
+                    onShowLocation = onShowLocation,
+                    showLocationButton = if (showLocationOnlyForDrivers) user.isDriver else true
                 )
             }
         }
@@ -63,7 +65,8 @@ fun ConductorItem(
     user: User,
     auto: Auto?,
     onToggleActive: (String, Boolean) -> Unit,
-    onShowLocation: (Double, Double) -> Unit
+    onShowLocation: (Double, Double) -> Unit,
+    showLocationButton: Boolean = true
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = Slate900),
@@ -101,6 +104,14 @@ fun ConductorItem(
                     style = MaterialTheme.typography.bodySmall,
                     color = Slate400
                 )
+                if (user.lineName.isNotBlank()) {
+                    Text(
+                        "Línea: ${user.lineName}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Brand400,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
                 Text(
                     if (user.active) "Estado: Activo" else "Estado: Suspendido",
                     style = MaterialTheme.typography.labelSmall,
@@ -127,19 +138,21 @@ fun ConductorItem(
                 }
             }
 
-            IconButton(
-                onClick = {
-                    if (auto != null && (auto.lat != 0.0 || auto.lng != 0.0)) {
-                        onShowLocation(auto.lat, auto.lng)
-                    }
-                },
-                enabled = auto != null && (auto.lat != 0.0 || auto.lng != 0.0),
-                colors = IconButtonDefaults.iconButtonColors(
-                    contentColor = Brand400,
-                    disabledContentColor = Slate700
-                )
-            ) {
-                Icon(Icons.Default.LocationOn, "Ver en mapa")
+            if (showLocationButton) {
+                IconButton(
+                    onClick = {
+                        if (auto != null && (auto.lat != 0.0 || auto.lng != 0.0)) {
+                            onShowLocation(auto.lat, auto.lng)
+                        }
+                    },
+                    enabled = auto != null && (auto.lat != 0.0 || auto.lng != 0.0),
+                    colors = IconButtonDefaults.iconButtonColors(
+                        contentColor = Brand400,
+                        disabledContentColor = Slate700
+                    )
+                ) {
+                    Icon(Icons.Default.LocationOn, "Ver en mapa")
+                }
             }
 
             IconButton(

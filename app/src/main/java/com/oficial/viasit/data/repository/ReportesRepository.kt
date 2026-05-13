@@ -22,26 +22,40 @@ class ReportesRepository(
         driverId: String,
         targetName: String,
         category: String
-    ): Result<Unit> =
-        client.createRecord(
+    ): Result<Unit> {
+        val fullDescription = "[$category] $descripcion | Reportado: $targetName"
+        
+        val result = client.createRecord(
             "reports",
             mapOf(
-                "description" to descripcion,
+                "description" to fullDescription,
                 "userid" to driverId,
-                "reporterName" to reporterName,
-                "targetName" to targetName,
-                "category" to category,
                 "status" to "pendiente",
                 "users" to listOf(reporterId)
             ),
             null
         ).map { }
 
+        if (result.isSuccess) {
+            val logDescription = "REPORTE: $reporterName reportó a $targetName ($category): $descripcion"
+            client.createRecord(
+                "logs",
+                mapOf(
+                    "userid" to reporterId,
+                    "description" to logDescription,
+                    "type" to "warning"
+                ),
+                null
+            )
+        }
+        
+        return result
+    }
+
     override suspend fun getReportes(query: String): Result<List<Reporte>> = try {
         val token = authRepository.getAuthToken()
         
         val filterQuery = if (query.isNotBlank()) {
-            // Buscamos por ID de usuario O por texto en la descripción (placa)
             if (query.length > 10) {
                 "userid = '$query' || description ~ '$query'"
             } else {
@@ -62,7 +76,6 @@ class ReportesRepository(
             items.map { jsonParser.decodeFromJsonElement<Reporte>(it) }
         }
     } catch (e: Exception) { 
-        android.util.Log.e("ReportesRepo", "Error al obtener reportes: ${e.message}")
         Result.failure(e) 
     }
 

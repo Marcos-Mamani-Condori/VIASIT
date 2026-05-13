@@ -39,8 +39,8 @@ data class Auto(
     @SerialName("plate")
     val placa: String = "",
 
-    @SerialName("lineaId")
-    val lineaId: String = "",
+    @SerialName("lineId")
+    val lineaIdFromDb: String = "",
 
     @SerialName("lat")
     val lat: Double = 0.0,
@@ -58,22 +58,70 @@ data class Auto(
     val updated: String = "",
 
     @SerialName("expand")
-    val expand: JsonObject? = null
+    val expand: JsonObject? = null,
+
+    // Caching fields to preserve expanded data in Room/Realtime
+    val driverNameCache: String? = null,
+    val lineNameCache: String? = null,
+    val lineIdCache: String? = null
 ) {
     val driverName: String
-        get() = try {
-            val userExpand = expand?.get("userid")
-            val userObj = when (userExpand) {
-                is JsonObject -> userExpand
-                is JsonArray -> if (userExpand.isNotEmpty()) userExpand[0] as? JsonObject else null
-                else -> null
-            }
-            userObj?.get("name")?.jsonPrimitive?.content 
-                ?: userObj?.get("email")?.jsonPrimitive?.content 
-                ?: "Conductor ($userId)".take(15)
-        } catch (e: Exception) {
-            "Conductor"
+        get() = driverNameCache ?: parseDriverName()
+
+    val lineName: String
+        get() = lineNameCache ?: parseLineName()
+
+    val lineaId: String
+        get() = if (lineaIdFromDb.isNotBlank()) lineaIdFromDb else (lineIdCache ?: parseLineId())
+
+    private fun parseDriverName(): String = try {
+        val userExpand = expand?.get("userid")
+        val userObj = when (userExpand) {
+            is JsonObject -> userExpand
+            is JsonArray -> if (userExpand.isNotEmpty()) userExpand[0] as? JsonObject else null
+            else -> null
         }
+        userObj?.get("name")?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
+            ?: userObj?.get("username")?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
+            ?: userObj?.get("email")?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
+            ?: "Conductor ($userId)".take(20)
+    } catch (e: Exception) {
+        "Conductor"
+    }
+
+    private fun parseLineName(): String = try {
+        val userExpand = expand?.get("userid")
+        val userObj = when (userExpand) {
+            is JsonObject -> userExpand
+            is JsonArray -> if (userExpand.isNotEmpty()) userExpand[0] as? JsonObject else null
+            else -> null
+        }
+        val lineExpand = userObj?.get("expand")?.jsonObject?.get("lineId")
+        val lineObj = when (lineExpand) {
+            is JsonObject -> lineExpand
+            is JsonArray -> if (lineExpand.isNotEmpty()) lineExpand[0] as? JsonObject else null
+            else -> null
+        }
+        lineObj?.get("name")?.jsonPrimitive?.content?.takeIf { it.isNotBlank() } ?: "Sin Línea"
+    } catch (e: Exception) {
+        "Sin Línea"
+    }
+
+    private fun parseLineId(): String = try {
+        val userExpand = expand?.get("userid")
+        val userObj = when (userExpand) {
+            is JsonObject -> userExpand
+            is JsonArray -> if (userExpand.isNotEmpty()) userExpand[0] as? JsonObject else null
+            else -> null
+        }
+        val lineExpand = userObj?.get("expand")?.jsonObject?.get("lineId")
+        val lineObj = when (lineExpand) {
+            is JsonObject -> lineExpand
+            is JsonArray -> if (lineExpand.isNotEmpty()) lineExpand[0] as? JsonObject else null
+            else -> null
+        }
+        lineObj?.get("id")?.jsonPrimitive?.content ?: ""
+    } catch (e: Exception) { "" }
 
     fun isActive(maxAgeMinutes: Int = 10): Boolean {
         return try {

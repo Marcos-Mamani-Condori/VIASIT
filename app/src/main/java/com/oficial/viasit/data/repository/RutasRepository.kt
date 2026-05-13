@@ -2,8 +2,6 @@ package com.oficial.viasit.data.repository
 
 import com.oficial.viasit.domain.model.Ruta
 import com.oficial.viasit.data.remote.PocketBaseRealtimeClient
-import com.oficial.viasit.data.repository.AdminJsonParsers.extractItemBlocks
-import com.oficial.viasit.data.repository.AdminJsonParsers.parseRutaFromJson
 import com.oficial.viasit.domain.repository.IRutasRepository
 
 internal class RutasRepository(
@@ -20,7 +18,7 @@ internal class RutasRepository(
         if (endPoint.isNotEmpty())   data["endPoint"]   = endPoint
         if (waypoints.isNotEmpty())  data["waypoints"]   = waypoints
         client.createRecord("routes", data, shared.authToken()).map { json ->
-            Ruta(id = AdminJsonParsers.extractStringField(json, "id"), name = name,
+            Ruta(id = extractStringField(json, "id"), name = name,
                 description = description, startPoint = startPoint, endPoint = endPoint, waypoints = waypoints)
         }
     } catch (e: Exception) { Result.failure(e) }

@@ -34,9 +34,11 @@ class AuthRepository(context: Context) : IAuthRepository {
     override suspend fun login(email: String, password: String): Result<User> {
         return withContext(Dispatchers.IO) {
             _authState.value = AuthState.Loading
+            android.util.Log.d("AuthRepository", "Iniciando login para: $email")
             val result = pocketBaseAuth.login(email, password)
             result.fold(
                 onSuccess = { user ->
+                    android.util.Log.d("AuthRepository", "Login exitoso. User: ${user.name}, LineaId: ${user.lineaId}, Role: ${user.role}")
                     if (!user.active) {
                         _authState.value = AuthState.Error("Tu cuenta ha sido deshabilitada por administración.")
                         Result.failure(Exception("Cuenta inactiva"))
@@ -47,6 +49,7 @@ class AuthRepository(context: Context) : IAuthRepository {
                     }
                 },
                 onFailure = { error ->
+                    android.util.Log.e("AuthRepository", "Error en login para $email", error)
                     _authState.value = AuthState.Error(error.message ?: "Error login")
                     Result.failure(error)
                 }
@@ -160,18 +163,22 @@ class AuthRepository(context: Context) : IAuthRepository {
     override fun getCurrentUser(): User? {
         if (!isLoggedIn() && !isGuestMode()) return null
         val roleStr = prefs.getString("role", UserRole.usuario.name) ?: UserRole.usuario.name
-        return User(
+        val user = User(
             id = prefs.getString("userId", "") ?: "",
             email = prefs.getString("email", "") ?: "",
             name = prefs.getString("name", "") ?: "",
             phone = prefs.getString("phone", "") ?: "",
             role = listOf(roleStr),
             lineaId = prefs.getString("lineaId", "") ?: "",
+            lineName = prefs.getString("lineName", "") ?: "",
             token = prefs.getString("token", "") ?: ""
         )
+        android.util.Log.d("AuthRepository", "getCurrentUser restaurado: ${user.name}, LineaId: ${user.lineaId}, LineName: ${user.lineName}")
+        return user
     }
 
     private fun saveUser(user: User, isGuest: Boolean) {
+        android.util.Log.d("AuthRepository", "Guardando usuario en SharedPreferences: ${user.name}, LineaId: ${user.lineaId}, LineName: ${user.lineName}")
         prefs.edit().apply {
             putString("userId", user.id)
             putString("email", user.email)
@@ -179,6 +186,7 @@ class AuthRepository(context: Context) : IAuthRepository {
             putString("phone", user.phone)
             putString("role", user.role.firstOrNull() ?: UserRole.usuario.name)
             putString("lineaId", user.lineaId)
+            putString("lineName", user.lineName)
             putString("token", user.token)
             putBoolean("loggedIn", !isGuest)
             putBoolean("isGuest", isGuest)

@@ -1,136 +1,171 @@
 package com.oficial.viasit.data.repository
 
-import com.oficial.viasit.domain.model.InvitationCode
-import com.oficial.viasit.domain.model.Linea
-import com.oficial.viasit.domain.model.LogEntry
-import com.oficial.viasit.domain.model.Ruta
+import com.oficial.viasit.domain.model.*
+import kotlinx.serialization.json.*
 
-internal object AdminJsonParsers {
+private val jsonParser = Json { ignoreUnknownKeys = true; isLenient = true }
 
-    fun extractStringField(json: String, field: String): String =
-        Regex(""""$field"\s*:\s*"([^"]*)"|"$field"\s*:\s*(\w+)|"$field"\s*:\s*\[([^\]]*)\]""").find(json)?.let { 
-            it.groupValues[1].ifEmpty { it.groupValues[2] }.ifEmpty { it.groupValues[3].replace("\"", "").trim() }
-        } ?: ""
+fun extractStringField(json: String, field: String): String {
+    return try {
+        val element = jsonParser.parseToJsonElement(json)
+        if (element is JsonObject) {
+            element[field]?.jsonPrimitive?.content ?: ""
+        } else {
+            Regex(""""$field"\s*:\s*"([^"]+)"""").find(json)?.groupValues?.get(1) ?: ""
+        }
+    } catch (e: Exception) {
+        Regex(""""$field"\s*:\s*"([^"]+)"""").find(json)?.groupValues?.get(1) ?: ""
+    }
+}
 
-    fun extractItemBlocks(json: String): List<String> {
-        val itemsKeyIndex = json.indexOf("\"items\"")
-        if (itemsKeyIndex == -1) return emptyList()
-        val arrayStart = json.indexOf('[', itemsKeyIndex)
-        if (arrayStart == -1) return emptyList()
-        
+fun extractItemBlocks(json: String): List<String> {
+    return try {
+        val root = jsonParser.parseToJsonElement(json).jsonObject
+        root["items"]?.jsonArray?.map { it.toString() } ?: emptyList()
+    } catch (e: Exception) {
+        val itemsMatch = Regex(""""items"\s*:\s*\[(.*)\]""").find(json) ?: return emptyList()
+        val content = itemsMatch.groupValues[1]
         val blocks = mutableListOf<String>()
-        var depth = 0; var blockStart = -1; var i = arrayStart + 1
-        while (i < json.length) {
-            when (json[i]) {
-                '{' -> { if (depth == 0) blockStart = i; depth++ }
-                '}' -> { depth--
-                    if (depth == 0 && blockStart != -1) { 
-                        blocks.add(json.substring(blockStart, i + 1))
-                        blockStart = -1 
-                    }
+        var bracketCount = 0
+        var currentBlock = StringBuilder()
+        for (char in content) {
+            if (char == '{') bracketCount++
+            if (bracketCount > 0) currentBlock.append(char)
+            if (char == '}') {
+                bracketCount--
+                if (bracketCount == 0) {
+                    blocks.add(currentBlock.toString())
+                    currentBlock = StringBuilder()
                 }
-                ']' -> if (depth == 0) break
-            }
-            i++
-        }
-        return blocks
-    }
-
-    fun parseInvitationCodesFromJson(json: String): List<InvitationCode> =
-        extractItemBlocks(json).map { block ->
-            InvitationCode(
-                id        = extractStringField(block, "id"),
-                code      = extractStringField(block, "code"),
-                role      = extractStringField(block, "role"),
-                lineaId   = extractStringField(block, "lineId"),
-                isUsed    = block.contains("\"isUsed\":true") || block.contains("\"isUsed\": true"),
-                expiresAt = extractStringField(block, "expiresAt")
-            )
-        }.filter { it.id.isNotEmpty() }
-
-    fun parseLineasFromJson(json: String): List<Linea> {
-        return extractItemBlocks(json).map { block ->
-            Linea(
-                id = extractStringField(block, "id"),
-                name = extractStringField(block, "name"),
-                code = extractStringField(block, "code"),
-                rutaId = extractStringField(block, "routeId")
-            )
-        }.filter { it.id.isNotEmpty() }
-    }
-
-    fun extractNestedObject(json: String, startIndex: Int): String {
-        val startBrace = json.indexOf('{', startIndex)
-        if (startBrace == -1) return ""
-        var depth = 0
-        for (i in startBrace until json.length) {
-            if (json[i] == '{') depth++
-            else if (json[i] == '}') {
-                depth--
-                if (depth == 0) return json.substring(startBrace, i + 1)
             }
         }
-        return ""
+        blocks
     }
+}
 
-    fun parseLogsFromJson(json: String): List<LogEntry> {
-        return extractItemBlocks(json).map { block ->
-            val expandStart = block.indexOf("\"expand\"")
+fun parseLogsFromJson(json: String): List<LogEntry> {
+    return try {
+        val root = jsonParser.parseToJsonElement(json).jsonObject
+        val items = root["items"]?.jsonArray ?: return emptyList()
+        items.map { it.jsonObject }.map { obj ->
+            val id = obj["id"]?.jsonPrimitive?.content ?: ""
+            val userId = obj["userid"]?.jsonPrimitive?.content ?: ""
+            val description = obj["description"]?.jsonPrimitive?.content ?: ""
+            val type = obj["type"]?.jsonPrimitive?.content ?: ""
+            val created = obj["created"]?.jsonPrimitive?.content ?: ""
+            
             var displayName = ""
-            if (expandStart != -1) {
-                val expandBlock = extractNestedObject(block, expandStart)
-                // Buscamos cualquier objeto dentro de expand que tenga 'name' o 'email'
-                // PocketBase puede llamar al campo 'users', 'userId', 'userid', etc.
-                val nameMatch = Regex(""""name"\s*:\s*"([^"]+)"""").find(expandBlock)
-                val emailMatch = Regex(""""email"\s*:\s*"([^"]+)"""").find(expandBlock)
-                
-                displayName = nameMatch?.groupValues?.get(1) 
-                    ?: emailMatch?.groupValues?.get(1) 
-                    ?: ""
+            val userExpand = obj["expand"]?.jsonObject?.get("userid")?.jsonObject
+            if (userExpand != null) {
+                displayName = userExpand["name"]?.jsonPrimitive?.content 
+                    ?: userExpand["username"]?.jsonPrimitive?.content ?: ""
             }
+            if (displayName.isEmpty()) displayName = "Usuario ($userId)"
 
-            val explicitUserName = extractStringField(block, "userName")
-            LogEntry(
-                id = extractStringField(block, "id"),
-                userId = extractStringField(block, "userid").ifEmpty { extractStringField(block, "userId") }.ifEmpty { extractStringField(block, "users") },
-                userName = explicitUserName.ifEmpty { displayName }.ifEmpty { "Sistema" },
-                description = extractStringField(block, "description"),
-                type = extractStringField(block, "type").ifEmpty { "info" },
-                created = extractStringField(block, "created")
+            LogEntry(id = id, userId = userId, userName = displayName, description = description, type = type, created = created)
+        }
+    } catch (e: Exception) { emptyList() }
+}
+
+fun parseUsersFromJson(json: String): List<User> {
+    return try {
+        val root = jsonParser.parseToJsonElement(json).jsonObject
+        val items = root["items"]?.jsonArray ?: return emptyList()
+        items.map { it.jsonObject }.map { obj ->
+            val id = obj["id"]?.jsonPrimitive?.content ?: ""
+            val email = obj["email"]?.jsonPrimitive?.content ?: ""
+            val name = obj["name"]?.jsonPrimitive?.content ?: obj["username"]?.jsonPrimitive?.content ?: ""
+            val active = obj["active"]?.jsonPrimitive?.booleanOrNull ?: true
+            val lineaId = obj["lineId"]?.jsonPrimitive?.content ?: ""
+            
+            val roles = when (val r = obj["role"]) {
+                is JsonArray -> r.map { it.jsonPrimitive.content }
+                is JsonPrimitive -> listOf(r.content)
+                else -> emptyList()
+            }
+            
+            var lineName = ""
+            val expand = obj["expand"]?.jsonObject
+            val lineExpand = expand?.get("lineId")
+            val lineObj = when (lineExpand) {
+                is JsonObject -> lineExpand
+                is JsonArray -> if (lineExpand.isNotEmpty()) lineExpand[0].jsonObject else null
+                else -> null
+            }
+            lineName = lineObj?.get("name")?.jsonPrimitive?.content ?: ""
+
+            User(
+                id = id,
+                email = email,
+                name = name,
+                role = roles,
+                active = active,
+                lineaId = lineaId,
+                lineName = lineName
             )
-        }.filter { it.id.isNotEmpty() }
-    }
+        }
+    } catch (e: Exception) { emptyList() }
+}
 
-    fun parseRutaFromJson(json: String): Ruta = Ruta(
-        id          = extractStringField(json, "id"),
-        name        = extractStringField(json, "name"),
-        description = extractStringField(json, "description"),
-        startPoint  = extractStringField(json, "startPoint"),
-        endPoint    = extractStringField(json, "endPoint"),
-        waypoints   = extractStringField(json, "waypoints")
-    )
-
-    fun parseUsersFromJson(json: String): List<com.oficial.viasit.domain.model.User> =
-        extractItemBlocks(json).map { block ->
-            com.oficial.viasit.domain.model.User(
-                id = extractStringField(block, "id"),
-                email = extractStringField(block, "email"),
-                name = extractStringField(block, "name"),
-                role = listOf(extractStringField(block, "role").replace("[", "").replace("]", "").replace("\"", "")),
-                phone = extractStringField(block, "phone"),
-                lineaId = extractStringField(block, "lineId"),
-                created = extractStringField(block, "created")
+fun parseInvitationCodesFromJson(json: String): List<InvitationCode> {
+    return try {
+        val root = jsonParser.parseToJsonElement(json).jsonObject
+        val items = root["items"]?.jsonArray ?: return emptyList()
+        items.map { it.jsonObject }.map { obj ->
+            InvitationCode(
+                id = obj["id"]?.jsonPrimitive?.content ?: "",
+                code = obj["code"]?.jsonPrimitive?.content ?: "",
+                role = obj["role"]?.jsonPrimitive?.content ?: "",
+                expiresAt = obj["expiresAt"]?.jsonPrimitive?.content ?: "",
+                isUsed = obj["isUsed"]?.jsonPrimitive?.booleanOrNull ?: false,
+                lineaId = obj["lineId"]?.jsonPrimitive?.content ?: ""
             )
-        }.filter { it.id.isNotEmpty() }
+        }
+    } catch (e: Exception) { emptyList() }
+}
 
-    fun parseAppealsAsLogs(json: String): List<LogEntry> =
-        extractItemBlocks(json).map { block ->
+fun parseLineasFromJson(json: String): List<Linea> {
+    return try {
+        val root = jsonParser.parseToJsonElement(json).jsonObject
+        val items = root["items"]?.jsonArray ?: return emptyList()
+        items.map { it.jsonObject }.map { obj ->
+            Linea(
+                id = obj["id"]?.jsonPrimitive?.content ?: "",
+                name = obj["name"]?.jsonPrimitive?.content ?: "",
+                code = obj["code"]?.jsonPrimitive?.content ?: "",
+                rutaId = obj["routeId"]?.jsonPrimitive?.content ?: ""
+            )
+        }
+    } catch (e: Exception) { emptyList() }
+}
+
+fun parseRutaFromJson(json: String): Ruta {
+    return try {
+        val obj = jsonParser.parseToJsonElement(json).jsonObject
+        Ruta(
+            id = obj["id"]?.jsonPrimitive?.content ?: "",
+            name = obj["name"]?.jsonPrimitive?.content ?: "",
+            description = obj["description"]?.jsonPrimitive?.content ?: "",
+            startPoint = obj["startPoint"]?.jsonPrimitive?.content ?: "",
+            endPoint = obj["endPoint"]?.jsonPrimitive?.content ?: "",
+            waypoints = obj["waypoints"]?.jsonPrimitive?.content ?: ""
+        )
+    } catch (e: Exception) { Ruta() }
+}
+
+fun parseAppealsAsLogs(json: String): List<LogEntry> {
+    return try {
+        val root = jsonParser.parseToJsonElement(json).jsonObject
+        val items = root["items"]?.jsonArray ?: return emptyList()
+        items.map { it.jsonObject }.map { obj ->
             LogEntry(
-                id = extractStringField(block, "id"),
-                userId = extractStringField(block, "userId"),
-                description = "APELACIÓN de ${extractStringField(block, "userName")}: ${extractStringField(block, "reason")}",
+                id = obj["id"]?.jsonPrimitive?.content ?: "",
+                userId = obj["userId"]?.jsonPrimitive?.content ?: "",
+                userName = obj["userName"]?.jsonPrimitive?.content ?: "",
+                description = "APELACIÓN: " + (obj["reason"]?.jsonPrimitive?.content ?: ""),
                 type = "warning",
-                created = extractStringField(block, "created")
+                created = obj["created"]?.jsonPrimitive?.content ?: ""
             )
-        }.filter { it.id.isNotEmpty() }
+        }
+    } catch (e: Exception) { emptyList() }
 }

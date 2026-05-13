@@ -64,13 +64,16 @@ class PocketBaseHttpClient(private val okHttpClient: OkHttpClient) {
         return withContext(Dispatchers.IO) {
             try {
                 val body = buildJsonString(data).toRequestBody("application/json".toMediaType())
+                val url = "$BASE_URL/api/collections/$collection/records/$recordId"
+                Log.d(TAG, "PATCH Request to: $url with data: $data")
                 val req = Request.Builder()
-                    .url("$BASE_URL/api/collections/$collection/records/$recordId")
+                    .url(url)
                     .patch(body)
                     .applyAuth(authToken)
                     .build()
                 val res = okHttpClient.newCall(req).execute()
                 val resBody = res.body?.string()
+                Log.d(TAG, "PATCH Response code: ${res.code}, body: $resBody")
                 if (res.isSuccessful) Result.success(resBody ?: "{}")
                 else handleError(res.code, resBody)
             } catch (e: Exception) { Log.e(TAG, "updateRecord", e); Result.failure(e) }
@@ -123,12 +126,18 @@ class PocketBaseHttpClient(private val okHttpClient: OkHttpClient) {
                 if (filter.isNotEmpty()) url += "&filter=${java.net.URLEncoder.encode(filter, "UTF-8")}"
                 if (sort.isNotEmpty())   url += "&sort=${java.net.URLEncoder.encode(sort, "UTF-8")}"
                 if (expand.isNotEmpty()) url += "&expand=${java.net.URLEncoder.encode(expand, "UTF-8")}"
+                
+                android.util.Log.e("LLAMADOS", ">>> [GET_LIST] URL: $url")
+                
                 val req = Request.Builder().url(url).get().applyAuth(authToken).build()
                 val res = okHttpClient.newCall(req).execute()
                 val resBody = res.body?.string()
+                
+                android.util.Log.e("LLAMADOS", ">>> [GET_LIST] RESP CODE: ${res.code}")
+                
                 if (res.isSuccessful) Result.success(resBody ?: "{}")
                 else handleError(res.code, resBody)
-            } catch (e: Exception) { Log.e(TAG, "getList", e); Result.failure(e) }
+            } catch (e: Exception) { android.util.Log.e("LLAMADOS", ">>> [GET_LIST] ERROR: ${e.message}"); Result.failure(e) }
         }
     }
 

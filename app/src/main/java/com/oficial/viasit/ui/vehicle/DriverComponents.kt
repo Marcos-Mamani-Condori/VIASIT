@@ -28,6 +28,9 @@ fun GreetingCard(name: String, vehicleCount: Int) {
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
+        Text("Bienvenido",
+            style = MaterialTheme.typography.labelMedium,
+            color = Slate400)
         Text(name,
             style = MaterialTheme.typography.headlineSmall,
             color = Color.White, fontWeight = FontWeight.Bold)
@@ -43,7 +46,7 @@ fun GreetingCard(name: String, vehicleCount: Int) {
 fun VehicleSelectorCard(
     vehicles: List<Auto>,
     selectedVehicle: Auto?,
-    lineaId: String?,
+    lineName: String?,
     onShowSelector: () -> Unit
 ) {
     val isChangeRestricted = vehicles.size <= 1
@@ -67,12 +70,12 @@ fun VehicleSelectorCard(
             Column(modifier = Modifier.weight(1f)) {
                 Text("Vehículo vinculado", style = MaterialTheme.typography.labelSmall, color = Slate400)
                 Text(
-                    selectedVehicle?.placa ?: "Sin vehículo vinculado",
+                    "Placa: ${selectedVehicle?.placa ?: "Sin vehículo vinculado"}",
                     style = MaterialTheme.typography.titleMedium,
                     color = if (selectedVehicle != null) Color.White else Slate500,
                     fontWeight = FontWeight.SemiBold
                 )
-                lineaId?.let { Text("Línea: $it", style = MaterialTheme.typography.bodySmall, color = Brand400) }
+                lineName?.let { Text("Línea: $it", style = MaterialTheme.typography.bodySmall, color = Brand400) }
             }
             if (!isChangeRestricted) {
                 Icon(Icons.Default.ExpandMore, null, tint = Slate400)
@@ -183,7 +186,7 @@ fun DashboardMenuItem(icon: ImageVector, title: String, subtitle: String, iconCo
 fun VehicleSelectorDialog(
     vehicles: List<Auto>,
     selectedVehicle: Auto?,
-    lineaId: String?,
+    lineName: String?,
     onSelectVehicle: (Auto) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -213,7 +216,7 @@ fun VehicleSelectorDialog(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(auto.placa, style = MaterialTheme.typography.titleSmall,
                                     color = if (isSelected) Color.White else Slate200, fontWeight = FontWeight.SemiBold)
-                                lineaId?.let { Text("Línea: $it", style = MaterialTheme.typography.labelSmall, color = Slate500) }
+                                lineName?.let { Text("Línea: $it", style = MaterialTheme.typography.labelSmall, color = Slate500) }
                             }
                             if (isSelected) Icon(Icons.Default.Check, null, tint = Brand400, modifier = Modifier.size(18.dp))
                         }

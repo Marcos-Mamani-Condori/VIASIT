@@ -539,7 +539,11 @@ fun AutoUnidadCard(auto: Auto, userLocation: Location?, onClick: () -> Unit) {
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text("Placa: ${auto.placa.ifBlank { "Sin placa" }}", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = Color.White)
-                Text(auto.driverName, style = MaterialTheme.typography.labelSmall, color = Brand400)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(auto.driverName, style = MaterialTheme.typography.labelSmall, color = Brand400)
+                    Text("•", color = Slate600, style = MaterialTheme.typography.labelSmall)
+                    Text(auto.lineName, style = MaterialTheme.typography.labelSmall, color = Slate400)
+                }
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text(distanceText, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = Color.White)

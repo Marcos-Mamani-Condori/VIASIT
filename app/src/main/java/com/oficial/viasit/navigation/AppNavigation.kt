@@ -43,7 +43,6 @@ fun VIASITApp() {
                 currentScreen = when (state.user.userRole) {
                     UserRole.conductor                           -> Screen.DriverDashboard
                     UserRole.ADMIN_PRINCIPAL, UserRole.ADMIN_LINEA -> Screen.AdminDashboard
-                    // usuario e invitado van al dashboard de pasajeros
                     UserRole.usuario, UserRole.invitado          -> Screen.PassengerDashboard
                 }
             }

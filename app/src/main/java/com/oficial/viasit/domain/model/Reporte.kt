@@ -68,6 +68,8 @@ data class Reporte(
     }
 
     private fun extractName(obj: JsonObject): String? {
+        val username = obj["username"]?.jsonPrimitive?.content
+        if (!username.isNullOrBlank()) return username
         val name = obj["name"]?.jsonPrimitive?.content
         if (!name.isNullOrBlank()) return name
         val email = obj["email"]?.jsonPrimitive?.content

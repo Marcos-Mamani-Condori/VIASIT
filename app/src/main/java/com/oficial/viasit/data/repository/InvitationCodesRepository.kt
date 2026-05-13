@@ -2,7 +2,6 @@ package com.oficial.viasit.data.repository
 
 import com.oficial.viasit.domain.model.InvitationCode
 import com.oficial.viasit.data.remote.PocketBaseRealtimeClient
-import com.oficial.viasit.data.repository.AdminJsonParsers.parseInvitationCodesFromJson
 import com.oficial.viasit.domain.repository.IInvitationCodesRepository
 
 internal class InvitationCodesRepository(
@@ -21,7 +20,7 @@ internal class InvitationCodesRepository(
             client.createRecord("invitation_codes", data, shared.authToken()).fold(
                 onSuccess = { json ->
                     Result.success(InvitationCode(
-                        id = AdminJsonParsers.extractStringField(json, "id"),
+                        id = extractStringField(json, "id"),
                         code = code, role = role, lineaId = lineaId,
                         isUsed = false, expiresAt = shared.formatNowPlus(expiresInHours)
                     ))

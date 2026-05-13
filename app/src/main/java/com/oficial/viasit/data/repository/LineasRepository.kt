@@ -2,7 +2,6 @@ package com.oficial.viasit.data.repository
 
 import com.oficial.viasit.domain.model.Linea
 import com.oficial.viasit.data.remote.PocketBaseRealtimeClient
-import com.oficial.viasit.data.repository.AdminJsonParsers.parseLineasFromJson
 import com.oficial.viasit.domain.repository.ILineasRepository
 
 internal class LineasRepository(
@@ -13,7 +12,7 @@ internal class LineasRepository(
         val data = mutableMapOf<String, Any>("name" to name, "code" to code)
         if (rutaId.isNotEmpty()) data["routeId"] = rutaId
         client.createRecord("lines", data, shared.authToken()).map { json ->
-            Linea(id = AdminJsonParsers.extractStringField(json, "id"), name = name, code = code, rutaId = rutaId)
+            Linea(id = extractStringField(json, "id"), name = name, code = code, rutaId = rutaId)
         }
     } catch (e: Exception) { Result.failure(e) }
 

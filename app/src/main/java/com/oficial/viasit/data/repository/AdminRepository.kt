@@ -27,8 +27,6 @@ class AdminRepository(
     internal fun formatNowPlus(hours: Int) = shared.formatNowPlus(hours)
     internal fun formatNow()               = shared.formatNow()
     internal fun generateSecureCode()      = shared.generateSecureCode()
-    internal fun extractStringField(json: String, field: String) = AdminJsonParsers.extractStringField(json, field)
-    internal fun extractItemBlocks(json: String)                 = AdminJsonParsers.extractItemBlocks(json)
 
     private val invitaciones   = InvitationCodesRepository(client, shared)
     private val lineas         = LineasRepository(client, shared)
@@ -66,14 +64,38 @@ class AdminRepository(
         logs.getByUser(userId)
 
     override suspend fun getUsersByLinea(lineaId: String): Result<List<com.oficial.viasit.domain.model.User>> = try {
-        // Buscamos usuarios cuyo lineId sea el ID de la linea o el código de la linea (por si acaso)
-        // También aseguramos que traiga el rol 'driver'
-        client.getList("users", filter = "(lineId='$lineaId' || lineaId='$lineaId')", authToken = getAuthToken())
-            .map { AdminJsonParsers.parseUsersFromJson(it) }
-    } catch (e: Exception) { Result.failure(e) }
+        val filter = if (lineaId.isBlank()) "" else "lineId='$lineaId'"
+        val expand = "lineId"
+        android.util.Log.e("LLAMADOS", ">>> [GET_USERS] Filtro: '$filter', Expand: '$expand'")
+        client.getList("users", filter = filter, expand = expand, authToken = getAuthToken())
+            .map { json ->
+                val users = parseUsersFromJson(json)
+                android.util.Log.e("LLAMADOS", ">>> [GET_USERS] Encontrados: ${users.size}")
+                users.forEach { u ->
+                    android.util.Log.i("LLAMADOS", "    - Usuario: ${u.name} | Línea: ${u.lineName} (${u.lineaId}) | Rol: ${u.role}")
+                }
+                users
+            }
+    } catch (e: Exception) {
+        android.util.Log.e("LLAMADOS", ">>> [GET_USERS] ERROR FATAL: ${e.message}", e)
+        Result.failure(e)
+    }
 
-    override suspend fun setUserActiveStatus(userId: String, active: Boolean): Result<Unit> =
-        client.updateRecord("users", userId, mapOf("active" to active), getAuthToken()).map { }
+    override suspend fun setUserActiveStatus(userId: String, active: Boolean): Result<Unit> {
+        if (userId.isBlank()) {
+            android.util.Log.e("LLAMADOS", ">>> [SUSPENDER] ERROR: userId está VACÍO")
+            return Result.failure(Exception("ID de usuario no proporcionado"))
+        }
+        android.util.Log.e("LLAMADOS", ">>> [SUSPENDER] Intentando ID: $userId, Estado: $active")
+        val token = getAuthToken()
+        
+        return client.updateRecord("users", userId, mapOf("active" to active), token).map { 
+            android.util.Log.e("LLAMADOS", ">>> [SUSPENDER] ÉXITO para $userId")
+            Unit
+        }.onFailure { e ->
+            android.util.Log.e("LLAMADOS", ">>> [SUSPENDER] FALLÓ: ${e.message}")
+        }
+    }
 
     override suspend fun deleteUser(userId: String): Result<Unit> =
         client.deleteRecord("users", userId, getAuthToken()).map { }
@@ -89,7 +111,7 @@ class AdminRepository(
 
     override suspend fun getAppeals(): Result<List<LogEntry>> = try {
         client.getList("appeals", sort = "-created", authToken = getAuthToken())
-            .map { AdminJsonParsers.parseAppealsAsLogs(it) }
+            .map { parseAppealsAsLogs(it) }
     } catch (e: Exception) { Result.failure(e) }
 
     override suspend fun resolveAppeal(appealId: String, userId: String, accept: Boolean): Result<Unit> = try {

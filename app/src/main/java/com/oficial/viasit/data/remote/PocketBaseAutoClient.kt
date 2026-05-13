@@ -53,22 +53,23 @@ class PocketBaseAutoClient(
 
     suspend fun fetchAutos() {
         try {
-            val request = Request.Builder()
-                .url("$BASE_URL/api/collections/$COLLECTION/records?perPage=200&expand=userid")
-                .get().build()
+            val url = "$BASE_URL/api/collections/$COLLECTION/records?perPage=200&expand=userid,userid.lineId"
+            android.util.Log.d("LLAMADOS", ">>> FETCH AUTOS: $url")
+            val request = Request.Builder().url(url).get().build()
             val responseBody = withContext(Dispatchers.IO) {
                 okHttpClient.newCall(request).execute().use { resp ->
                     if (resp.isSuccessful) resp.body?.string()
-                    else { Log.e(TAG, "fetchAutos HTTP ${resp.code}"); null }
+                    else { null }
                 }
             }
             responseBody?.let { body ->
                 val list = json.decodeFromString<ListResponse>(body)
                 _autos.value = list.items
+                // Al guardar en entities, se disparan los getters que pueblan los campos de cache
                 autoDao?.insertOrUpdateAutos(list.items.toEntities())
             }
         } catch (e: Exception) {
-            Log.e(TAG, "fetchAutos: ${e.message}", e)
+            android.util.Log.e("LLAMADOS", ">>> ERROR FETCH AUTOS: ${e.message}")
             loadFromCache()
         }
     }
@@ -87,14 +88,24 @@ class PocketBaseAutoClient(
         if (record == null) return
         val list = _autos.value.toMutableList()
         when (action) {
-            "create" -> {
-                val existingIdx = list.indexOfFirst { it.id == record.id || it.userId == record.userId }
-                if (existingIdx != -1) list[existingIdx] = record
-                else list.add(record)
-            }
-            "update" -> {
+            "create", "update" -> {
                 val i = list.indexOfFirst { it.id == record.id }
-                if (i != -1) list[i] = record else list.add(record)
+                if (i != -1) {
+                    val existing = list[i]
+                    // PocketBase realtime updates often lack the 'expand' field.
+                    // If the update has no expand but the existing record does, we preserve it.
+                    val updatedRecord = if (record.expand == null && existing.expand != null) {
+                        record.copy(
+                            expand = existing.expand,
+                            driverNameCache = existing.driverName,
+                            lineNameCache = existing.lineName,
+                            lineIdCache = existing.lineaId
+                        )
+                    } else record
+                    list[i] = updatedRecord
+                } else {
+                    list.add(record)
+                }
             }
             "delete" -> list.removeIf { it.id == record.id }
         }
@@ -106,16 +117,15 @@ class PocketBaseAutoClient(
             try {
                 Log.d(TAG, "registerAuto: userId=$userId, placa=$placa, lineaId=$lineaCode")
                 
-                // Usamos el lineaId directamente (asignado previamente al usuario)
                 val lineaId = lineaCode
 
                 val existingAuto = getAutoByUserId(userId).getOrNull()
                 if (existingAuto != null) {
-                    Log.d(TAG, "Re-vinculando auto existente: id=${existingAuto.id}")
-                    val body = """{"plate":"$placa","lat":$lat,"lng":$lng,"angle":0,"lineaId":"$lineaId"}"""
+                    android.util.Log.d("LLAMADOS", ">>> ACTUALIZANDO AUTO EXISTENTE: ${existingAuto.id}")
+                    val body = """{"plate":"$placa","lat":$lat,"lng":$lng,"angle":0,"lineId":"$lineaId"}"""
                         .toRequestBody("application/json".toMediaType())
                     val resp = okHttpClient.newCall(
-                        Request.Builder().url("$BASE_URL/api/collections/$COLLECTION/records/${existingAuto.id}").patch(body).build()
+                        Request.Builder().url("$BASE_URL/api/collections/$COLLECTION/records/${existingAuto.id}?expand=userid,userid.lineId").patch(body).build()
                     ).execute()
                     return@withContext if (resp.isSuccessful) {
                         val updated = json.decodeFromString<Auto>(resp.body?.string() ?: "")
@@ -126,11 +136,11 @@ class PocketBaseAutoClient(
                     }
                 }
 
-                val body = "{\"userid\":\"$userId\",\"plate\":\"$placa\",\"lat\":$lat,\"lng\":$lng,\"angle\":0,\"lineaId\":\"$lineaId\"}"
+                val body = "{\"userid\":\"$userId\",\"plate\":\"$placa\",\"lat\":$lat,\"lng\":$lng,\"angle\":0,\"lineId\":\"$lineaId\"}"
                     .toRequestBody("application/json".toMediaType())
-                Log.d(TAG, "Creando nuevo auto...")
+                android.util.Log.d("LLAMADOS", ">>> CREANDO NUEVO AUTO PARA: $userId")
                 val resp = okHttpClient.newCall(
-                    Request.Builder().url("$BASE_URL/api/collections/$COLLECTION/records").post(body).build()
+                    Request.Builder().url("$BASE_URL/api/collections/$COLLECTION/records?expand=userid,userid.lineId").post(body).build()
                 ).execute()
 
                 if (resp.isSuccessful) {
@@ -150,12 +160,14 @@ class PocketBaseAutoClient(
     private suspend fun updateUserLinea(userId: String, lineaId: String): Boolean {
         return withContext(Dispatchers.IO) {
             try {
-                val body = """{"lineaId":"$lineaId"}""".toRequestBody("application/json".toMediaType())
+                android.util.Log.d("LLAMADOS", ">>> VINCULANDO USUARIO $userId A LINEA $lineaId")
+                val body = """{"lineId":"$lineaId"}""".toRequestBody("application/json".toMediaType())
                 val resp = okHttpClient.newCall(
                     Request.Builder().url("$BASE_URL/api/collections/users/records/$userId").patch(body).build()
                 ).execute()
+                android.util.Log.d("LLAMADOS", ">>> VINCULACION RESP: ${resp.code}")
                 resp.isSuccessful
-            } catch (e: Exception) { Log.e(TAG, "updateUserLinea", e); false }
+            } catch (e: Exception) { android.util.Log.e("LLAMADOS", ">>> ERROR VINCULACION: ${e.message}"); false }
         }
     }
 
@@ -164,7 +176,7 @@ class PocketBaseAutoClient(
             try {
                 val filter = "userid.id=\"$userId\""
                 val encodedFilter = java.net.URLEncoder.encode(filter, "UTF-8")
-                val url = "$BASE_URL/api/collections/$COLLECTION/records?perPage=1&filter=$encodedFilter&expand=userid"
+                val url = "$BASE_URL/api/collections/$COLLECTION/records?perPage=1&filter=$encodedFilter&expand=userid,userid.lineId"
                 val resp = okHttpClient.newCall(Request.Builder().url(url).get().build()).execute()
                 if (resp.isSuccessful) {
                     val responseBody = resp.body?.string() ?: ""
@@ -183,7 +195,7 @@ class PocketBaseAutoClient(
                 val body = """{"lat":$lat,"lng":$lng,"angle":$angulo}"""
                     .toRequestBody("application/json".toMediaType())
                 val resp = okHttpClient.newCall(
-                    Request.Builder().url("$BASE_URL/api/collections/$COLLECTION/records/$autoId").patch(body).build()
+                    Request.Builder().url("$BASE_URL/api/collections/$COLLECTION/records/$autoId?expand=userid,userid.lineId").patch(body).build()
                 ).execute()
                 if (resp.isSuccessful)
                     Result.success(json.decodeFromString(resp.body?.string() ?: ""))
@@ -201,7 +213,7 @@ class PocketBaseAutoClient(
                 val body = """{"lat":$lat,"lng":$lng,"angle":$angulo}"""
                     .toRequestBody("application/json".toMediaType())
                 val resp = okHttpClient.newCall(
-                    Request.Builder().url("$BASE_URL/api/collections/$COLLECTION/records/$autoId").patch(body).build()
+                    Request.Builder().url("$BASE_URL/api/collections/$COLLECTION/records/$autoId?expand=userid,userid.lineId").patch(body).build()
                 ).execute()
                 if (resp.isSuccessful) Result.success(Unit)
                 else Result.failure(Exception("Error al actualizar ubicación: ${resp.code}"))

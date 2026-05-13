@@ -432,7 +432,7 @@ fun PassengerMapScreen(
                     }
                 }
 
-                // Line Filter Chips (Visible to everyone)
+                // Line Filter Chips (Visible to everyone, restricted for Line Admins)
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -443,19 +443,33 @@ fun PassengerMapScreen(
                         contentPadding = PaddingValues(end = 12.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        item {
-                            FilterChip(
-                                selected = selectedLineaId == null,
-                                onClick = { passengerViewModel.clearSelectedLinea() },
-                                label = { Text("Todas") }
-                            )
-                        }
-                        items(lineas) { linea ->
-                            FilterChip(
-                                selected = selectedLineaId == linea.id,
-                                onClick = { passengerViewModel.selectLinea(linea.id) },
-                                label = { Text(linea.name) }
-                            )
+                        if (isLineAdmin) {
+                            // Line Admin solo ve su propia línea
+                            val miLinea = lineas.find { it.id == currentUser?.lineaId }
+                            miLinea?.let { linea ->
+                                item {
+                                    FilterChip(
+                                        selected = true,
+                                        onClick = { /* Ya está seleccionada y restringida */ },
+                                        label = { Text(linea.name) }
+                                    )
+                                }
+                            }
+                        } else {
+                            item {
+                                FilterChip(
+                                    selected = selectedLineaId == null,
+                                    onClick = { passengerViewModel.clearSelectedLinea() },
+                                    label = { Text("Todas") }
+                                )
+                            }
+                            items(lineas) { linea ->
+                                FilterChip(
+                                    selected = selectedLineaId == linea.id,
+                                    onClick = { passengerViewModel.selectLinea(linea.id) },
+                                    label = { Text(linea.name) }
+                                )
+                            }
                         }
                     }
 

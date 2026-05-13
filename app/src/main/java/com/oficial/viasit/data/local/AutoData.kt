@@ -17,7 +17,10 @@ data class AutoEntity(
     val code: String = "",
     val lat: Double = 0.0,
     val lng: Double = 0.0,
-    val angulo: Double = 0.0
+    val angulo: Double = 0.0,
+    val driverName: String = "",
+    val lineName: String = "",
+    val lineId: String = ""
 )
 
 fun Auto.toEntity(): AutoEntity {
@@ -29,6 +32,9 @@ fun Auto.toEntity(): AutoEntity {
         lat = this.lat,
         lng = this.lng,
         angulo = this.angulo,
+        driverName = this.driverName,
+        lineName = this.lineName,
+        lineId = this.lineaId
     )
 }
 
@@ -45,6 +51,9 @@ fun AutoEntity.toAuto(): Auto {
         lat = this.lat,
         lng = this.lng,
         angulo = this.angulo,
+        driverNameCache = this.driverName,
+        lineNameCache = this.lineName,
+        lineIdCache = this.lineId
     )
 }
 

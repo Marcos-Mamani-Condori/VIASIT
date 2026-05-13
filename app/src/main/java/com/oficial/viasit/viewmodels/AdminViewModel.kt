@@ -124,7 +124,7 @@ class AdminViewModel(
     fun clearVehicleCode() { _uiState.value = _uiState.value.copy(generatedCode = null) }
 
     // Admin Users, Reports & Appeals
-    fun loadUsers(lineaId: String) = usersHandler.loadUsers(lineaId, _uiState)
+    fun loadUsers(lineaId: String, isAdminPrincipal: Boolean = false) = usersHandler.loadUsers(lineaId, isAdminPrincipal, _uiState)
     fun setUserActiveStatus(targetUserId: String, active: Boolean, adminId: String, adminName: String) = 
         usersHandler.setUserActiveStatus(targetUserId, active, adminId, adminName, _uiState, logAction)
     fun loadAllReportes() = usersHandler.loadAllReportes(_uiState)

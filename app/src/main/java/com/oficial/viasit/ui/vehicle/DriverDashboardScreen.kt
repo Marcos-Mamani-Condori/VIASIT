@@ -129,7 +129,7 @@ fun DriverDashboardScreen(
                 VehicleSelectorCard(
                     vehicles = vehicles,
                     selectedVehicle = selectedVehicle,
-                    lineaId = currentUser?.lineaId,
+                    lineName = currentUser?.lineName?.ifBlank { currentUser.lineaId },
                     onShowSelector = { /* Restricted to one vehicle, selector disabled */ }
                 )
             }
@@ -236,7 +236,7 @@ fun DriverDashboardScreen(
             VehicleSelectorDialog(
                 vehicles = vehicles,
                 selectedVehicle = selectedVehicle,
-                lineaId = currentUser?.lineaId,
+                lineName = currentUser?.lineName?.ifBlank { currentUser.lineaId },
                 onSelectVehicle = { vehicle ->
                     onSelectVehicle(vehicle)
                     showVehicleSelector = false

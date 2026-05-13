@@ -59,7 +59,7 @@ class PocketBaseAuthClient {
                     .toRequestBody("application/json".toMediaType())
 
                 val request = Request.Builder()
-                    .url("$BASE_URL/api/collections/users/auth-with-password")
+                    .url("$BASE_URL/api/collections/users/auth-with-password?expand=lineId")
                     .post(body)
                     .build()
 
@@ -112,7 +112,7 @@ class PocketBaseAuthClient {
                 val body = json.encodeToString(reqObj).toRequestBody("application/json".toMediaType())
 
                 val request = Request.Builder()
-                    .url("$BASE_URL/api/collections/users/records")
+                    .url("$BASE_URL/api/collections/users/records?expand=lineId")
                     .post(body)
                     .build()
 
@@ -135,7 +135,7 @@ class PocketBaseAuthClient {
             try {
                 val token = authToken ?: return@withContext Result.failure(Exception("No hay token"))
                 val request = Request.Builder()
-                    .url("$BASE_URL/api/collections/users/auth-refresh")
+                    .url("$BASE_URL/api/collections/users/auth-refresh?expand=lineId")
                     .post("".toRequestBody("application/json".toMediaType()))
                     .header("Authorization", "Bearer $token")
                     .build()
@@ -172,22 +172,36 @@ data class UserResponse(
     val id: String = "",
     val email: String = "",
     val name: String = "",
+    val username: String = "",
     val phone: String = "",
     val role: List<String> = listOf("usuario"),
     @SerialName("lineId")
     val lineaId: String? = null,
     val active: Boolean = true,
     val created: String = "",
-    val updated: String = ""
+    val updated: String = "",
+    val expand: UserExpand? = null
 ) {
     fun toDomain(token: String? = null) = com.oficial.viasit.domain.model.User(
         id = id,
         email = email,
-        name = name,
+        name = if (name.isNotBlank()) name else username,
         phone = phone,
         role = role,
         lineaId = lineaId ?: "",
+        lineName = expand?.lineId?.name ?: "",
         token = token ?: "",
         active = active
     )
 }
+
+@Serializable
+data class UserExpand(
+    @SerialName("lineId")
+    val lineId: LineExpand? = null
+)
+
+@Serializable
+data class LineExpand(
+    val name: String = ""
+)

@@ -30,6 +30,9 @@ data class User(
     
     @SerialName("lineId")
     val lineaId: String = "",
+
+    @SerialName("lineName")
+    val lineName: String = "",
     
     @SerialName("token")
     val token: String = "",
@@ -61,25 +64,25 @@ data class User(
         }
     
     val isDriver: Boolean
-        get() = role.contains(UserRole.conductor.name)
+        get() = role.any { it.equals(UserRole.conductor.name, ignoreCase = true) || it.equals("DRIVER", ignoreCase = true) }
     
     val isGuest: Boolean
-        get() = role.contains(UserRole.invitado.name)
+        get() = role.any { it.equals(UserRole.invitado.name, ignoreCase = true) }
     
     val canSendLocation: Boolean
-        get() = role.contains(UserRole.usuario.name) || role.contains(UserRole.conductor.name)
+        get() = role.any { it.equals(UserRole.usuario.name, ignoreCase = true) || it.equals(UserRole.conductor.name, ignoreCase = true) }
     
     val canToggleService: Boolean
-        get() = role.contains(UserRole.conductor.name)
+        get() = role.any { it.equals(UserRole.conductor.name, ignoreCase = true) }
     
     val isAdmin: Boolean
-        get() = role.contains(UserRole.ADMIN_LINEA.name) || role.contains(UserRole.ADMIN_PRINCIPAL.name)
+        get() = role.any { it.equals(UserRole.ADMIN_LINEA.name, ignoreCase = true) || it.equals(UserRole.ADMIN_PRINCIPAL.name, ignoreCase = true) }
     
     val isAdminPrincipal: Boolean
-        get() = role.contains(UserRole.ADMIN_PRINCIPAL.name)
+        get() = role.any { it.equals(UserRole.ADMIN_PRINCIPAL.name, ignoreCase = true) }
     
     val canManageLines: Boolean
-        get() = role.contains(UserRole.ADMIN_PRINCIPAL.name)
+        get() = role.any { it.equals(UserRole.ADMIN_PRINCIPAL.name, ignoreCase = true) }
 }
 
 @Serializable

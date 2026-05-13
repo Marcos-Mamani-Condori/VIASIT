@@ -44,6 +44,7 @@ fun AdminDashboardScreen(
     val tabs: List<Pair<String, ImageVector>> = if (currentUser.isAdminPrincipal) {
         listOf(
             "Mapa" to Icons.Default.Map,
+            "Usuarios" to Icons.Default.Group,
             "Líneas" to Icons.Default.DirectionsBus,
             "Rutas" to Icons.Default.Route,
             "Reportes" to Icons.Default.Warning,
@@ -66,15 +67,16 @@ fun AdminDashboardScreen(
         if (currentUser.isAdminPrincipal) {
             viewModel.loadLineas()
             viewModel.loadRutas()
+            viewModel.loadUsers("", true)
             viewModel.loadInvitationCodes()
             viewModel.loadAllReportes()
             viewModel.loadAppeals()
         } else {
             viewModel.loadLineas()
             viewModel.loadRutas()
-            viewModel.loadUsers(currentUser.lineaId)
+            viewModel.loadUsers(currentUser.lineaId, false)
             viewModel.loadVehicleInvitationCodes(currentUser.lineaId)
-            viewModel.loadAllReportes() // Deberíamos filtrar por línea en el ViewModel
+            viewModel.loadAllReportes()
             logsViewModel.setLineId(currentUser.lineaId)
         }
         logsViewModel.loadLogs()
@@ -125,12 +127,25 @@ fun AdminDashboardScreen(
                             showTailsButton = true,
                             currentUser = currentUser
                         )
-                        1 -> LineasTabContent(
+                        1 -> ConductoresTabContent(
+                            users = uiState.users,
+                            autos = autos,
+                            isLoading = uiState.isLoading,
+                            onToggleActive = { targetUserId, active ->
+                                viewModel.setUserActiveStatus(targetUserId, active, currentUser.id, currentUser.name)
+                            },
+                            onShowLocation = { lat, lng ->
+                                passengerViewModel.onShowLocation(lat, lng)
+                                selectedTab = 0
+                            },
+                            showLocationOnlyForDrivers = true
+                        )
+                        2 -> LineasTabContent(
                             lineas        = uiState.lineas, isLoading = uiState.isLoading,
                             onCreateLinea = { n, c, r -> viewModel.createLinea(n, c, r, currentUser.id, currentUser.name) },
                             onDeleteLinea = { viewModel.deleteLinea(it, currentUser.id, currentUser.name) }
                         )
-                        2 -> RutasTabContent(
+                        3 -> RutasTabContent(
                             rutas     = uiState.rutas,
                             lineas    = uiState.lineas,
                             isLoading = uiState.isLoading,
@@ -138,19 +153,19 @@ fun AdminDashboardScreen(
                                 viewModel.deleteRuta(rutaId, rutaName, lineaId, currentUser.id, currentUser.name)
                             }
                         )
-                        3 -> ReportesTabContent(
+                        4 -> ReportesTabContent(
                             reportes = uiState.reportes, 
                             isLoading = uiState.isLoading,
                             onResponder = { id, resp -> viewModel.responderReporte(id, resp, currentUser.id, currentUser.name) }
                         )
-                        4 -> ApelacionesTabContent(
+                        5 -> ApelacionesTabContent(
                             appeals = uiState.appeals,
                             isLoading = uiState.isLoading,
                             onResolve = { appealId, targetUserId, accept ->
                                 viewModel.resolveAppeal(appealId, targetUserId, accept, currentUser.id, currentUser.name)
                             }
                         )
-                        5 -> InvitacionesTabContent(
+                        6 -> InvitacionesTabContent(
                             invitationCodes = uiState.invitationCodes, lineas = uiState.lineas,
                             isLoading       = uiState.isLoading, generatedCode = uiState.generatedCode,
                             onGenerateCode  = { role, lineaId ->
@@ -158,7 +173,7 @@ fun AdminDashboardScreen(
                             },
                             onDeleteCode = { viewModel.deleteInvitationCode(it, currentUser.id, currentUser.name) }
                         )
-                        6 -> {
+                        7 -> {
                             val logs by logsViewModel.logs.collectAsState()
                             val isLoadingLogs by logsViewModel.isLoading.collectAsState()
                             val searchQuery by logsViewModel.searchQuery.collectAsState()
