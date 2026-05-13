@@ -357,19 +357,21 @@ fun RouteMapPickerScreen(
         }
 
         Column(
-            modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp),
+            modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp).padding(bottom = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Card(
                 colors = CardDefaults.cardColors(
                     containerColor = when {
-                        isRouting                              -> Slate700.copy(alpha = 0.95f)
-                        viaMode                               -> Color(0xFF8B5CF6).copy(alpha = 0.9f)
-                        selectionMode == PointSelectionMode.START -> Brand500.copy(alpha = 0.9f)
-                        else                                  -> Emerald500.copy(alpha = 0.9f)
+                        isRouting                              -> Slate900.copy(alpha = 0.98f)
+                        viaMode                               -> Color(0xFF4C1D95).copy(alpha = 0.98f) // Púrpura más oscuro
+                        selectionMode == PointSelectionMode.START -> Brand700.copy(alpha = 0.98f) // Azul más oscuro
+                        else                                  -> Color(0xFF064E3B).copy(alpha = 0.98f) // Verde más oscuro
                     }
-                ), shape = RoundedCornerShape(16.dp)
+                ), 
+                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+                shape = RoundedCornerShape(16.dp)
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
@@ -398,22 +400,24 @@ fun RouteMapPickerScreen(
 
             if (startPoint != null || endPoint != null || viaPoints.isNotEmpty()) {
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = Slate800.copy(alpha = 0.95f)),
+                    colors = CardDefaults.cardColors(containerColor = Slate950.copy(alpha = 0.98f)),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
                     shape  = RoundedCornerShape(12.dp)
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(modifier = Modifier.size(10.dp).background(Brand500, CircleShape))
-                            Spacer(modifier = Modifier.width(4.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 if (startPoint != null) startPoint!!.name.ifEmpty { "Inicio" }.take(12)
                                 else "Inicio",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = if (startPoint != null) Brand400 else Slate600
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = if (startPoint != null) Color.White else Slate600
                             )
                         }
                         if (viaPoints.isNotEmpty()) {
@@ -440,12 +444,13 @@ fun RouteMapPickerScreen(
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(modifier = Modifier.size(10.dp).background(Emerald500, CircleShape))
-                            Spacer(modifier = Modifier.width(4.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 if (endPoint != null) endPoint!!.name.ifEmpty { "Fin" }.take(12)
                                 else "Fin",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = if (endPoint != null) Emerald400 else Slate600
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = if (endPoint != null) Color.White else Slate600
                             )
                         }
                         // Limpiar todo

@@ -45,6 +45,7 @@ fun AuthScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Brush.verticalGradient(listOf(Slate950, Slate900)))
+            .windowInsetsPadding(WindowInsets.systemBars)
     ) {
         Box(
             modifier = Modifier
