@@ -74,7 +74,10 @@ fun parseUsersFromJson(json: String): List<User> {
         items.map { it.jsonObject }.map { obj ->
             val id = obj["id"]?.jsonPrimitive?.content ?: ""
             val email = obj["email"]?.jsonPrimitive?.content ?: ""
-            val name = obj["name"]?.jsonPrimitive?.content ?: obj["username"]?.jsonPrimitive?.content ?: ""
+            // Priorizamos 'name' (Nombre Completo) sobre 'username' (ID técnico)
+            val name = obj["name"]?.jsonPrimitive?.content?.ifBlank { null } 
+                ?: obj["username"]?.jsonPrimitive?.content 
+                ?: ""
             val active = obj["active"]?.jsonPrimitive?.booleanOrNull ?: true
             val lineaId = obj["lineId"]?.jsonPrimitive?.content ?: ""
             
@@ -158,12 +161,19 @@ fun parseAppealsAsLogs(json: String): List<LogEntry> {
         val root = jsonParser.parseToJsonElement(json).jsonObject
         val items = root["items"]?.jsonArray ?: return emptyList()
         items.map { it.jsonObject }.map { obj ->
+            val status = obj["status"]?.jsonPrimitive?.content ?: "pending"
+            // Mapeamos status a type de LogEntry para persistir el estado visual
+            val type = when(status) {
+                "accepted" -> "success"
+                "rejected" -> "error"
+                else -> "warning"
+            }
             LogEntry(
                 id = obj["id"]?.jsonPrimitive?.content ?: "",
                 userId = obj["userId"]?.jsonPrimitive?.content ?: "",
                 userName = obj["userName"]?.jsonPrimitive?.content ?: "",
                 description = "APELACIÓN: " + (obj["reason"]?.jsonPrimitive?.content ?: ""),
-                type = "warning",
+                type = type,
                 created = obj["created"]?.jsonPrimitive?.content ?: ""
             )
         }

@@ -111,17 +111,16 @@ class AdminRepository(
         ), null).map { }
 
     override suspend fun getAppeals(): Result<List<LogEntry>> = try {
-        // Filtrar apelaciones que están marcadas como activas (no archivadas)
-        client.getList("appeals", filter = "active = true", sort = "-created", authToken = getAuthToken())
+        // Obtenemos todas las apelaciones recientes (pueden ser pendientes o ya resueltas para que el admin vea el cambio)
+        client.getList("appeals", filter = "", sort = "-created", authToken = getAuthToken())
             .map { parseAppealsAsLogs(it) }
     } catch (e: Exception) { Result.failure(e) }
 
     override suspend fun resolveAppeal(appealId: String, userId: String, accept: Boolean): Result<Unit> = try {
         val status = if (accept) "accepted" else "rejected"
-        // Actualizamos el estado y la ocultamos de la lista principal marcándola como no activa
+        // Actualizamos el estado. NO la marcamos como active=false todavía para que el Admin vea el cambio de UI
         client.updateRecord("appeals", appealId, mapOf(
-            "status" to status,
-            "active" to false
+            "status" to status
         ), getAuthToken()).getOrThrow()
 
         if (accept) {

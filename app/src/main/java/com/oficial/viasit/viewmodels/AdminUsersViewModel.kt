@@ -34,6 +34,11 @@ internal class AdminUsersHandler(
 
     fun setUserActiveStatus(userId: String, userName: String, active: Boolean, currentUserId: String, adminName: String, state: MutableStateFlow<AdminUiState>, onLog: (String, String, String) -> Unit) {
         scope.launch {
+            if (userId.isBlank()) {
+                state.value = state.value.copy(error = "Error: El reporte no contiene un ID de usuario válido para suspender.")
+                return@launch
+            }
+
             // Actualización optimista
             val oldUsers = state.value.users
             val updatedUsers = oldUsers.map { 
@@ -47,7 +52,7 @@ internal class AdminUsersHandler(
                     state.value = state.value.copy(
                         successMessage = "Usuario $action correctamente"
                     )
-                    onLog(currentUserId, adminName, "${if(active) "Reactivó" else "Suspendió"} a usuario: $userName")
+                    onLog(currentUserId, adminName, "${if(active) "Reactivó" else "Suspendió"} a usuario: $userName (ID: $userId)")
                 },
                 onFailure = { error -> 
                     // Revertir si falla
@@ -79,9 +84,13 @@ internal class AdminUsersHandler(
 
     fun resolveAppeal(appealId: String, userId: String, userName: String, accept: Boolean, currentUserId: String, adminName: String, state: MutableStateFlow<AdminUiState>, onLog: (String, String, String) -> Unit) {
         scope.launch {
-            // Actualización optimista: quitar de la lista de pendientes
+            // Actualización optimista: marcar como resuelto en la lista local
             val oldAppeals = state.value.appeals
-            val updatedAppeals = oldAppeals.filter { it.id != appealId }
+            val updatedAppeals = oldAppeals.map {
+                if (it.id == appealId) {
+                    it.copy(type = if (accept) "success" else "error")
+                } else it
+            }
             state.value = state.value.copy(appeals = updatedAppeals, error = null)
 
             resolveAppealUseCase(appealId, userId, accept).fold(
@@ -106,6 +115,9 @@ internal class AdminUsersHandler(
             val targetName = reporte?.driverName ?: "desconocido"
             val targetId = reporte?.targetUserId ?: ""
             
+            // Log de depuración para ver qué ID estamos enviando
+            android.util.Log.e("REPORT_SUSPEND", "Intentando suspender desde reporte. TargetId: '$targetId', TargetName: '$targetName'")
+
             val updatedReportes = oldReportes.map {
                 if (it.id == reporteId) it.copy(status = "resuelto", adminResponse = respuesta) else it
             }

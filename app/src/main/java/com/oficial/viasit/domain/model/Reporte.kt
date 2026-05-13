@@ -46,16 +46,33 @@ data class Reporte(
     val expand: JsonObject? = null
 ) {
     /**
-     * Devuelve el ID del conductor reportado intentando todas las posibles variantes de campo
-     * que PocketBase podría devolver.
+     * Devuelve el ID del conductor reportado intentando todas las posibles variantes de campo.
      */
     val targetUserId: String
-        get() = userid.ifBlank { userIdAlternative }.ifBlank {
-            try {
-                // Intentamos sacar el ID del expand si los campos directos están vacíos
-                val driverExpand = expand?.get("userid")?.jsonObject
-                driverExpand?.get("id")?.jsonPrimitive?.content ?: ""
-            } catch (e: Exception) { "" }
+        get() {
+            // 1. Prioridad: Campos directos (userid o userIdAlternative)
+            if (userid.isNotBlank()) return userid
+            if (userIdAlternative.isNotBlank()) return userIdAlternative
+            
+            // 2. Fallback: Buscar en el objeto expandido (PocketBase suele incluir el 'id' dentro)
+            expand?.let { exp ->
+                listOf("userid", "userId", "user", "driver").forEach { key ->
+                    try {
+                        val entry = exp[key]
+                        if (entry is JsonObject) {
+                            val id = entry["id"]?.jsonPrimitive?.content
+                            if (!id.isNullOrBlank()) return id
+                        } else if (entry is JsonArray && entry.isNotEmpty()) {
+                            val first = entry[0]
+                            if (first is JsonObject) {
+                                val id = first["id"]?.jsonPrimitive?.content
+                                if (!id.isNullOrBlank()) return id
+                            }
+                        }
+                    } catch (e: Exception) { /* ignore */ }
+                }
+            }
+            return ""
         }
 
     val driverName: String
@@ -87,10 +104,13 @@ data class Reporte(
     }
 
     private fun extractName(obj: JsonObject): String? {
-        val username = obj["username"]?.jsonPrimitive?.content
-        if (!username.isNullOrBlank()) return username
+        // Prioridad: 1. Nombre completo, 2. Username técnico, 3. Email
         val name = obj["name"]?.jsonPrimitive?.content
         if (!name.isNullOrBlank()) return name
+        
+        val username = obj["username"]?.jsonPrimitive?.content
+        if (!username.isNullOrBlank()) return username
+
         val email = obj["email"]?.jsonPrimitive?.content
         if (!email.isNullOrBlank()) return email
         return null

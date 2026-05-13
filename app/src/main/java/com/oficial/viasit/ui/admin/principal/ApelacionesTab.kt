@@ -51,7 +51,16 @@ fun ApelacionesTabContent(
 
 @Composable
 fun AppealItem(appeal: LogEntry, onResolve: (String, String, Boolean) -> Unit) {
-    var resolutionState by remember { mutableStateOf<Boolean?>(null) }
+    // Sincronizar el estado inicial con lo que viene de la DB (mapeado en type)
+    var resolutionState by remember(appeal.id, appeal.type) { 
+        mutableStateOf(
+            when(appeal.type) {
+                "success" -> true
+                "error" -> false
+                else -> null
+            }
+        ) 
+    }
 
     Card(
         colors = CardDefaults.cardColors(containerColor = Slate900),
@@ -60,11 +69,20 @@ fun AppealItem(appeal: LogEntry, onResolve: (String, String, Boolean) -> Unit) {
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(Icons.Default.Gavel, null, tint = Brand400, modifier = Modifier.size(20.dp))
+                Icon(
+                    Icons.Default.Gavel, 
+                    null, 
+                    tint = when(appeal.type) {
+                        "success" -> Emerald400
+                        "error" -> Rose500
+                        else -> Brand400
+                    }, 
+                    modifier = Modifier.size(20.dp)
+                )
                 Text(
                     "Solicitud de Apelación",
                     style = MaterialTheme.typography.labelMedium,
-                    color = Brand400,
+                    color = if (resolutionState != null) (if(resolutionState!!) Emerald400 else Rose500) else Brand400,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.weight(1f))
