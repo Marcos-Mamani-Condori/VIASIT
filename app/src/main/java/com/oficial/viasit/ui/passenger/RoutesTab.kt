@@ -145,7 +145,7 @@ fun RoutesTab(
                                 }
                             },
                             onReportRoute = { descripcion ->
-                                viewModel.reportarProblemaRuta(linea.name, descripcion)
+                                viewModel.reportarProblemaRuta(linea.id, linea.name, descripcion)
                             }
                         )
                     }

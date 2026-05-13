@@ -62,7 +62,7 @@ class PassengerViewModel(
         }
     }
 
-    fun reportarProblemaRuta(lineaName: String, descripcion: String) {
+    fun reportarProblemaRuta(lineaId: String, lineaName: String, descripcion: String) {
         viewModelScope.launch {
             val user = authRepository.getCurrentUser()
             submitReporteUseCase(
@@ -71,6 +71,7 @@ class PassengerViewModel(
                 reporterName = user?.name ?: "Pasajero Anónimo",
                 driverId = "", // No es contra un conductor específico
                 targetName = "Ruta $lineaName",
+                lineId = lineaId,
                 category = "rutas"
             ).onSuccess {
                 _reportSuccess.value = true
@@ -82,7 +83,7 @@ class PassengerViewModel(
         }
     }
 
-    fun reportarMalServicio(placa: String, driverId: String, descripcion: String) {
+    fun reportarMalServicio(placa: String, driverId: String, lineaId: String, descripcion: String) {
         viewModelScope.launch {
             val user = authRepository.getCurrentUser()
             submitReporteUseCase(
@@ -91,6 +92,7 @@ class PassengerViewModel(
                 reporterName = user?.name ?: "Pasajero Anónimo",
                 driverId = driverId,
                 targetName = "Unidad $placa",
+                lineId = lineaId,
                 category = "servicio"
             ).onSuccess {
                 _reportSuccess.value = true

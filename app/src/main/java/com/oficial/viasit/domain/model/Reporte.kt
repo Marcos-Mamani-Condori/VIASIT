@@ -24,6 +24,9 @@ data class Reporte(
     @SerialName("userid")
     val userid: String = "", // ID del Conductor
 
+    @SerialName("lineId")
+    val lineId: String = "",
+
     @SerialName("status")
     val status: String = "pendiente",
 

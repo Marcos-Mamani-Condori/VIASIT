@@ -21,18 +21,24 @@ class ReportesRepository(
         reporterName: String,
         driverId: String,
         targetName: String,
+        lineId: String,
         category: String
     ): Result<Unit> {
         val fullDescription = "[$category] $descripcion | Reportado: $targetName"
         
+        val mapData = mutableMapOf<String, Any>(
+            "description" to fullDescription,
+            "userid" to driverId,
+            "status" to "pendiente",
+            "users" to listOf(reporterId)
+        )
+        if (lineId.isNotBlank()) {
+            mapData["lineId"] = lineId
+        }
+
         val result = client.createRecord(
             "reports",
-            mapOf(
-                "description" to fullDescription,
-                "userid" to driverId,
-                "status" to "pendiente",
-                "users" to listOf(reporterId)
-            ),
+            mapData,
             null
         ).map { }
 

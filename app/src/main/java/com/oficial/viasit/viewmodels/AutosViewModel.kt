@@ -134,10 +134,11 @@ class AutosViewModel(
         reporterName: String,
         driverId: String,
         targetName: String,
+        lineId: String = "",
         onResult: (Boolean) -> Unit
     ) {
         viewModelScope.launch {
-            submitReporteUseCase(descripcion, reporterId, reporterName, driverId, targetName).fold(
+            submitReporteUseCase(descripcion, reporterId, reporterName, driverId, targetName, lineId).fold(
                 onSuccess = { onResult(true) },
                 onFailure = { onResult(false) }
             )

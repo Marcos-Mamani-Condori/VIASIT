@@ -23,7 +23,7 @@ data class User(
     val name: String = "",
     
     @SerialName("role")
-    val role: List<String> = listOf(UserRole.usuario.name),
+    val role: String = UserRole.usuario.name,
     
     @SerialName("phone")
     val phone: String = "",
@@ -54,35 +54,31 @@ data class User(
 ) {
     val userRole: UserRole
         get() = try {
-            if (role.isNotEmpty()) {
-                UserRole.valueOf(role.first())
-            } else {
-                UserRole.usuario
-            }
+            UserRole.valueOf(role)
         } catch (e: Exception) {
             UserRole.usuario
         }
     
     val isDriver: Boolean
-        get() = role.any { it.equals(UserRole.conductor.name, ignoreCase = true) || it.equals("DRIVER", ignoreCase = true) }
+        get() = role.equals(UserRole.conductor.name, ignoreCase = true) || role.equals("DRIVER", ignoreCase = true)
     
     val isGuest: Boolean
-        get() = role.any { it.equals(UserRole.invitado.name, ignoreCase = true) }
+        get() = role.equals(UserRole.invitado.name, ignoreCase = true)
     
     val canSendLocation: Boolean
-        get() = role.any { it.equals(UserRole.usuario.name, ignoreCase = true) || it.equals(UserRole.conductor.name, ignoreCase = true) }
+        get() = role.equals(UserRole.usuario.name, ignoreCase = true) || role.equals(UserRole.conductor.name, ignoreCase = true)
     
     val canToggleService: Boolean
-        get() = role.any { it.equals(UserRole.conductor.name, ignoreCase = true) }
+        get() = role.equals(UserRole.conductor.name, ignoreCase = true)
     
     val isAdmin: Boolean
-        get() = role.any { it.equals(UserRole.ADMIN_LINEA.name, ignoreCase = true) || it.equals(UserRole.ADMIN_PRINCIPAL.name, ignoreCase = true) }
+        get() = role.equals(UserRole.ADMIN_LINEA.name, ignoreCase = true) || role.equals(UserRole.ADMIN_PRINCIPAL.name, ignoreCase = true)
     
     val isAdminPrincipal: Boolean
-        get() = role.any { it.equals(UserRole.ADMIN_PRINCIPAL.name, ignoreCase = true) }
+        get() = role.equals(UserRole.ADMIN_PRINCIPAL.name, ignoreCase = true)
     
     val canManageLines: Boolean
-        get() = role.any { it.equals(UserRole.ADMIN_PRINCIPAL.name, ignoreCase = true) }
+        get() = role.equals(UserRole.ADMIN_PRINCIPAL.name, ignoreCase = true)
 }
 
 @Serializable

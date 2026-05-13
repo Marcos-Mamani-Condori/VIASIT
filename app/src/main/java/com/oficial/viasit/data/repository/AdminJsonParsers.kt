@@ -78,10 +78,10 @@ fun parseUsersFromJson(json: String): List<User> {
             val active = obj["active"]?.jsonPrimitive?.booleanOrNull ?: true
             val lineaId = obj["lineId"]?.jsonPrimitive?.content ?: ""
             
-            val roles = when (val r = obj["role"]) {
-                is JsonArray -> r.map { it.jsonPrimitive.content }
-                is JsonPrimitive -> listOf(r.content)
-                else -> emptyList()
+            val role = when (val r = obj["role"]) {
+                is JsonArray -> r.firstOrNull()?.jsonPrimitive?.content ?: "usuario"
+                is JsonPrimitive -> r.content
+                else -> "usuario"
             }
             
             var lineName = ""
@@ -98,7 +98,7 @@ fun parseUsersFromJson(json: String): List<User> {
                 id = id,
                 email = email,
                 name = name,
-                role = roles,
+                role = role,
                 active = active,
                 lineaId = lineaId,
                 lineName = lineName

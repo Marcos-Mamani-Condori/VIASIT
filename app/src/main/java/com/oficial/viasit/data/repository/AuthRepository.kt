@@ -92,7 +92,7 @@ class AuthRepository(context: Context) : IAuthRepository {
             id = "guest",
             email = "guest@viasit.com",
             name = "Invitado",
-            role = listOf(UserRole.invitado.name)
+            role = UserRole.invitado.name
         )
         saveUser(guest, isGuest = true)
         _authState.value = AuthState.Authenticated(guest)
@@ -168,7 +168,7 @@ class AuthRepository(context: Context) : IAuthRepository {
             email = prefs.getString("email", "") ?: "",
             name = prefs.getString("name", "") ?: "",
             phone = prefs.getString("phone", "") ?: "",
-            role = listOf(roleStr),
+            role = roleStr,
             lineaId = prefs.getString("lineaId", "") ?: "",
             lineName = prefs.getString("lineName", "") ?: "",
             token = prefs.getString("token", "") ?: ""
@@ -184,7 +184,7 @@ class AuthRepository(context: Context) : IAuthRepository {
             putString("email", user.email)
             putString("name", user.name)
             putString("phone", user.phone)
-            putString("role", user.role.firstOrNull() ?: UserRole.usuario.name)
+            putString("role", user.role)
             putString("lineaId", user.lineaId)
             putString("lineName", user.lineName)
             putString("token", user.token)

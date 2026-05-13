@@ -87,7 +87,7 @@ fun PassengerMapScreen(
     var searchJob          by remember { mutableStateOf<Job?>(null) }
 
     val selectedLineaId by passengerViewModel.selectedLineaId.collectAsState()
-    val userRoleStr = currentUser?.role?.firstOrNull() ?: ""
+    val userRoleStr = currentUser?.role ?: ""
     val isLineAdmin = userRoleStr.equals(UserRole.ADMIN_LINEA.name, ignoreCase = true)
     val isPrincipalAdmin = userRoleStr.equals(UserRole.ADMIN_PRINCIPAL.name, ignoreCase = true)
 
@@ -508,7 +508,7 @@ fun PassengerMapScreen(
                                     Button(
                                         onClick = {
                                             if (routeReportText.isNotBlank()) {
-                                                passengerViewModel.reportarProblemaRuta(linea?.name ?: "", routeReportText)
+                                                passengerViewModel.reportarProblemaRuta(linea?.id ?: "", linea?.name ?: "", routeReportText)
                                                 showRouteReportDialog = false
                                                 routeReportText = ""
                                             }
@@ -526,7 +526,6 @@ fun PassengerMapScreen(
             }
         }
 
-        // Botón de Rastro (Tails) - Movido y mejorado
         if (showTailsButton) {
             SmallFloatingActionButton(
                 onClick = { showTails = !showTails },
@@ -566,7 +565,6 @@ fun PassengerMapScreen(
             )
         }
 
-        // Bottom Sheet for Vehicle Info
         if (showVehicleSheet && selectedVehicleForSheet != null) {
             val auto = selectedVehicleForSheet!!
             val linea = lineas.find { it.id == auto.lineaId }
@@ -588,7 +586,7 @@ fun PassengerMapScreen(
                     reportes = reportes,
                     puedeReportar = puedeReportar,
                     onReportClick = { desc ->
-                        passengerViewModel.reportarMalServicio(auto.placa, auto.userId, desc)
+                        passengerViewModel.reportarMalServicio(auto.placa, auto.userId, auto.lineaId, desc)
                     }
                 )
             }
@@ -613,7 +611,6 @@ fun VehicleInfoContent(
             .padding(16.dp)
             .padding(bottom = 32.dp)
     ) {
-        // Header
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
@@ -676,7 +673,6 @@ fun VehicleInfoContent(
 
         Spacer(modifier = Modifier.height(24.dp))
         
-        // Stats Row
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
@@ -698,7 +694,6 @@ fun VehicleInfoContent(
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Reports History (Social Justice / Truth Wall)
         if (reportes.isNotEmpty()) {
             Text(
                 "Muro de la Verdad (Reportes Recientes)",
@@ -742,7 +737,6 @@ fun VehicleInfoContent(
         }
 
         if (puedeReportar) {
-            // Action Button
             Button(
                 onClick = { showReportDialog = true },
                 modifier = Modifier.fillMaxWidth(),

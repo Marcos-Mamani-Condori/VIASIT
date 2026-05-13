@@ -8,7 +8,8 @@ interface IReportesRepository {
         reporterId: String,
         reporterName: String,
         driverId: String,
-        targetName: String, // <--- Nuevo: Nombre del conductor reportado
+        targetName: String,
+        lineId: String = "",
         category: String = "general"
     ): Result<Unit>
     suspend fun getReportes(query: String = ""): Result<List<Reporte>>

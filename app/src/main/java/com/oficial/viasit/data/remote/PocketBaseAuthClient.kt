@@ -45,7 +45,7 @@ class PocketBaseAuthClient {
         val passwordConfirm: String,
         val name: String,
         val phone: String,
-        val role: List<String>,
+        val role: String,
         @SerialName("lineId")
         val lineaId: String? = null,
         val active: Boolean = true
@@ -106,7 +106,7 @@ class PocketBaseAuthClient {
                     passwordConfirm = passwordConfirm,
                     name = name,
                     phone = phone,
-                    role = listOf(role),
+                    role = role,
                     lineaId = lineaId.ifEmpty { null }
                 )
                 val body = json.encodeToString(reqObj).toRequestBody("application/json".toMediaType())
@@ -174,7 +174,7 @@ data class UserResponse(
     val name: String = "",
     val username: String = "",
     val phone: String = "",
-    val role: List<String> = listOf("usuario"),
+    val role: String = "usuario",
     @SerialName("lineId")
     val lineaId: String? = null,
     val active: Boolean = true,

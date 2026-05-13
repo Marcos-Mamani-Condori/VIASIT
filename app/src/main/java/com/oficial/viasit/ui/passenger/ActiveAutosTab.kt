@@ -53,7 +53,7 @@ fun ActiveAutosTab(
     val destinoIds    = destinoLineas.map { it.id }.toSet()
 
     // BLOQUEO ESTRICTO: Solo 'usuario' o 'pasajero' pueden reportar. Invitados NO.
-    val userRoleStr = currentUser.role.firstOrNull() ?: ""
+    val userRoleStr = currentUser.role
     val puedeReportar = (userRoleStr.equals("usuario", ignoreCase = true) || userRoleStr.equals("pasajero", ignoreCase = true)) && !currentUser.isGuest
 
     var query by remember { mutableStateOf("") }
@@ -480,7 +480,7 @@ fun ActiveAutosTab(
                             if (reportText.isNotBlank() && auto != null) {
                                 isLoading = true
                                 val finalMsg = "[Unidad: ${auto.placa}] $reportText"
-                                autosViewModel.submitReporte(finalMsg, currentUser.id, currentUser.name, auto.userId, auto.driverName) { success ->
+                                autosViewModel.submitReporte(finalMsg, currentUser.id, currentUser.name, auto.userId, auto.driverName, auto.lineaId) { success ->
                                     isLoading = false
                                     if (success) enviado = true
                                 }
