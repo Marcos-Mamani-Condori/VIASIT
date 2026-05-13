@@ -25,7 +25,8 @@ class AuthViewModel(
     private val setDriverInServiceUseCase: SetDriverInServiceUseCase,
     private val getAuthStateUseCase: GetAuthStateUseCase,
     private val getIsInServiceUseCase: GetIsInServiceUseCase,
-    private val restoreSessionUseCase: RestoreSessionUseCase
+    private val restoreSessionUseCase: RestoreSessionUseCase,
+    private val createAppealUseCase: CreateAppealUseCase
 ) : ViewModel() {
 
     val authState: StateFlow<AuthState> = getAuthStateUseCase()
@@ -59,8 +60,28 @@ class AuthViewModel(
             val result = loginUseCase(form.email, form.password)
             result.fold(
                 onSuccess = { _loginForm.update { it.copy(isLoading = false, isSuccess = true) } },
-                onFailure = { e -> _loginForm.update { it.copy(isLoading = false, error = e.message) } }
+                onFailure = { e -> 
+                    val errorMsg = if (e.message == "Cuenta inactiva") "Tu cuenta está suspendida. Puedes enviar una apelación." else e.message
+                    _loginForm.update { it.copy(isLoading = false, error = errorMsg) }
+                }
             )
+        }
+    }
+
+    fun submitAppeal(reason: String) {
+        val state = authState.value
+        if (state is AuthState.Suspended) {
+            _loginForm.update { it.copy(isLoading = true) }
+            viewModelScope.launch {
+                createAppealUseCase(state.user.id, state.user.name, reason, state.user.lineaId).fold(
+                    onSuccess = { 
+                        _loginForm.update { it.copy(isLoading = false, successMessage = "Apelación enviada correctamente") }
+                    },
+                    onFailure = { e -> 
+                        _loginForm.update { it.copy(isLoading = false, error = e.message) }
+                    }
+                )
+            }
         }
     }
 
@@ -110,7 +131,8 @@ class AuthViewModel(
                     setDriverInServiceUseCase = app.setDriverInServiceUseCase,
                     getAuthStateUseCase = app.getAuthStateUseCase,
                     getIsInServiceUseCase = app.getIsInServiceUseCase,
-                    restoreSessionUseCase = app.restoreSessionUseCase
+                    restoreSessionUseCase = app.restoreSessionUseCase,
+                    createAppealUseCase = app.createAppealUseCase
                 )
             }
         }

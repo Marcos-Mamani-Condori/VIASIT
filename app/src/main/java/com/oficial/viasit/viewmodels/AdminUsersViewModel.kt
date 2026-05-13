@@ -32,16 +32,27 @@ internal class AdminUsersHandler(
         }
     }
 
-    fun setUserActiveStatus(userId: String, active: Boolean, currentUserId: String, adminName: String, state: MutableStateFlow<AdminUiState>, onLog: (String, String, String) -> Unit) {
+    fun setUserActiveStatus(userId: String, userName: String, active: Boolean, currentUserId: String, adminName: String, state: MutableStateFlow<AdminUiState>, onLog: (String, String, String) -> Unit) {
         scope.launch {
-            state.value = state.value.copy(isLoading = true, error = null)
+            // Actualización optimista
+            val oldUsers = state.value.users
+            val updatedUsers = oldUsers.map { 
+                if (it.id == userId) it.copy(active = active) else it 
+            }
+            state.value = state.value.copy(users = updatedUsers, error = null)
+
             setUserActiveStatusUseCase(userId, active).fold(
                 onSuccess = {
                     val action = if (active) "reactivado" else "suspendido"
-                    state.value = state.value.copy(isLoading = false, successMessage = "Usuario $action correctamente")
-                    onLog(currentUserId, adminName, "Cambió estado de usuario $userId a active=$active")
+                    state.value = state.value.copy(
+                        successMessage = "Usuario $action correctamente"
+                    )
+                    onLog(currentUserId, adminName, "${if(active) "Reactivó" else "Suspendió"} a usuario: $userName")
                 },
-                onFailure = { error -> state.value = state.value.copy(isLoading = false, error = error.message ?: "Error al cambiar estado") }
+                onFailure = { error -> 
+                    // Revertir si falla
+                    state.value = state.value.copy(users = oldUsers, error = error.message ?: "Error al cambiar estado")
+                }
             )
         }
     }
@@ -66,30 +77,49 @@ internal class AdminUsersHandler(
         }
     }
 
-    fun resolveAppeal(appealId: String, userId: String, accept: Boolean, currentUserId: String, adminName: String, state: MutableStateFlow<AdminUiState>, onLog: (String, String, String) -> Unit) {
+    fun resolveAppeal(appealId: String, userId: String, userName: String, accept: Boolean, currentUserId: String, adminName: String, state: MutableStateFlow<AdminUiState>, onLog: (String, String, String) -> Unit) {
         scope.launch {
-            state.value = state.value.copy(isLoading = true, error = null)
+            // Actualización optimista: quitar de la lista de pendientes
+            val oldAppeals = state.value.appeals
+            val updatedAppeals = oldAppeals.filter { it.id != appealId }
+            state.value = state.value.copy(appeals = updatedAppeals, error = null)
+
             resolveAppealUseCase(appealId, userId, accept).fold(
                 onSuccess = {
-                    state.value = state.value.copy(isLoading = false, successMessage = "Apelación resuelta")
-                    onLog(currentUserId, adminName, "Resolvió apelación $appealId para usuario $userId (aceptada: $accept)")
-                    loadAppeals(state)
+                    val action = if (accept) "Aceptó" else "Rechazó"
+                    state.value = state.value.copy(successMessage = "Apelación resuelta")
+                    onLog(currentUserId, adminName, "$action apelación de: $userName")
                 },
-                onFailure = { error -> state.value = state.value.copy(isLoading = false, error = error.message ?: "Error al resolver apelación") }
+                onFailure = { error -> 
+                    // Revertir
+                    state.value = state.value.copy(appeals = oldAppeals, error = error.message ?: "Error al resolver apelación")
+                }
             )
         }
     }
 
     fun responderReporte(reporteId: String, respuesta: String, currentUserId: String, adminName: String, state: MutableStateFlow<AdminUiState>, onLog: (String, String, String) -> Unit) {
         scope.launch {
-            state.value = state.value.copy(isLoading = true, error = null)
+            // Actualización optimista
+            val oldReportes = state.value.reportes
+            val reporte = oldReportes.find { it.id == reporteId }
+            val targetName = reporte?.driverName ?: "desconocido"
+            val targetId = reporte?.targetUserId ?: ""
+            
+            val updatedReportes = oldReportes.map {
+                if (it.id == reporteId) it.copy(status = "resuelto", adminResponse = respuesta) else it
+            }
+            state.value = state.value.copy(reportes = updatedReportes, error = null)
+
             responderReporteUseCase(reporteId, respuesta).fold(
                 onSuccess = {
-                    state.value = state.value.copy(isLoading = false, successMessage = "Reporte respondido")
-                    onLog(currentUserId, adminName, "Respondió reporte $reporteId")
-                    loadAllReportes(state)
+                    state.value = state.value.copy(successMessage = "Reporte respondido")
+                    onLog(currentUserId, adminName, "Resolvió reporte contra: $targetName (ID: $targetId)")
                 },
-                onFailure = { error -> state.value = state.value.copy(isLoading = false, error = error.message ?: "Error al responder reporte") }
+                onFailure = { error -> 
+                    // Revertir
+                    state.value = state.value.copy(reportes = oldReportes, error = error.message ?: "Error al responder reporte")
+                }
             )
         }
     }

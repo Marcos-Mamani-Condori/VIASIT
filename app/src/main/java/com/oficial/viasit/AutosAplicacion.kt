@@ -86,6 +86,7 @@ class AutosAplicacion : Application() {
     // UseCases de Admin - Extra (Appeals & All Reports)
     val getAppealsUseCase by lazy { GetAppealsUseCase(adminRepository) }
     val resolveAppealUseCase by lazy { ResolveAppealUseCase(adminRepository) }
+    val createAppealUseCase by lazy { CreateAppealUseCase(adminRepository) }
     val getAllReportesUseCase by lazy { GetAllReportesUseCase(reportesRepository) }
 
     // UseCases de Pasajero

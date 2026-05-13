@@ -24,6 +24,9 @@ data class Reporte(
     @SerialName("userid")
     val userid: String = "", // ID del Conductor
 
+    @SerialName("userId")
+    val userIdAlternative: String = "", // Fallback por si en DB es userId
+
     @SerialName("lineId")
     val lineId: String = "",
 
@@ -42,6 +45,19 @@ data class Reporte(
     @SerialName("expand")
     val expand: JsonObject? = null
 ) {
+    /**
+     * Devuelve el ID del conductor reportado intentando todas las posibles variantes de campo
+     * que PocketBase podría devolver.
+     */
+    val targetUserId: String
+        get() = userid.ifBlank { userIdAlternative }.ifBlank {
+            try {
+                // Intentamos sacar el ID del expand si los campos directos están vacíos
+                val driverExpand = expand?.get("userid")?.jsonObject
+                driverExpand?.get("id")?.jsonPrimitive?.content ?: ""
+            } catch (e: Exception) { "" }
+        }
+
     val driverName: String
         get() {
             val nameFromExpand = getNameFromExpand("userid")

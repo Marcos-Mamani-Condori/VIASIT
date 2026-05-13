@@ -1,5 +1,6 @@
 package com.oficial.viasit.ui.admin.principal
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -9,9 +10,10 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Gavel
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -22,7 +24,7 @@ import com.oficial.viasit.ui.theme.*
 fun ApelacionesTabContent(
     appeals: List<LogEntry>,
     isLoading: Boolean,
-    onResolve: (String, String, Boolean) -> Unit
+    onResolve: (String, String, String, Boolean) -> Unit
 ) {
     if (isLoading) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -39,7 +41,9 @@ fun ApelacionesTabContent(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             items(appeals) { appeal ->
-                AppealItem(appeal = appeal, onResolve = onResolve)
+                AppealItem(appeal = appeal, onResolve = { id, userId, accept -> 
+                    onResolve(id, userId, appeal.userName, accept) 
+                })
             }
         }
     }
@@ -47,6 +51,8 @@ fun ApelacionesTabContent(
 
 @Composable
 fun AppealItem(appeal: LogEntry, onResolve: (String, String, Boolean) -> Unit) {
+    var resolutionState by remember { mutableStateOf<Boolean?>(null) }
+
     Card(
         colors = CardDefaults.cardColors(containerColor = Slate900),
         shape = RoundedCornerShape(16.dp),
@@ -78,31 +84,60 @@ fun AppealItem(appeal: LogEntry, onResolve: (String, String, Boolean) -> Unit) {
             HorizontalDivider(color = Slate800, modifier = Modifier.padding(vertical = 4.dp))
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    "ID Usuario: ${appeal.userId}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Slate400,
-                    modifier = Modifier.weight(1f)
-                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Usuario: ${appeal.userName}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        "ID: ${appeal.userId}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Slate500
+                    )
+                }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilledTonalIconButton(
-                        onClick = { onResolve(appeal.id, appeal.userId, false) },
-                        colors = IconButtonDefaults.filledTonalIconButtonColors(
-                            containerColor = Rose500.copy(0.1f),
-                            contentColor = Rose500
-                        )
-                    ) {
-                        Icon(Icons.Default.Close, "Rechazar")
+                if (resolutionState == null) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilledTonalIconButton(
+                            onClick = { 
+                                resolutionState = false
+                                onResolve(appeal.id, appeal.userId, false) 
+                            },
+                            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                containerColor = Rose500.copy(0.1f),
+                                contentColor = Rose500
+                            )
+                        ) {
+                            Icon(Icons.Default.Close, "Rechazar")
+                        }
+                        FilledTonalIconButton(
+                            onClick = { 
+                                resolutionState = true
+                                onResolve(appeal.id, appeal.userId, true) 
+                            },
+                            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                containerColor = Emerald400.copy(0.1f),
+                                contentColor = Emerald400
+                            )
+                        ) {
+                            Icon(Icons.Default.Check, "Aceptar")
+                        }
                     }
-                    FilledTonalIconButton(
-                        onClick = { onResolve(appeal.id, appeal.userId, true) },
-                        colors = IconButtonDefaults.filledTonalIconButtonColors(
-                            containerColor = Emerald400.copy(0.1f),
-                            contentColor = Emerald400
-                        )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (resolutionState == true) Emerald400.copy(0.1f) else Rose500.copy(0.1f))
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
                     ) {
-                        Icon(Icons.Default.Check, "Aceptar")
+                        Text(
+                            text = if (resolutionState == true) "ACEPTADA" else "RECHAZADA",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = if (resolutionState == true) Emerald400 else Rose500,
+                            fontWeight = FontWeight.Black
+                        )
                     }
                 }
             }

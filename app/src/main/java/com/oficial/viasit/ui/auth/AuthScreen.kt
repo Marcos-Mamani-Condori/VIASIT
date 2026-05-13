@@ -116,12 +116,15 @@ fun AuthScreen(
                         email = loginFormState.email, password = loginFormState.password,
                         emailError = loginFormState.emailError, passwordError = loginFormState.passwordError,
                         isLoading = loginFormState.isLoading, error = loginFormState.error,
+                        successMessage = loginFormState.successMessage,
+                        isSuspended = authState is AuthState.Suspended,
                         onEmailChange    = viewModel::updateLoginEmail,
                         onPasswordChange = viewModel::updateLoginPassword,
                         onLoginClick     = viewModel::login,
                         onShowRegister   = { showRegister = true },
                         onGuestClick     = viewModel::enterAsGuest,
-                        onRegisterAdmin  = onRegisterAdmin
+                        onRegisterAdmin  = onRegisterAdmin,
+                        onSubmitAppeal   = viewModel::submitAppeal
                     )
                 }
             }

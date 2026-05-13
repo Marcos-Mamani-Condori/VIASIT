@@ -28,14 +28,50 @@ fun LoginForm(
     passwordError: String?,
     isLoading: Boolean,
     error: String?,
+    successMessage: String? = null,
+    isSuspended: Boolean = false,
     onEmailChange: (String) -> Unit,
     onPasswordChange: (String) -> Unit,
     onLoginClick: () -> Unit,
     onShowRegister: () -> Unit,
     onGuestClick: () -> Unit,
-    onRegisterAdmin: () -> Unit = {}
+    onRegisterAdmin: () -> Unit = {},
+    onSubmitAppeal: (String) -> Unit = {}
 ) {
     var passwordVisible by remember { mutableStateOf(false) }
+    var showAppealDialog by remember { mutableStateOf(false) }
+    var appealReason by remember { mutableStateOf("") }
+
+    if (showAppealDialog) {
+        AlertDialog(
+            onDismissRequest = { showAppealDialog = false },
+            title = { Text("Enviar Apelación") },
+            text = {
+                Column {
+                    Text("Explica por qué deberíamos reactivar tu cuenta:", style = MaterialTheme.typography.bodySmall, color = Slate400)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    ViasitTextField(
+                        value = appealReason,
+                        onValueChange = { appealReason = it },
+                        label = "Motivo",
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onSubmitAppeal(appealReason)
+                        showAppealDialog = false
+                    },
+                    enabled = appealReason.isNotBlank()
+                ) { Text("Enviar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAppealDialog = false }) { Text("Cancelar") }
+            }
+        )
+    }
 
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text("Bienvenido", style = MaterialTheme.typography.headlineMedium, color = Color.White)
@@ -44,6 +80,27 @@ fun LoginForm(
         Spacer(modifier = Modifier.height(4.dp))
 
         error?.let { ErrorCard(it) }
+        successMessage?.let { 
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = Brand500.copy(alpha = 0.1f)),
+                border = BorderStroke(1.dp, Brand500.copy(alpha = 0.5f))
+            ) {
+                Text(it, color = Brand400, modifier = Modifier.padding(12.dp), style = MaterialTheme.typography.bodySmall)
+            }
+        }
+
+        if (isSuspended) {
+            Button(
+                onClick = { showAppealDialog = true },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE11D48)) // Rose 600
+            ) {
+                Icon(Icons.Default.Gavel, null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Apelar Suspensión")
+            }
+        }
 
         ViasitTextField(
             value = email, onValueChange = onEmailChange, label = "Correo electrónico",

@@ -57,15 +57,15 @@ internal class LineasHandler(
     }
 
     fun deleteLinea(
-        lineaId: String, currentUserId: String = "", adminName: String = "",
+        lineaId: String, name: String, currentUserId: String = "", adminName: String = "",
         state: MutableStateFlow<AdminUiState>, onLog: (String, String, String) -> Unit
     ) {
         scope.launch {
             state.value = state.value.copy(isLoading = true, error = null)
             deleteLineaUseCase(lineaId).fold(
                 onSuccess = {
-                    state.value = state.value.copy(isLoading = false, successMessage = "Línea eliminada")
-                    if (currentUserId.isNotEmpty()) onLog(currentUserId, adminName, "Eliminó línea: $lineaId")
+                    state.value = state.value.copy(isLoading = false, successMessage = "Línea eliminada: $name")
+                    if (currentUserId.isNotEmpty()) onLog(currentUserId, adminName, "Eliminó línea: $name")
                     loadLineas(state)
                 },
                 onFailure = { state.value = state.value.copy(isLoading = false, error = it.message ?: "Error al eliminar línea") }

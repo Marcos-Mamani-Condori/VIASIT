@@ -82,6 +82,29 @@ fun AdminDashboardScreen(
         logsViewModel.loadLogs()
     }
 
+    // Refresco automático al cambiar de pestaña
+    LaunchedEffect(selectedTab) {
+        if (currentUser.isAdminPrincipal) {
+            when (selectedTab) {
+                1 -> viewModel.loadUsers("", true)
+                2 -> viewModel.loadLineas()
+                3 -> viewModel.loadRutas()
+                4 -> viewModel.loadAllReportes()
+                5 -> viewModel.loadAppeals()
+                6 -> viewModel.loadInvitationCodes()
+                7 -> logsViewModel.loadLogs()
+            }
+        } else {
+            when (selectedTab) {
+                1 -> { viewModel.loadLineas(); viewModel.loadRutas() }
+                2 -> viewModel.loadUsers(currentUser.lineaId, false)
+                3 -> viewModel.loadVehicleInvitationCodes(currentUser.lineaId)
+                4 -> viewModel.loadAllReportes()
+                5 -> logsViewModel.loadLogs()
+            }
+        }
+    }
+
     val uiState by viewModel.uiState.collectAsState()
     val autos by viewModel.autosUiState.collectAsState(initial = emptyList())
 
@@ -131,8 +154,8 @@ fun AdminDashboardScreen(
                             users = uiState.users,
                             autos = autos,
                             isLoading = uiState.isLoading,
-                            onToggleActive = { targetUserId, active ->
-                                viewModel.setUserActiveStatus(targetUserId, active, currentUser.id, currentUser.name)
+                            onToggleActive = { targetUserId, targetUserName, active ->
+                                viewModel.setUserActiveStatus(targetUserId, targetUserName, active, currentUser.id, currentUser.name)
                             },
                             onShowLocation = { lat, lng ->
                                 passengerViewModel.onShowLocation(lat, lng)
@@ -143,7 +166,7 @@ fun AdminDashboardScreen(
                         2 -> LineasTabContent(
                             lineas        = uiState.lineas, isLoading = uiState.isLoading,
                             onCreateLinea = { n, c, r -> viewModel.createLinea(n, c, r, currentUser.id, currentUser.name) },
-                            onDeleteLinea = { viewModel.deleteLinea(it, currentUser.id, currentUser.name) }
+                            onDeleteLinea = { id, name -> viewModel.deleteLinea(id, name, currentUser.id, currentUser.name) }
                         )
                         3 -> RutasTabContent(
                             rutas     = uiState.rutas,
@@ -156,13 +179,16 @@ fun AdminDashboardScreen(
                         4 -> ReportesTabContent(
                             reportes = uiState.reportes, 
                             isLoading = uiState.isLoading,
-                            onResponder = { id, resp -> viewModel.responderReporte(id, resp, currentUser.id, currentUser.name) }
+                            onResponder = { id, resp -> viewModel.responderReporte(id, resp, currentUser.id, currentUser.name) },
+                            onSuspendUser = { targetUserId, targetUserName ->
+                                viewModel.setUserActiveStatus(targetUserId, targetUserName, false, currentUser.id, currentUser.name)
+                            }
                         )
                         5 -> ApelacionesTabContent(
                             appeals = uiState.appeals,
                             isLoading = uiState.isLoading,
-                            onResolve = { appealId, targetUserId, accept ->
-                                viewModel.resolveAppeal(appealId, targetUserId, accept, currentUser.id, currentUser.name)
+                            onResolve = { appealId, targetUserId, targetUserName, accept ->
+                                viewModel.resolveAppeal(appealId, targetUserId, targetUserName, accept, currentUser.id, currentUser.name)
                             }
                         )
                         6 -> InvitacionesTabContent(
@@ -219,8 +245,8 @@ fun AdminDashboardScreen(
                             users = uiState.users,
                             autos = autos,
                             isLoading = uiState.isLoading,
-                            onToggleActive = { targetUserId, active ->
-                                viewModel.setUserActiveStatus(targetUserId, active, currentUser.id, currentUser.name)
+                            onToggleActive = { targetUserId, targetUserName, active ->
+                                viewModel.setUserActiveStatus(targetUserId, targetUserName, active, currentUser.id, currentUser.name)
                             },
                             onShowLocation = { lat, lng ->
                                 passengerViewModel.onShowLocation(lat, lng)
@@ -228,7 +254,7 @@ fun AdminDashboardScreen(
                             }
                         )
                         3 -> {
-                            val vCodes = uiState.invitationCodes.filter { it.role == "DRIVER" }
+                            val vCodes = uiState.invitationCodes.filter { it.role == "conductor" }
                             com.oficial.viasit.ui.admin.linea.VehicleCodesTabContent(
                                 lineaId = currentUser.lineaId,
                                 vehicleCodes = vCodes,
@@ -253,7 +279,10 @@ fun AdminDashboardScreen(
                             ReportesTabContent(
                                 reportes = lineReportes,
                                 isLoading = uiState.isLoading,
-                                onResponder = { id, resp -> viewModel.responderReporte(id, resp, currentUser.id, currentUser.name) }
+                                onResponder = { id, resp -> viewModel.responderReporte(id, resp, currentUser.id, currentUser.name) },
+                                onSuspendUser = { targetUserId, targetUserName ->
+                                    viewModel.setUserActiveStatus(targetUserId, targetUserName, false, currentUser.id, currentUser.name)
+                                }
                             )
                         }
                         5 -> {

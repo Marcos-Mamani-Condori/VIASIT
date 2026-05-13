@@ -9,12 +9,21 @@ internal class LineasRepository(
     private val shared: AdminRepositoryShared
 ) : ILineasRepository {
     override suspend fun create(name: String, code: String, rutaId: String): Result<Linea> = try {
+        val token = shared.authToken()
+        
         val data = mutableMapOf<String, Any>("name" to name, "code" to code)
-        if (rutaId.isNotEmpty()) data["routeId"] = rutaId
-        client.createRecord("lines", data, shared.authToken()).map { json ->
-            Linea(id = extractStringField(json, "id"), name = name, code = code, rutaId = rutaId)
+        if (rutaId.isNotBlank() && rutaId.length >= 10) {
+            data["routeId"] = rutaId
         }
-    } catch (e: Exception) { Result.failure(e) }
+
+        client.createRecord("lines", data, token).map { json ->
+            val id = extractStringField(json, "id")
+            if (id.isEmpty()) throw Exception("Respuesta inválida del servidor")
+            Linea(id = id, name = name, code = code, rutaId = if (data.containsKey("routeId")) rutaId else "")
+        }
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
 
     override suspend fun getAll(): Result<List<Linea>> = try {
         client.getList("lines", perPage = 100, sort = "name", authToken = shared.authToken())

@@ -87,6 +87,7 @@ sealed class AuthState {
     data object Loading : AuthState()
     @SerialName("authenticated")
     data class Authenticated(val user: User) : AuthState()
+    data class Suspended(val user: User) : AuthState()
     data class Error(val message: String) : AuthState()
 }
 

@@ -40,7 +40,7 @@ class AuthRepository(context: Context) : IAuthRepository {
                 onSuccess = { user ->
                     android.util.Log.d("AuthRepository", "Login exitoso. User: ${user.name}, LineaId: ${user.lineaId}, Role: ${user.role}")
                     if (!user.active) {
-                        _authState.value = AuthState.Error("Tu cuenta ha sido deshabilitada por administración.")
+                        _authState.value = AuthState.Suspended(user)
                         Result.failure(Exception("Cuenta inactiva"))
                     } else {
                         saveUser(user, isGuest = false)

@@ -26,10 +26,10 @@ fun LineasTabContent(
     lineas: List<Linea>,
     isLoading: Boolean,
     onCreateLinea: (name: String, code: String, rutaId: String) -> Unit,
-    onDeleteLinea: (lineaId: String) -> Unit
+    onDeleteLinea: (lineaId: String, name: String) -> Unit
 ) {
     var showCreateDialog   by remember { mutableStateOf(false) }
-    var showDeleteDialogFor by remember { mutableStateOf<String?>(null) }
+    var showDeleteDialogFor by remember { mutableStateOf<Linea?>(null) }
 
     if (isLoading) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -61,12 +61,11 @@ fun LineasTabContent(
             item { EmptyState("No hay líneas creadas") }
         } else {
             items(lineas) { linea ->
-                LineaCard(linea = linea, onDelete = { showDeleteDialogFor = linea.id })
+                LineaCard(linea = linea, onDelete = { showDeleteDialogFor = linea })
             }
         }
     }
 
-    // ── Diálogo: crear línea ──────────────────────────────────────────────
     if (showCreateDialog) {
         var name   by remember { mutableStateOf("") }
         var code   by remember { mutableStateOf("") }
@@ -101,17 +100,15 @@ fun LineasTabContent(
         )
     }
 
-    // ── Diálogo: confirmar eliminación ───────────────────────────────────
-    showDeleteDialogFor?.let { lineaId ->
+    showDeleteDialogFor?.let { linea ->
         DeleteConfirmDialog(
-            title     = "Eliminar línea",
-            onConfirm = { onDeleteLinea(lineaId); showDeleteDialogFor = null },
+            title     = "Eliminar línea: ${linea.name}",
+            onConfirm = { onDeleteLinea(linea.id, linea.name); showDeleteDialogFor = null },
             onDismiss = { showDeleteDialogFor = null }
         )
     }
 }
 
-// ── Tarjeta de una línea ──────────────────────────────────────────────────────
 @Composable
 fun LineaCard(linea: Linea, onDelete: () -> Unit) {
     Row(

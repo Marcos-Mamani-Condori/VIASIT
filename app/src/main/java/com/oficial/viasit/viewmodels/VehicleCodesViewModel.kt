@@ -20,7 +20,7 @@ internal class VehicleCodesHandler(
     ) {
         scope.launch {
             state.value = state.value.copy(isLoading = true, error = null, generatedCode = null)
-            generateInvitationCodeUseCase("DRIVER", lineaId, expiresInHours, adminName).fold(
+            generateInvitationCodeUseCase("conductor", lineaId, expiresInHours, adminName).fold(
                 onSuccess = { code ->
                     state.value = state.value.copy(isLoading = false, generatedCode = code.code, successMessage = "Código de vehículo generado: ${code.code}")
                     if (currentUserId.isNotEmpty()) onLog(currentUserId, adminName, "Generó código de vehículo: ${code.code} (línea: $lineaId)")
@@ -36,7 +36,7 @@ internal class VehicleCodesHandler(
             state.value = state.value.copy(isLoading = true, error = null)
             getInvitationCodesUseCase().fold(
                 onSuccess = { codes -> 
-                    val filtered = codes.filter { it.lineaId == lineaId && it.role == "DRIVER" }
+                    val filtered = codes.filter { it.lineaId == lineaId && it.role == "conductor" }
                     state.value = state.value.copy(isLoading = false, invitationCodes = filtered) 
                 },
                 onFailure = { state.value = state.value.copy(isLoading = false, error = it.message ?: "Error al cargar códigos") }

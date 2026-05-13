@@ -95,7 +95,7 @@ class AdminViewModel(
     fun loadLineas()                                                               = lineasHandler.loadLineas(_uiState)
     fun createLinea(n: String, c: String, r: String, userId: String, adminName: String) = lineasHandler.createLinea(n, c, r, userId, adminName, _uiState, logAction)
     fun updateLinea(id: String, n: String, c: String, r: String, userId: String, adminName: String) = lineasHandler.updateLinea(id, n, c, r, userId, adminName, _uiState, logAction)
-    fun deleteLinea(id: String, userId: String, adminName: String)                 = lineasHandler.deleteLinea(id, userId, adminName, _uiState, logAction)
+    fun deleteLinea(id: String, name: String, userId: String, adminName: String)                 = lineasHandler.deleteLinea(id, name, userId, adminName, _uiState, logAction)
 
     fun loadInvitationCodes()                                                      = invitacionesHandler.loadInvitationCodes(_uiState)
     fun generateInvitationCode(role: String, lineaId: String, hours: Int = 24, userId: String = "", adminName: String = "") =
@@ -125,12 +125,12 @@ class AdminViewModel(
 
     // Admin Users, Reports & Appeals
     fun loadUsers(lineaId: String, isAdminPrincipal: Boolean = false) = usersHandler.loadUsers(lineaId, isAdminPrincipal, _uiState)
-    fun setUserActiveStatus(targetUserId: String, active: Boolean, adminId: String, adminName: String) = 
-        usersHandler.setUserActiveStatus(targetUserId, active, adminId, adminName, _uiState, logAction)
+    fun setUserActiveStatus(targetUserId: String, targetUserName: String, active: Boolean, adminId: String, adminName: String) = 
+        usersHandler.setUserActiveStatus(targetUserId, targetUserName, active, adminId, adminName, _uiState, logAction)
     fun loadAllReportes() = usersHandler.loadAllReportes(_uiState)
     fun loadAppeals() = usersHandler.loadAppeals(_uiState)
-    fun resolveAppeal(appealId: String, targetUserId: String, accept: Boolean, adminId: String, adminName: String) =
-        usersHandler.resolveAppeal(appealId, targetUserId, accept, adminId, adminName, _uiState, logAction)
+    fun resolveAppeal(appealId: String, targetUserId: String, targetUserName: String, accept: Boolean, adminId: String, adminName: String) =
+        usersHandler.resolveAppeal(appealId, targetUserId, targetUserName, accept, adminId, adminName, _uiState, logAction)
 
     fun responderReporte(reporteId: String, respuesta: String, adminId: String, adminName: String) =
         usersHandler.responderReporte(reporteId, respuesta, adminId, adminName, _uiState, logAction)
