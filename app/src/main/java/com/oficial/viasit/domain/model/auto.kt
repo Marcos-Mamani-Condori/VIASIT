@@ -123,7 +123,7 @@ data class Auto(
         lineObj?.get("id")?.jsonPrimitive?.content ?: ""
     } catch (e: Exception) { "" }
 
-    fun isActive(maxAgeMinutes: Int = 10): Boolean {
+    fun isActive(maxAgeMinutes: Int = 30): Boolean {
         return try {
             if (updated.isEmpty() || (lat == 0.0 && lng == 0.0)) return false
             val normalized = updated.replace(" ", "T")

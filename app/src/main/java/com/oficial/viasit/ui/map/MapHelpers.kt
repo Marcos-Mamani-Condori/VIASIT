@@ -24,43 +24,55 @@ import org.maplibre.geojson.Point
 import com.google.gson.JsonObject
 
 fun addCarIconToStyle(style: Style, context: android.content.Context) {
-    val drawable = ContextCompat.getDrawable(context, R.drawable.ic_car_icon)
-    if (drawable != null) {
-        val bitmap = android.graphics.Bitmap.createBitmap(
-            drawable.intrinsicWidth,
-            drawable.intrinsicHeight,
-            android.graphics.Bitmap.Config.ARGB_8888
-        )
+    val iconSizePx = 128 // Tamaño base para evitar pixelado
+
+    fun drawableToBitmap(drawableId: Int, tintColor: Int? = null): android.graphics.Bitmap? {
+        val drawable = ContextCompat.getDrawable(context, drawableId) ?: return null
+        val wrapped = if (tintColor != null) {
+            val d = androidx.core.graphics.drawable.DrawableCompat.wrap(drawable).mutate()
+            androidx.core.graphics.drawable.DrawableCompat.setTint(d, tintColor)
+            d
+        } else drawable
+
+        val bitmap = android.graphics.Bitmap.createBitmap(iconSizePx, iconSizePx, android.graphics.Bitmap.Config.ARGB_8888)
         val canvas = android.graphics.Canvas(bitmap)
-        drawable.setBounds(0, 0, canvas.width, canvas.height)
-        drawable.draw(canvas)
-        style.addImage("car-icon", bitmap)
+        wrapped.setBounds(0, 0, canvas.width, canvas.height)
+        wrapped.draw(canvas)
+        return bitmap
     }
+
+    // Tintamos AMBOS de verde para que todos los autos en el mapa se vean verdes
+    val verdeViasit = android.graphics.Color.parseColor("#10B981")
+    drawableToBitmap(R.drawable.ic_car_icon, verdeViasit)?.let { style.addImage("car-icon", it) }
+    drawableToBitmap(R.drawable.ic_car_icon, verdeViasit)?.let { style.addImage("car-icon-self", it) }
 }
 
 fun addCarsLayer(style: Style) {
     if (style.getSource("cars-source") == null) {
-        // Habilitamos clustering para evitar solapamientos
         style.addSource(
             GeoJsonSource("cars-source", 
                 org.maplibre.android.style.sources.GeoJsonOptions()
-                    .withCluster(true)
-                    .withClusterMaxZoom(14)
-                    .withClusterRadius(50)
+                    .withCluster(false) // Desactivado para ver todos los autos individuales siempre
             )
         )
     }
     
-    // Capa para vehículos individuales
     if (style.getLayer("cars-layer") == null) {
         val symbolLayer = SymbolLayer("cars-layer", "cars-source").withProperties(
-            PropertyFactory.iconImage("car-icon"),
-            PropertyFactory.iconSize(0.5f),
+            PropertyFactory.iconImage(
+                Expression.match(
+                    Expression.get("isSelf"),
+                    Expression.literal(true), Expression.literal("car-icon-self"),
+                    Expression.literal("car-icon")
+                )
+            ),
+            PropertyFactory.iconSize(0.7f), // Un poco más grande para visibilidad
             PropertyFactory.iconAllowOverlap(true),
             PropertyFactory.iconIgnorePlacement(true),
-            PropertyFactory.iconAnchor("center"),
-            PropertyFactory.iconRotate(Expression.get("angulo"))
-        ).withFilter(Expression.has("id")) // Solo si tiene ID (no es cluster)
+            PropertyFactory.iconRotationAlignment("map"),
+            PropertyFactory.iconRotate(Expression.get("angulo")),
+            PropertyFactory.iconPadding(0f)
+        )
         style.addLayer(symbolLayer)
     }
 
@@ -92,7 +104,7 @@ fun addCarsLayer(style: Style) {
     }
 }
 
-fun updateCarsSource(style: Style, autos: List<Auto>) {
+fun updateCarsSource(style: Style, autos: List<Auto>, currentUserId: String? = null) {
     val source = style.getSource("cars-source") as? GeoJsonSource ?: return
     val features = autos
         .filter { it.lat != 0.0 || it.lng != 0.0 }
@@ -103,6 +115,7 @@ fun updateCarsSource(style: Style, autos: List<Auto>) {
                 addProperty("lineaId", auto.lineaId)
                 addProperty("angulo", auto.angulo)
                 addProperty("userId", auto.userId)
+                addProperty("isSelf", auto.userId == currentUserId && !currentUserId.isNullOrBlank())
             }
             Feature.fromGeometry(Point.fromLngLat(auto.lng, auto.lat), properties)
         }

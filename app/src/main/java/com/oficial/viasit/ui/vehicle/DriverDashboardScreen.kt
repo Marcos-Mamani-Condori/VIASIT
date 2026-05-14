@@ -200,7 +200,8 @@ fun DriverDashboardScreen(
                         reportesList = emptyList()
                         reportesLoading = true
                         showReportesDialog = true
-                        autosViewModel.fetchReportes(selectedVehicle.placa.ifBlank { selectedVehicle.id }) { lista ->
+                        // Buscamos por el ID de usuario del conductor para mayor precisión
+                        autosViewModel.fetchReportes(selectedVehicle.userId) { lista ->
                             reportesList = lista
                             reportesLoading = false
                         }
@@ -364,7 +365,7 @@ fun DriverDashboardScreen(
                                                                 autosViewModel.responderReporte(rep.id, replyText) { ok ->
                                                                     isReplying = false
                                                                     if (ok) {
-                                                                        autosViewModel.fetchReportes(selectedVehicle?.placa ?: "") { lista -> reportesList = lista }
+                                                                        autosViewModel.fetchReportes(selectedVehicle?.userId ?: "") { lista -> reportesList = lista }
                                                                     }
                                                                 }
                                                             }

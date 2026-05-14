@@ -51,10 +51,15 @@ class AutosViewModel(
                     if (auto.lat != 0.0 && auto.lng != 0.0) {
                         val list = currentTails[auto.id]?.toMutableList() ?: mutableListOf()
                         val lastPos = list.lastOrNull()
-                        // Solo agregamos si la posición cambió significativamente
-                        if (lastPos == null || lastPos.first != auto.lat || lastPos.second != auto.lng) {
+                        // Solo agregamos si la posición cambió significativamente (aprox 10-15 metros)
+                        val delta = 0.0001
+                        val moved = lastPos == null || 
+                                    kotlin.math.abs(lastPos.first - auto.lat) > delta || 
+                                    kotlin.math.abs(lastPos.second - auto.lng) > delta
+
+                        if (moved) {
                             list.add(auto.lat to auto.lng)
-                            if (list.size > 15) list.removeAt(0) // Límite de 15 puntos para no pesar
+                            if (list.size > 15) list.removeAt(0)
                             currentTails[auto.id] = list
                             changed = true
                         }

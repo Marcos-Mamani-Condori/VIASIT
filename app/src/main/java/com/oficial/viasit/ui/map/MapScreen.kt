@@ -29,6 +29,15 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.oficial.viasit.domain.model.AuthState
 import com.oficial.viasit.domain.model.Auto
 import com.oficial.viasit.domain.model.UserRole
+import com.oficial.viasit.ui.map.addCarIconToStyle
+import com.oficial.viasit.ui.map.addCarsLayer
+import com.oficial.viasit.ui.map.addRoutesLayer
+import com.oficial.viasit.ui.map.clearRoutesSource
+import com.oficial.viasit.ui.map.updateCarsSource
+import com.oficial.viasit.ui.map.updateRoutesSource
+import com.oficial.viasit.ui.map.updateTailsSource
+import com.oficial.viasit.ui.map.enableLocationComponent
+import com.oficial.viasit.ui.map.centerOnUser
 import com.oficial.viasit.ui.routes.GeocodingService
 import com.oficial.viasit.ui.routes.SearchResult
 import com.oficial.viasit.viewmodels.AuthViewModel
@@ -54,6 +63,7 @@ fun MainMapScreen(
     val autosViewModel: AutosViewModel = viewModel(factory = AutosViewModel.Factory)
     val passengerViewModel: PassengerViewModel = viewModel(factory = PassengerViewModel.Factory)
     val autos        by autosViewModel.autosUiState.collectAsState()
+    val tails        by autosViewModel.tails.collectAsState()
     val authState    by authViewModel.authState.collectAsState()
     val rutas        by passengerViewModel.rutas.collectAsState()
     val lineas       by passengerViewModel.lineas.collectAsState()
@@ -63,6 +73,7 @@ fun MainMapScreen(
     var mapInstance  by remember { mutableStateOf<MapLibreMap?>(null) }
     var mapStyle     by remember { mutableStateOf<Style?>(null) }
     var selectedCar  by remember { mutableStateOf<Auto?>(null) }
+    var showTails    by remember { mutableStateOf(true) }
 
     val geocodingService                         = remember { GeocodingService() }
     var searchQuery  by remember { mutableStateOf("") }
@@ -75,8 +86,8 @@ fun MainMapScreen(
     val isDriver    = currentUser?.userRole == UserRole.conductor
     val isInService by authViewModel.isInService.collectAsState()
 
-    val myVehicle: Auto? = if (isDriver && isInService) {
-        autos.find { it.userId.contains(currentUser?.id ?: "") }
+    val myVehicle: Auto? = if (isDriver && isInService && !currentUser?.id.isNullOrBlank()) {
+        autos.find { it.userId == currentUser?.id }
     } else null
 
     val routePolylines: List<RoutePolyline> = remember(rutas, lineas, lineaId) {
@@ -103,8 +114,8 @@ fun MainMapScreen(
                     addCarIconToStyle(style, context)
                     addCarsLayer(style)
                     addRoutesLayer(style)
-                    val activeAutos = autos.filter { it.isActive() }
-                    updateCarsSource(style, activeAutos)
+                    val activeAutos = autos.filter { it.isActive() || it.userId == currentUser?.id }
+                    updateCarsSource(style, activeAutos, currentUser?.id)
                     enableLocationComponent(style, map, context)
                     mapStyle = style
                 }
@@ -137,8 +148,18 @@ fun MainMapScreen(
     }
 
     LaunchedEffect(autos, mapStyle) {
-        val activeAutos = autos.filter { it.isActive() }
-        mapStyle?.let { style -> updateCarsSource(style, activeAutos) }
+        val activeAutos = autos.filter { it.isActive() || it.userId == currentUser?.id }
+        mapStyle?.let { style -> updateCarsSource(style, activeAutos, currentUser?.id) }
+    }
+
+    LaunchedEffect(tails, mapStyle, showTails) {
+        mapStyle?.let { style ->
+            if (showTails) {
+                updateTailsSource(style, tails)
+            } else {
+                updateTailsSource(style, emptyMap())
+            }
+        }
     }
 
     LaunchedEffect(routePolylines, mapStyle) {
@@ -351,6 +372,22 @@ fun MainMapScreen(
             shape = CircleShape
         ) {
             Icon(Icons.Default.LocationOn, contentDescription = "Mi posición")
+        }
+
+        SmallFloatingActionButton(
+            onClick = { showTails = !showTails },
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = 280.dp, end = 20.dp),
+            containerColor = if (showTails) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+            contentColor = if (showTails) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary,
+            shape = CircleShape
+        ) {
+            Icon(
+                if (showTails) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                "Ver rastro",
+                modifier = Modifier.size(18.dp)
+            )
         }
 
         Box(

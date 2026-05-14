@@ -62,7 +62,8 @@ class ReportesRepository(
         val token = authRepository.getAuthToken()
         
         val filterQuery = if (query.isNotBlank()) {
-            if (query.length > 10) {
+            // Si parece un ID de PocketBase (aprox 15 caracteres) o si queremos buscar por texto
+            if (query.length >= 15) {
                 "userid = '$query' || description ~ '$query'"
             } else {
                 "description ~ '$query'"
