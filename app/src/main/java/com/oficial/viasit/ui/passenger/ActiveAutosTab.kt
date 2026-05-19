@@ -353,7 +353,9 @@ fun ActiveAutosTab(
                     reportesList = emptyList()
                     reportesLoading = true
                     showReportesDialog = true
-                    autosViewModel.fetchReportes(auto.placa.ifBlank { auto.id }) { lista ->
+                    // Usamos el ID del conductor para traer sus reportes personales, si no hay, usamos la placa
+                    val query = auto.userId.ifBlank { auto.placa.ifBlank { auto.id } }
+                    autosViewModel.fetchReportes(query) { lista ->
                         reportesList = lista
                         reportesLoading = false
                     }

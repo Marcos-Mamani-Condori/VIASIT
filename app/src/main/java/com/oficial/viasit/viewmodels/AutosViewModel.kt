@@ -150,9 +150,9 @@ class AutosViewModel(
         }
     }
 
-    fun fetchReportes(placa: String, callback: (List<Reporte>) -> Unit) {
+    fun fetchReportes(query: String, callback: (List<Reporte>) -> Unit) {
         viewModelScope.launch {
-            getReportesUseCase(placa).fold(
+            getReportesUseCase(query).fold(
                 onSuccess = { callback(it) },
                 onFailure = { callback(emptyList()) }
             )

@@ -138,9 +138,11 @@ fun PassengerMapScreen(
                         val feature = features[0]
                         val autoId = feature.getStringProperty("id") ?: ""
                         val placa = feature.getStringProperty("placa") ?: ""
+                        val driverId = feature.getStringProperty("userId") ?: ""
+                        
                         selectedVehicleIdForSheet = autoId
-                        if (placa.isNotEmpty()) {
-                            passengerViewModel.loadReportesForVehicle(placa)
+                        if (driverId.isNotEmpty()) {
+                            passengerViewModel.loadReportesForVehicle(placa, driverId)
                         }
                         showVehicleSheet = true
                         true
@@ -173,7 +175,10 @@ fun PassengerMapScreen(
         } else {
             activeAutos
         }
-        mapStyle?.let { style -> updateCarsSource(style, filteredAutos) }
+
+        mapStyle?.let { style -> 
+            updateCarsSource(style, filteredAutos, currentUser?.id) 
+        }
     }
 
     LaunchedEffect(tails, mapStyle, showTails) {

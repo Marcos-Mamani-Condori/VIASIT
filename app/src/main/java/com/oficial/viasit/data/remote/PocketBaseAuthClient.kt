@@ -2,6 +2,7 @@ package com.oficial.viasit.data.remote
 
 import com.oficial.viasit.BuildConfig
 import com.oficial.viasit.domain.model.User
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
@@ -27,6 +28,7 @@ class PocketBaseAuthClient {
     private val json = Json {
         ignoreUnknownKeys = true
         isLenient = true
+        encodeDefaults = true
     }
 
     private var authToken: String? = null
@@ -66,7 +68,11 @@ class PocketBaseAuthClient {
                 val response = okHttpclient.newCall(request).execute()
                 if (response.isSuccessful) {
                     val responseBody = response.body?.string() ?: ""
+                    android.util.Log.d("PocketBaseAuth", "Login response: $responseBody")
                     val authResponse = json.decodeFromString<AuthResponse>(responseBody)
+                    
+                    android.util.Log.d("PocketBaseAuth", "User active status: ${authResponse.user.active}")
+                    
                     authToken = authResponse.token
                     Result.success(authResponse.user.toDomain(authToken))
                 } else {
@@ -142,6 +148,9 @@ class PocketBaseAuthClient {
                 val response = okHttpclient.newCall(request).execute()
                 if (response.isSuccessful) {
                     val authResponse = json.decodeFromString<AuthResponse>(response.body?.string() ?: "")
+                    if (!authResponse.user.active) {
+                        return@withContext Result.failure(Exception("Cuenta inactiva"))
+                    }
                     Result.success(authResponse.user.toDomain(authToken))
                 } else {
                     Result.failure(Exception("Error al obtener usuario: ${response.code}"))
@@ -177,7 +186,7 @@ data class UserResponse(
     val role: String = "usuario",
     @SerialName("lineId")
     val lineaId: String? = null,
-    val active: Boolean = true,
+    val active: Boolean = false,
     val created: String = "",
     val updated: String = "",
     val expand: UserExpand? = null

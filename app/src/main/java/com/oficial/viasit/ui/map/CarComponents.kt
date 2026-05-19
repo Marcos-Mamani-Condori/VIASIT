@@ -1,9 +1,11 @@
 package com.oficial.viasit.ui.map
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Circle
@@ -21,34 +23,61 @@ import com.oficial.viasit.domain.model.Auto
 @Composable
 fun CarInfoCard(car: Auto, onClose: () -> Unit) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(8.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
+            containerColor = Color.Black,
+            contentColor = Color.White
         ),
-        shape = RoundedCornerShape(12.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+        shape = RoundedCornerShape(16.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(20.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = car.placa,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                IconButton(onClick = onClose) {
-                    Icon(Icons.Default.Close, contentDescription = "Cerrar")
+                Column {
+                    Text(
+                        text = car.lineName,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Color(0xFF10B981), // Verde vibrante para la línea
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = car.placa,
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.White
+                    )
+                }
+                IconButton(
+                    onClick = onClose,
+                    modifier = Modifier.background(Color.White.copy(alpha = 0.2f), CircleShape)
+                ) {
+                    Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = Color.White)
                 }
             }
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(text = "Placa: ${car.placa}", style = MaterialTheme.typography.bodyMedium)
-            Text(
-                text = "ID: ${car.id}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-            )
+            
+            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = Color.White.copy(alpha = 0.2f))
+            
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.DirectionsCar,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.7f),
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Conductor: ${car.driverName}",
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    color = Color.White
+                )
+            }
         }
     }
 }

@@ -52,9 +52,11 @@ class PassengerViewModel(
     private val _selectedVehicleReportes = MutableStateFlow<List<Reporte>>(emptyList())
     val selectedVehicleReportes: StateFlow<List<Reporte>> = _selectedVehicleReportes.asStateFlow()
 
-    fun loadReportesForVehicle(placa: String) {
+    fun loadReportesForVehicle(placa: String, driverId: String = "") {
         viewModelScope.launch {
-            getReportesUseCase(placa).onSuccess {
+            // Buscamos reportes que coincidan con la placa o con el ID del conductor para mayor precisión
+            val query = if (driverId.isNotBlank()) driverId else placa
+            getReportesUseCase(query).onSuccess {
                 _selectedVehicleReportes.value = it
             }.onFailure {
                 _selectedVehicleReportes.value = emptyList()
@@ -96,7 +98,7 @@ class PassengerViewModel(
                 category = "servicio"
             ).onSuccess {
                 _reportSuccess.value = true
-                loadReportesForVehicle(placa) // Recargar reportes
+                loadReportesForVehicle(placa, driverId) // Recargar reportes con ID
                 kotlinx.coroutines.delay(3000)
                 _reportSuccess.value = false
             }.onFailure {
