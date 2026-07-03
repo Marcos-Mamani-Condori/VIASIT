@@ -2,130 +2,117 @@
 """
 VIASIT - Demo Simulator
 =======================
-Simula el movimiento de minibuses en La Paz, Bolivia.
-No toca nada del código Android. Solo hace PATCH a los autos en PocketBase.
+Simula el movimiento de vehículos en La Paz, Bolivia.
+No toca nada del código Android. Solo hace PATCH a los vehículos en PocketBase.
 
-REQUISITO en PocketBase: Collection 'autos' → Update rule = (vacío)
+NUEVO: Utiliza la API pública de OSRM para seguir las calles reales de forma
+precisa e interpola los puntos para que el movimiento sea fluido y natural.
 
-Instrucciones:
-  1. Completa POCKETBASE_URL, AUTO_1_ID y AUTO_2_ID abajo
-  2. Corre:  python3 demo_simulator.py
-  3. Abre la app y ve al mapa
-  4. Ctrl+C para parar
-
-Requisitos:
-  pip install requests
+REQUISITO en PocketBase: Collection 'vehicles' → Update rule = (vacío)
 """
 
 import requests
 import time
 import math
 import sys
+import random
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  CONFIGURACIÓN — EDITA ESTOS VALORES
 # ─────────────────────────────────────────────────────────────────────────────
 
-POCKETBASE_URL = "http://127.0.0.1:8090"   # URL de tu PocketBase (misma red WiFi: usa IP del laptop)
-CONDUCTOR_EMAIL = "conductor1@demo.com"     # Email del conductor dueño del auto (usuario en PocketBase)
-CONDUCTOR_PASSWORD = "password123"          # Contraseña del conductor
-
-# IDs de los autos en tu colección 'autos' de PocketBase
-# Los encuentras en: PocketBase → Collections → autos → (click en el registro) → copia el ID
-AUTO_1_ID = "iaaef1fgrk9earz"
-AUTO_2_ID = "wd43t93pa36qwpl"
+POCKETBASE_URL = "http://127.0.0.1:8090"
 
 # Segundos entre cada movimiento (2 = tiempo real, 1 = más rápido para demo)
 INTERVALO_SEGUNDOS = 2
 
+# Cuántos vehículos simular como máximo
+MAX_VEHICULOS_SIMULADOS = 10
+
 # ─────────────────────────────────────────────────────────────────────────────
-#  RUTAS REALES DE LA PAZ, BOLIVIA
+#  WAYPOINTS (PUNTOS CLAVE DE LAS RUTAS)
+#  OSRM se encargará de encontrar las calles entre estos puntos
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Ruta 1: Micro 132 — Villa Fátima → Plaza del Estudiante
-# Recorre Av. Baptista → Av. Montes → El Prado
-RUTA_132 = [
+# Ruta 1: Micro 132 — Villa Fátima ↔ Plaza del Estudiante (Ida y Vuelta)
+WAYPOINTS_132_LOOP = [
     (-16.4785, -68.1275),   # Villa Fátima - inicio
-    (-16.4803, -68.1270),
-    (-16.4825, -68.1262),
     (-16.4852, -68.1255),
-    (-16.4878, -68.1248),   # Av. Baptista
-    (-16.4902, -68.1238),
     (-16.4921, -68.1228),
-    (-16.4940, -68.1218),
-    (-16.4958, -68.1210),   # cruce Av. Montes
-    (-16.4970, -68.1205),
     (-16.4982, -68.1202),
-    (-16.4990, -68.1198),
-    (-16.5003, -68.1193),   # Plaza del Estudiante - fin
-    # Vuelta (evitar teletransportación)
-    (-16.4990, -68.1198),
+    (-16.5003, -68.1193),   # Plaza del Estudiante - medio (retorno)
     (-16.4982, -68.1202),
-    (-16.4970, -68.1205),
-    (-16.4958, -68.1210),
-    (-16.4940, -68.1218),
     (-16.4921, -68.1228),
-    (-16.4902, -68.1238),
-    (-16.4878, -68.1248),
     (-16.4852, -68.1255),
-    (-16.4825, -68.1262),
-    (-16.4803, -68.1270),
+    (-16.4785, -68.1275),   # Fin de vuelta
 ]
 
-# Ruta 2: Minibus 2 — Max Paredes → Sopocachi
-# Recorre Av. Max Paredes → El Prado → Av. 6 de Agosto
-RUTA_2 = [
+# Ruta 2: Minibus 2 — Max Paredes ↔ Sopocachi (Ida y Vuelta)
+WAYPOINTS_2_LOOP = [
     (-16.4943, -68.1521),   # Max Paredes - inicio
-    (-16.4960, -68.1498),
-    (-16.4978, -68.1475),
-    (-16.4997, -68.1450),
-    (-16.5012, -68.1420),   # cruce hacia El Prado
-    (-16.5028, -68.1390),
-    (-16.5045, -68.1360),
-    (-16.5065, -68.1330),
-    (-16.5085, -68.1300),   # El Prado
-    (-16.5105, -68.1275),
-    (-16.5130, -68.1252),
-    (-16.5155, -68.1235),
-    (-16.5180, -68.1220),
-    (-16.5210, -68.1215),
-    (-16.5240, -68.1213),
-    (-16.5264, -68.1211),   # Sopocachi - fin
-    # Vuelta
-    (-16.5240, -68.1213),
-    (-16.5210, -68.1215),
-    (-16.5180, -68.1220),
-    (-16.5155, -68.1235),
-    (-16.5130, -68.1252),
-    (-16.5105, -68.1275),
-    (-16.5085, -68.1300),
-    (-16.5065, -68.1330),
-    (-16.5045, -68.1360),
-    (-16.5028, -68.1390),
     (-16.5012, -68.1420),
-    (-16.4997, -68.1450),
-    (-16.4978, -68.1475),
-    (-16.4960, -68.1498),
+    (-16.5085, -68.1300),   # El Prado
+    (-16.5155, -68.1235),
+    (-16.5264, -68.1211),   # Sopocachi - medio (retorno)
+    (-16.5155, -68.1235),
+    (-16.5085, -68.1300),
+    (-16.5012, -68.1420),
+    (-16.4943, -68.1521),   # Fin de vuelta
 ]
 
-# ─────────────────────────────────────────────────────────────────────────────
-#  CONFIGURACIÓN DE VEHÍCULOS DEMO
-#  Agrega o quita vehículos aquí. Asegúrate de que el usuario_email/password
-#  sea el conductor dueño del auto (para que PocketBase lo permita actualizar).
-# ─────────────────────────────────────────────────────────────────────────────
-
-VEHICULOS = [
-    {"id": AUTO_1_ID, "nombre": "Micro 132",  "ruta": RUTA_132, "offset": 0},
-    {"id": AUTO_2_ID, "nombre": "Minibus 2",  "ruta": RUTA_2,   "offset": 8},
-    # ← agrega más autos aquí
-]
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  LÓGICA INTERNA — No necesitas editar nada de aquí para abajo
+#  LÓGICA DE RUTAS (OSRM + INTERPOLACIÓN)
 # ─────────────────────────────────────────────────────────────────────────────
+
+def obtener_ruta_calles(waypoints):
+    """
+    Usa el servicio público de enrutamiento OSRM para obtener la geometría exacta
+    de las calles entre los waypoints dados.
+    """
+    coords = ";".join([f"{lng},{lat}" for lat, lng in waypoints])
+    url = f"http://router.project-osrm.org/route/v1/driving/{coords}?geometries=geojson&overview=full"
+
+    try:
+        r = requests.get(url, timeout=10)
+        if r.status_code == 200:
+            data = r.json()
+            if "routes" in data and len(data["routes"]) > 0:
+                # OSRM devuelve [lng, lat], convertimos a (lat, lng)
+                geojson_coords = data["routes"][0]["geometry"]["coordinates"]
+                return [(lat, lng) for lng, lat in geojson_coords]
+    except Exception as e:
+        print(f"⚠️ Error al conectar con OSRM para ruta: {e}")
+
+    print("⚠️ Usando waypoints originales como fallback (linea recta)")
+    return waypoints
+
+def interpolar_ruta(ruta, max_distancia_grados=0.00015):
+    """
+    Rellena los espacios entre coordenadas para que el vehículo se mueva
+    suavemente. max_distancia_grados=0.00015 equivale a unos 16 metros.
+    Así, un salto de 2 segundos representa una velocidad realista de ~30 km/h.
+    """
+    ruta_interpolada = []
+    for i in range(len(ruta) - 1):
+        p1 = ruta[i]
+        p2 = ruta[i+1]
+
+        # Distancia entre puntos
+        dist = math.hypot(p2[0] - p1[0], p2[1] - p1[1])
+        pasos = max(1, int(dist / max_distancia_grados))
+
+        for j in range(pasos):
+            f = j / pasos
+            lat = p1[0] + (p2[0] - p1[0]) * f
+            lng = p1[1] + (p2[1] - p1[1]) * f
+            ruta_interpolada.append((lat, lng))
+
+    ruta_interpolada.append(ruta[-1])
+    return ruta_interpolada
 
 def calcular_angulo(lat1, lng1, lat2, lng2):
-    """Calcula el ángulo de movimiento entre dos coordenadas GPS (bearing)."""
+    """Calcula la orientación del vehículo."""
     dlng = math.radians(lng2 - lng1)
     lat1_r = math.radians(lat1)
     lat2_r = math.radians(lat2)
@@ -135,85 +122,94 @@ def calcular_angulo(lat1, lng1, lat2, lng2):
     return (angulo + 360) % 360
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+#  POCKETBASE Y SIMULACIÓN
+# ─────────────────────────────────────────────────────────────────────────────
+
 def mover_auto(auto_id, lat, lng, angulo):
-    """Hace PATCH al registro del auto con la nueva posición. Sin autenticación."""
-    url = f"{POCKETBASE_URL}/api/collections/autos/records/{auto_id}"
-    data = {"lat": lat, "lng": lng, "angulo": angulo}
+    url = f"{POCKETBASE_URL}/api/collections/vehicles/records/{auto_id}"
+    data = {"lat": lat, "lng": lng, "angle": angulo}
     try:
         resp = requests.patch(url, json=data, timeout=5)
         if resp.status_code == 200:
             return True
         else:
-            print(f"  ⚠️  PATCH falló [{resp.status_code}] para auto {auto_id}")
-            print(f"       Respuesta: {resp.text[:200]}")
-            if resp.status_code == 403:
-                print(f"       → Ve a PocketBase → Collections → autos → 🔒 API Rules → 'Update rule' → déjalo VACÍO")
-            elif resp.status_code == 404:
-                print(f"       → El ID '{auto_id}' no existe en la colección 'autos'")
             return False
-    except requests.exceptions.ConnectionError:
-        print(f"  ⚠️  No se puede conectar a {POCKETBASE_URL}")
-        print(f"       → Verifica que PocketBase esté corriendo")
-        return False
-    except requests.exceptions.RequestException as e:
-        print(f"  ⚠️  Error al mover auto {auto_id}: {e}")
+    except requests.exceptions.RequestException:
         return False
 
+def obtener_vehiculos():
+    try:
+        r = requests.get(f"{POCKETBASE_URL}/api/collections/vehicles/records?perPage={MAX_VEHICULOS_SIMULADOS}", timeout=5)
+        if r.status_code == 200:
+            return r.json().get("items", [])
+    except Exception:
+        pass
+    return []
 
 def main():
     print("=" * 50)
-    print("  VIASIT Demo Simulator — La Paz, Bolivia")
+    print("  VIASIT Demo Simulator — Modo Calles Reales")
     print("=" * 50)
 
-    ids_invalidos = [v for v in VEHICULOS if "REEMPLAZA" in v["id"]]
-    if ids_invalidos:
-        print("\n❌ ERROR: Reemplaza los IDs de los autos (AUTO_1_ID, AUTO_2_ID) al inicio del archivo\n")
-        sys.exit(1)
-
-    # ── Verificar conectividad con PocketBase ──────────────────────────────
-    print(f"\n🔍 Verificando conexión a {POCKETBASE_URL}...")
+    print(f"\n🔍 Verificando conexión a PocketBase ({POCKETBASE_URL})...")
     try:
         resp = requests.get(f"{POCKETBASE_URL}/api/health", timeout=5)
-        if resp.status_code == 200:
-            print("   ✅ PocketBase está corriendo")
-        else:
+        if resp.status_code != 200:
             print(f"   ⚠️  PocketBase respondió con código {resp.status_code}")
+        else:
+            print("   ✅ Conectado a PocketBase")
     except requests.exceptions.ConnectionError:
         print(f"   ❌ No se puede conectar a {POCKETBASE_URL}")
-        print(f"      → Asegúrate de que PocketBase esté corriendo")
-        print(f"      → Si usas WiFi, cambia POCKETBASE_URL a la IP de tu laptop (ej: http://192.168.1.X:8090)")
         sys.exit(1)
-    except requests.exceptions.RequestException as e:
-        print(f"   ⚠️  Error al verificar: {e}")
 
-    # ── Verificar que los IDs de autos existen ─────────────────────────────
-    print(f"\n🔍 Verificando IDs de autos...")
-    for v in VEHICULOS:
-        try:
-            r = requests.get(f"{POCKETBASE_URL}/api/collections/autos/records/{v['id']}", timeout=5)
-            if r.status_code == 200:
-                data = r.json()
-                print(f"   ✅ {v['nombre']}: placa={data.get('placa', '?')}, id={v['id']}")
-            elif r.status_code == 404:
-                print(f"   ❌ {v['nombre']}: ID '{v['id']}' NO EXISTE en PocketBase")
-                print(f"      → Ve a PocketBase → Collections → autos → copia el ID correcto")
-            elif r.status_code == 403:
-                print(f"   ⚠️  {v['nombre']}: Acceso denegado (ID puede existir pero List rule bloquea)")
-                print(f"      → Ve a PocketBase → Collections → autos → 🔒 API Rules → déjalas VACÍAS")
-            else:
-                print(f"   ⚠️  {v['nombre']}: Respuesta inesperada {r.status_code}")
-        except Exception:
-            pass
+    print("\n🗺️  Generando rutas siguiendo las calles (vía OSRM)...")
+    ruta_132_bruta = obtener_ruta_calles(WAYPOINTS_132_LOOP)
+    ruta_2_bruta = obtener_ruta_calles(WAYPOINTS_2_LOOP)
 
-    posiciones = [v["offset"] % len(v["ruta"]) for v in VEHICULOS]
+    print("✨ Interpolando puntos para movimiento suave...")
+    RUTA_132 = interpolar_ruta(ruta_132_bruta)
+    RUTA_2 = interpolar_ruta(ruta_2_bruta)
 
-    print(f"\n🚌 Iniciando simulación con {len(VEHICULOS)} vehículos...")
-    print(f"   Intervalo: {INTERVALO_SEGUNDOS} seg | Ctrl+C para parar\n")
+    print(f"   → Ruta 132: {len(RUTA_132)} puntos de alta resolución")
+    print(f"   → Ruta 2: {len(RUTA_2)} puntos de alta resolución")
+
+    RUTAS_DISPONIBLES = [RUTA_132, RUTA_2]
+
+    print("\n🔍 Obteniendo vehículos de la base de datos...")
+    vehiculos_db = obtener_vehiculos()
+    if not vehiculos_db:
+        print("❌ No se encontraron vehículos en la colección 'vehicles'.")
+        print("   Asegúrate de crear algunos en la app primero.")
+        sys.exit(1)
+
+    print(f"✅ Se encontraron {len(vehiculos_db)} vehículos.")
+
+    vehiculos_simulados = []
+    for idx, v in enumerate(vehiculos_db):
+        ruta_asignada = RUTAS_DISPONIBLES[idx % len(RUTAS_DISPONIBLES)]
+        # Asignar a diferentes partes de la ruta para que no salgan todos del mismo lugar
+        offset_inicial = int((len(ruta_asignada) / len(vehiculos_db)) * idx) % len(ruta_asignada)
+
+        vehiculos_simulados.append({
+            "id": v["id"],
+            "placa": v.get("plate", "Desconocida"),
+            "ruta": ruta_asignada,
+            "offset": offset_inicial
+        })
+        print(f"   🚌 {v.get('plate', 'Desconocida')} ({v['id']}) asignado a Ruta {idx % len(RUTAS_DISPONIBLES) + 1}")
+
+    posiciones = [v["offset"] for v in vehiculos_simulados]
+
+    print(f"\n🚀 Iniciando simulación...")
+    print(f"   Moviendo {len(vehiculos_simulados)} vehículos cada {INTERVALO_SEGUNDOS} seg")
+    print(f"   Presiona Ctrl+C para detener\n")
 
     iteracion = 0
     try:
         while True:
-            for i, vehiculo in enumerate(VEHICULOS):
+            exitos = 0
+            for i, vehiculo in enumerate(vehiculos_simulados):
                 ruta = vehiculo["ruta"]
                 idx_actual = posiciones[i]
                 idx_siguiente = (idx_actual + 1) % len(ruta)
@@ -222,20 +218,17 @@ def main():
                 lat_sig, lng_sig = ruta[idx_siguiente]
                 angulo = calcular_angulo(lat, lng, lat_sig, lng_sig)
 
-                ok = mover_auto(vehiculo["id"], lat, lng, angulo)
-                icono = "✅" if ok else "❌"
-                print(f"  {icono} [{vehiculo['nombre']}] lat={lat:.4f}, lng={lng:.4f}, angulo={angulo:.0f}°  (punto {idx_actual+1}/{len(ruta)})")
+                if mover_auto(vehiculo["id"], lat, lng, angulo):
+                    exitos += 1
 
                 posiciones[i] = idx_siguiente
 
             iteracion += 1
-            print(f"  — iteración {iteracion} — esperando {INTERVALO_SEGUNDOS}s...")
+            print(f"  [Iteración {iteracion}] {exitos}/{len(vehiculos_simulados)} vehículos actualizados correctamente. Esperando {INTERVALO_SEGUNDOS}s...", end="\r")
             time.sleep(INTERVALO_SEGUNDOS)
-            print()
 
     except KeyboardInterrupt:
         print("\n\n🛑 Simulación detenida.")
-
 
 if __name__ == "__main__":
     main()
