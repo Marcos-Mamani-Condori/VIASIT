@@ -100,15 +100,23 @@ class AdminRepository(
     override suspend fun deleteUser(userId: String): Result<Unit> =
         client.deleteRecord("users", userId, getAuthToken()).map { }
 
-    override suspend fun createAppeal(userId: String, name: String, reason: String, lineaId: String): Result<Unit> =
-        client.createRecord("appeals", mapOf(
+    override suspend fun createAppeal(userId: String, name: String, reason: String, lineaId: String): Result<Unit> {
+        android.util.Log.d("LLAMADOS", ">>> CREANDO APELACION: userId=$userId, name=$name")
+        val data = mapOf(
             "userId" to userId,
             "userName" to name,
             "reason" to reason,
             "lineId" to lineaId,
             "status" to "pending",
-            "active" to true // Marcamos como activa por defecto
-        ), null).map { }
+            "active" to true
+        )
+        return client.createRecord("appeals", data, null).map { 
+            android.util.Log.d("LLAMADOS", ">>> APELACION CREADA")
+            Unit
+        }.onFailure { e ->
+            android.util.Log.e("LLAMADOS", ">>> ERROR AL CREAR APELACION: ${e.message}")
+        }
+    }
 
     override suspend fun getAppeals(): Result<List<LogEntry>> = try {
         // Obtenemos todas las apelaciones recientes (pueden ser pendientes o ya resueltas para que el admin vea el cambio)

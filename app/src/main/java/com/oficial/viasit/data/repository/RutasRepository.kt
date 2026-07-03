@@ -13,15 +13,39 @@ internal class RutasRepository(
         startPoint: String, endPoint: String,
         lineaId: String, waypoints: String
     ): Result<Ruta> = try {
-        val data = mutableMapOf<String, Any>("name" to name, "description" to description)
+        android.util.Log.d("LLAMADOS", ">>> CREANDO RUTA: name=$name, line=$lineaId")
+        val data = mutableMapOf<String, Any>(
+            "name" to name, 
+            "description" to description
+        )
+        if (lineaId.isNotEmpty()) data["lineId"] = lineaId // Solo enviar si no está vacío
         if (startPoint.isNotEmpty()) data["startPoint"] = startPoint
         if (endPoint.isNotEmpty())   data["endPoint"]   = endPoint
         if (waypoints.isNotEmpty())  data["waypoints"]   = waypoints
-        client.createRecord("routes", data, shared.authToken()).map { json ->
-            Ruta(id = extractStringField(json, "id"), name = name,
-                description = description, startPoint = startPoint, endPoint = endPoint, waypoints = waypoints)
-        }
-    } catch (e: Exception) { Result.failure(e) }
+        
+        val result = client.createRecord("routes", data, shared.authToken())
+        
+        result.fold(
+            onSuccess = { json ->
+                android.util.Log.d("LLAMADOS", ">>> RUTA CREADA EXITOSAMENTE: $json")
+                Result.success(Ruta(
+                    id = extractStringField(json, "id"), 
+                    name = name,
+                    description = description, 
+                    startPoint = startPoint, 
+                    endPoint = endPoint, 
+                    waypoints = waypoints
+                ))
+            },
+            onFailure = { e ->
+                android.util.Log.e("LLAMADOS", ">>> ERROR AL CREAR RUTA: ${e.message}")
+                Result.failure(e)
+            }
+        )
+    } catch (e: Exception) { 
+        android.util.Log.e("LLAMADOS", ">>> EXCEPCION AL CREAR RUTA: ${e.message}")
+        Result.failure(e) 
+    }
 
     override suspend fun getById(rutaId: String): Result<Ruta> = try {
         client.getRecord("routes", rutaId, shared.authToken()).map { parseRutaFromJson(it) }

@@ -30,6 +30,7 @@ class PocketBaseHttpClient(private val okHttpClient: OkHttpClient) {
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
     private fun handleError(code: Int, body: String?): Result<Nothing> {
+        android.util.Log.e("LLAMADOS", ">>> ERROR SERVIDOR ($code): $body")
         if (body.isNullOrBlank()) return Result.failure(Exception("Error $code: No body"))
         return try {
             val errorJson = json.parseToJsonElement(body)

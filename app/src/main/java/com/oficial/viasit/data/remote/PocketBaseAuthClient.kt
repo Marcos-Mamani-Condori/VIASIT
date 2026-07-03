@@ -13,6 +13,28 @@ import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.concurrent.TimeUnit
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.*
+
+object SafeStringSerializer : KSerializer<String> {
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("SafeString", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: String) = encoder.encodeString(value)
+    override fun deserialize(decoder: Decoder): String {
+        val input = decoder as? JsonDecoder ?: return decoder.decodeString()
+        val element = input.decodeJsonElement()
+        return when (element) {
+            is JsonPrimitive -> element.content
+            is JsonObject -> element["id"]?.jsonPrimitive?.content ?: ""
+            is JsonArray -> if (element.isNotEmpty()) (element[0] as? JsonObject)?.get("id")?.jsonPrimitive?.content ?: "" else ""
+            else -> ""
+        }
+    }
+}
 
 class PocketBaseAuthClient {
     companion object {
@@ -184,6 +206,7 @@ data class UserResponse(
     val username: String = "",
     val phone: String = "",
     val role: String = "usuario",
+    @Serializable(with = SafeStringSerializer::class)
     @SerialName("lineId")
     val lineaId: String? = null,
     val active: Boolean = false,
