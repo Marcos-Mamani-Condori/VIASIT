@@ -165,8 +165,14 @@ fun AdminDashboardScreen(
                         )
                         2 -> LineasTabContent(
                             lineas        = uiState.lineas, isLoading = uiState.isLoading,
-                            onCreateLinea = { n, c, r -> viewModel.createLinea(n, c, r, currentUser.id, currentUser.name) },
-                            onDeleteLinea = { id, name -> viewModel.deleteLinea(id, name, currentUser.id, currentUser.name) }
+                            onCreateLinea = { n, c, r -> 
+                                viewModel.createLinea(n, c, r, currentUser.id, currentUser.name)
+                                passengerViewModel.loadLineas()
+                            },
+                            onDeleteLinea = { id, name -> 
+                                viewModel.deleteLinea(id, name, currentUser.id, currentUser.name)
+                                passengerViewModel.loadLineas()
+                            }
                         )
                         3 -> RutasTabContent(
                             rutas     = uiState.rutas,
@@ -174,6 +180,7 @@ fun AdminDashboardScreen(
                             isLoading = uiState.isLoading,
                             onDeleteRuta = { rutaId, rutaName, lineaId ->
                                 viewModel.deleteRuta(rutaId, rutaName, lineaId, currentUser.id, currentUser.name)
+                                passengerViewModel.loadLineas()
                             }
                         )
                         4 -> ReportesTabContent(
@@ -236,10 +243,14 @@ fun AdminDashboardScreen(
                             isLoading = uiState.isLoading,
                             userEmail = currentUser.email,
                             onCreateRuta = { name, desc, start, end, lineaId ->
-                                viewModel.createRuta(name, desc, start, end, lineaId, currentUser.id, currentUser.name)
+                                viewModel.createRuta(name, desc, start, end, lineaId, currentUser.id, currentUser.name, onSuccess = {
+                                    passengerViewModel.loadLineas()
+                                })
                             },
                             onAssignRuta = { rutaId, rutaName ->
-                                viewModel.assignRutaToLinea(currentUser.lineaId, rutaId, rutaName, currentUser.id, currentUser.name)
+                                viewModel.assignRutaToLinea(currentUser.lineaId, rutaId, rutaName, currentUser.id, currentUser.name, onSuccess = {
+                                    passengerViewModel.loadLineas()
+                                })
                             },
                             onNavigateToRoutePicker = onNavigateToRoutePicker
                         )

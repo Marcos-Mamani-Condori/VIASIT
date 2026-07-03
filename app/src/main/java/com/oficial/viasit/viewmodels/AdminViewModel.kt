@@ -106,15 +106,15 @@ class AdminViewModel(
     fun createLog(userId: String, userName: String, description: String)           = logsHandler.createLog(userId, userName, description)
 
     fun loadRutas() = rutasHandler.loadRutas(_uiState)
-    fun createRuta(n: String, d: String, s: String, e: String, lineaId: String, userId: String, adminName: String) =
-        rutasHandler.createRuta(n, d, s, e, lineaId, userId, adminName, _uiState, logAction)
+    fun createRuta(n: String, d: String, s: String, e: String, lineaId: String, userId: String, adminName: String, onSuccess: (() -> Unit)? = null) =
+        rutasHandler.createRuta(n, d, s, e, lineaId, userId, adminName, _uiState, logAction, onSuccess)
     fun createRutaWithCoords(n: String, d: String, sLat: Double, sLng: Double, eLat: Double, eLng: Double,
-                             lineaId: String, userId: String, adminName: String, waypoints: List<Pair<Double, Double>> = emptyList()) =
-        rutasHandler.createRutaWithCoords(n, d, sLat, sLng, eLat, eLng, lineaId, userId, adminName, waypoints, _uiState, logAction)
-    fun assignRutaToLinea(lineaId: String, rutaId: String, rutaName: String, userId: String, adminName: String) =
-        rutasHandler.assignRutaToLinea(lineaId, rutaId, rutaName, userId, adminName, _uiState, logAction)
-    fun deleteRuta(rutaId: String, rutaName: String, lineaId: String = "", userId: String, adminName: String) =
-        rutasHandler.deleteRuta(rutaId, rutaName, lineaId, userId, adminName, _uiState, logAction)
+                             lineaId: String, userId: String, adminName: String, waypoints: List<Pair<Double, Double>> = emptyList(), onSuccess: (() -> Unit)? = null) =
+        rutasHandler.createRutaWithCoords(n, d, sLat, sLng, eLat, eLng, lineaId, userId, adminName, waypoints, _uiState, logAction, onSuccess)
+    fun assignRutaToLinea(lineaId: String, rutaId: String, rutaName: String, userId: String, adminName: String, onSuccess: (() -> Unit)? = null) =
+        rutasHandler.assignRutaToLinea(lineaId, rutaId, rutaName, userId, adminName, _uiState, logAction, onSuccess)
+    fun deleteRuta(rutaId: String, rutaName: String, lineaId: String = "", userId: String, adminName: String, onSuccess: (() -> Unit)? = null) =
+        rutasHandler.deleteRuta(rutaId, rutaName, lineaId, userId, adminName, _uiState, logAction, onSuccess)
 
     fun loadVehicleInvitationCodes(lineaId: String)                               = vehicleCodesHandler.loadVehicleInvitationCodes(lineaId, _uiState)
     fun generateVehicleInvitationCode(lineaId: String, adminName: String, hours: Int = 72, userId: String = "") =

@@ -4,6 +4,7 @@ import com.oficial.viasit.domain.usecases.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 
 internal class RutasHandler(
     private val scope: CoroutineScope,
@@ -28,7 +29,9 @@ internal class RutasHandler(
         startLat: Double, startLng: Double, endLat: Double, endLng: Double,
         lineaId: String, currentUserId: String = "", adminName: String = "",
         waypoints: List<Pair<Double, Double>> = emptyList(),
-        state: MutableStateFlow<AdminUiState>, onLog: (String, String, String) -> Unit
+        state: MutableStateFlow<AdminUiState>, 
+        onLog: (String, String, String) -> Unit,
+        onSuccess: (() -> Unit)? = null
     ) {
         scope.launch {
             state.value = state.value.copy(isLoading = true, error = null)
@@ -38,20 +41,28 @@ internal class RutasHandler(
 
             createRutaUseCase(name, description, startPoint, endPoint, lineaId, waypointsStr).fold(
                 onSuccess = { ruta ->
-                    if (lineaId.isNotEmpty() && ruta.id.isNotEmpty())
-                        assignRutaToLineaUseCase(lineaId, ruta.id)
-                    
-                    val updatedLineas = getLineasUseCase().getOrElse { state.value.lineas }
-                    val updatedRutas  = getRutasUseCase().getOrElse  { state.value.rutas  }
-                    
-                    val wptInfo = if (waypoints.isNotEmpty()) " con ${waypoints.size} puntos de recorrido" else ""
-                    state.value = state.value.copy(
-                        isLoading = false,
-                        successMessage = "Ruta \"$name\" creada y asignada",
-                        lineas = updatedLineas, rutas = updatedRutas
-                    )
-                    if (currentUserId.isNotEmpty())
-                        onLog(currentUserId, adminName, "Creó y asignó ruta: $name ($startPoint → $endPoint)$wptInfo")
+                    scope.launch {
+                        if (lineaId.isNotEmpty() && ruta.id.isNotEmpty()) {
+                            // ESPERAMOS a que la asignación termine realmente
+                            assignRutaToLineaUseCase(lineaId, ruta.id)
+                            delay(500) // Pausa de seguridad para consistencia de DB
+                        }
+                        
+                        val updatedLineas = getLineasUseCase().getOrNull() ?: state.value.lineas
+                        val updatedRutas  = getRutasUseCase().getOrNull()  ?: state.value.rutas
+                        
+                        state.value = state.value.copy(
+                            isLoading = false,
+                            successMessage = "Ruta actualizada",
+                            lineas = updatedLineas, 
+                            rutas = updatedRutas
+                        )
+                        
+                        if (currentUserId.isNotEmpty())
+                            onLog(currentUserId, adminName, "Actualizó ruta de línea")
+                        
+                        onSuccess?.invoke()
+                    }
                 },
                 onFailure = { state.value = state.value.copy(isLoading = false, error = it.message ?: "Error al crear ruta") }
             )
@@ -62,21 +73,33 @@ internal class RutasHandler(
         name: String, description: String,
         startPoint: String = "", endPoint: String = "",
         lineaId: String = "", currentUserId: String = "", adminName: String = "",
-        state: MutableStateFlow<AdminUiState>, onLog: (String, String, String) -> Unit
+        state: MutableStateFlow<AdminUiState>, 
+        onLog: (String, String, String) -> Unit,
+        onSuccess: (() -> Unit)? = null
     ) {
         scope.launch {
             state.value = state.value.copy(isLoading = true, error = null)
             createRutaUseCase(name, description, startPoint, endPoint, lineaId).fold(
                 onSuccess = { ruta ->
-                    if (lineaId.isNotEmpty() && ruta.id.isNotEmpty())
-                        assignRutaToLineaUseCase(lineaId, ruta.id)
-                    
-                    val updatedLineas = getLineasUseCase().getOrElse { state.value.lineas }
-                    val updatedRutas  = getRutasUseCase().getOrElse  { state.value.rutas  }
-                    
-                    state.value = state.value.copy(isLoading = false, successMessage = "Ruta creada: $name",
-                        lineas = updatedLineas, rutas = updatedRutas)
-                    if (currentUserId.isNotEmpty()) onLog(currentUserId, adminName, "Creó ruta: $name")
+                    scope.launch {
+                        if (lineaId.isNotEmpty() && ruta.id.isNotEmpty()) {
+                            assignRutaToLineaUseCase(lineaId, ruta.id)
+                            delay(500)
+                        }
+                        
+                        val updatedLineas = getLineasUseCase().getOrNull() ?: state.value.lineas
+                        val updatedRutas  = getRutasUseCase().getOrNull()  ?: state.value.rutas
+                        
+                        state.value = state.value.copy(
+                            isLoading = false, 
+                            successMessage = "Ruta creada",
+                            lineas = updatedLineas, 
+                            rutas = updatedRutas
+                        )
+                        
+                        onSuccess?.invoke()
+                        if (currentUserId.isNotEmpty()) onLog(currentUserId, adminName, "Creó ruta")
+                    }
                 },
                 onFailure = { state.value = state.value.copy(isLoading = false, error = it.message ?: "Error al crear ruta") }
             )
@@ -85,19 +108,27 @@ internal class RutasHandler(
 
     fun assignRutaToLinea(
         lineaId: String, rutaId: String, rutaName: String,
-        currentUserId: String, adminName: String, state: MutableStateFlow<AdminUiState>, onLog: (String, String, String) -> Unit
+        currentUserId: String, adminName: String, 
+        state: MutableStateFlow<AdminUiState>, 
+        onLog: (String, String, String) -> Unit,
+        onSuccess: (() -> Unit)? = null
     ) {
         scope.launch {
             state.value = state.value.copy(isLoading = true, error = null)
             assignRutaToLineaUseCase(lineaId, rutaId).fold(
                 onSuccess = {
-                    val updatedLineas = getLineasUseCase().getOrElse { state.value.lineas }
-                    val updatedRutas  = getRutasUseCase().getOrElse  { state.value.rutas  }
-                    state.value = state.value.copy(isLoading = false,
-                        successMessage = "Ruta \"$rutaName\" asignada",
-                        lineas = updatedLineas, rutas = updatedRutas)
-                    if (currentUserId.isNotEmpty())
-                        onLog(currentUserId, adminName, "Asignó ruta \"$rutaName\" a línea $lineaId")
+                    scope.launch {
+                        delay(500)
+                        val updatedLineas = getLineasUseCase().getOrNull() ?: state.value.lineas
+                        val updatedRutas  = getRutasUseCase().getOrNull()  ?: state.value.rutas
+                        state.value = state.value.copy(
+                            isLoading = false,
+                            successMessage = "Ruta asignada",
+                            lineas = updatedLineas, 
+                            rutas = updatedRutas
+                        )
+                        onSuccess?.invoke()
+                    }
                 },
                 onFailure = { state.value = state.value.copy(isLoading = false, error = it.message ?: "Error al asignar ruta") }
             )
@@ -106,7 +137,10 @@ internal class RutasHandler(
 
     fun deleteRuta(
         rutaId: String, rutaName: String, lineaId: String = "",
-        currentUserId: String, adminName: String, state: MutableStateFlow<AdminUiState>, onLog: (String, String, String) -> Unit
+        currentUserId: String, adminName: String, 
+        state: MutableStateFlow<AdminUiState>, 
+        onLog: (String, String, String) -> Unit,
+        onSuccess: (() -> Unit)? = null
     ) {
         scope.launch {
             state.value = state.value.copy(isLoading = true, error = null)
@@ -114,13 +148,18 @@ internal class RutasHandler(
             
             deleteRutaUseCase(rutaId).fold(
                 onSuccess = {
-                    val updatedRutas  = getRutasUseCase().getOrElse  { state.value.rutas  }
-                    val updatedLineas = getLineasUseCase().getOrElse { state.value.lineas }
-                    state.value = state.value.copy(isLoading = false,
-                        successMessage = "Ruta \"$rutaName\" eliminada",
-                        rutas = updatedRutas, lineas = updatedLineas)
-                    if (currentUserId.isNotEmpty())
-                        onLog(currentUserId, adminName, "Eliminó ruta: $rutaName")
+                    scope.launch {
+                        delay(500)
+                        val updatedRutas  = getRutasUseCase().getOrNull()  ?: state.value.rutas
+                        val updatedLineas = getLineasUseCase().getOrNull() ?: state.value.lineas
+                        state.value = state.value.copy(
+                            isLoading = false,
+                            successMessage = "Ruta eliminada",
+                            rutas = updatedRutas, 
+                            lineas = updatedLineas
+                        )
+                        onSuccess?.invoke()
+                    }
                 },
                 onFailure = { state.value = state.value.copy(isLoading = false, error = it.message ?: "Error al eliminar ruta") }
             )

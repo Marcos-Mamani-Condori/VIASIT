@@ -45,6 +45,11 @@ internal class LineasRepository(
     override suspend fun delete(lineaId: String): Result<Unit> =
         client.deleteRecord("lines", lineaId, shared.authToken()).map { }
 
-    override suspend fun updateRuta(lineaId: String, rutaId: String): Result<Unit> =
-        client.updateRecord("lines", lineaId, mapOf("routeId" to rutaId), shared.authToken()).map { }
+    override suspend fun updateRuta(lineaId: String, rutaId: String): Result<Unit> {
+        android.util.Log.d("LLAMADOS", ">>> ASIGNANDO RUTA $rutaId A LINEA $lineaId")
+        return client.updateRecord("lines", lineaId, mapOf("routeId" to rutaId), shared.authToken())
+            .onSuccess { android.util.Log.d("LLAMADOS", ">>> ASIGNACION EXITOSA") }
+            .onFailure { e -> android.util.Log.e("LLAMADOS", ">>> ERROR ASIGNACION: ${e.message}") }
+            .map { }
+    }
 }
