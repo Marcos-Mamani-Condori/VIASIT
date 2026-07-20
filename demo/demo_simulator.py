@@ -21,7 +21,7 @@ import random
 #  CONFIGURACIÓN — EDITA ESTOS VALORES
 # ─────────────────────────────────────────────────────────────────────────────
 
-POCKETBASE_URL = "http://127.0.0.1:8090"
+POCKETBASE_URL = "https://dbvia.onrender.com"
 
 # Segundos entre cada movimiento (2 = tiempo real, 1 = más rápido para demo)
 INTERVALO_SEGUNDOS = 2

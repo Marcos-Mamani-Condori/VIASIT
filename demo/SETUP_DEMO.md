@@ -7,6 +7,8 @@ Abre una terminal en la carpeta del proyecto:
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -r demo/requirements.txt
+
+.\.venv\Scripts\pip install -r demo\requirements.txt
 ```
 
 ---
@@ -36,6 +38,7 @@ ip addr show | grep "inet " | grep -v 127
 
 ```bash
 .venv/bin/python demo/demo_simulator.py
+.\.venv\Scripts\python.exe demo\demo_simulator.py
 ```
 
 No necesitas "activar" el venv ni hacer nada más. Solo ese comando.

@@ -46,13 +46,14 @@ android {
                 localProps.load(input)
                 input.close()
             }
-            val serverIp = localProps.getProperty("SERVER_IP") ?: "192.168.1.19"
+            val pocketbaseUrl = localProps.getProperty("POCKETBASE_URL") 
+                ?: "http://${localProps.getProperty("SERVER_IP") ?: "192.168.1.19"}:8090"
 
-            buildConfigField("String", "POCKETBASE_URL", "\"http://$serverIp:8090\"")
+            buildConfigField("String", "POCKETBASE_URL", "\"$pocketbaseUrl\"")
         }
         create("prod") {
             dimension = "environment"
-            buildConfigField("String", "POCKETBASE_URL", "\"https://viasit.oficial.com\"")
+            buildConfigField("String", "POCKETBASE_URL", "\"https://dbvia.onrender.com\"")
         }
     }
 
